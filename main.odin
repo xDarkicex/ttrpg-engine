@@ -71,14 +71,15 @@ HELP_COMMANDS := []CommandHelp{
 		command = "creature",
 		description = "Manage enemies, villains, and monsters for DM combat tracking.",
 		subcommands = []SubcommandHelp{
-			{"create", "<name> <max_hp> <ac> <attacks> <story_role>", "Create a new creature preset."},
-			{"list", "", "List active creatures."},
+			{"create", "<name> <max_hp> <ac> <attacks> <story_role> <campaign_id>", "Create a new creature preset."},
+			{"list", "", "Display active creatures."},
 			{"get", "<id>", "Display creature details."},
 			{"damage", "<id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]", "Apply damage to a creature."},
 			{"heal", "<id> <amount>", "Heal a creature."},
 			{"set-status", "<id> <status_effects>", "Update active status conditions."},
 			{"set-combat-meta", "<id> <resistances> <vulnerabilities> <immunities>", "Configure creature resistances/vulnerabilities/immunities."},
 			{"set-action", "<id> <action>", "Set creature's last combat action."},
+			{"set-location", "<creature_id> <location_id>", "Link creature to a campaign location."},
 		},
 	},
 	{
@@ -525,7 +526,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get":
 		return route_creature_core(db, sub, args)
-	case "set-status", "set-combat-meta", "set-action", "damage", "heal":
+	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal":
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
@@ -551,6 +552,7 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-status":      return cmd.creature_set_status(db, args)
 	case "set-combat-meta": return cmd.creature_set_combat_meta(db, args)
 	case "set-action":      return cmd.creature_set_action(db, args)
+	case "set-location":    return cmd.creature_set_location(db, args)
 	case "damage":          return cmd.creature_damage(db, args)
 	case "heal":            return cmd.creature_heal(db, args)
 	}

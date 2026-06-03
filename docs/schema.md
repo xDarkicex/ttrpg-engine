@@ -6,7 +6,7 @@ This document details the SQLite database schema (`dnd-agent.db`) used by the D&
 
 ## Database Versioning
 The database schema utilizes SQLite's built-in `PRAGMA user_version` value to manage forward-only schema migrations.
-* **Current Version**: `2` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, story progression, and NPC ability scores).
+* **Current Version**: `3` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, story progression, NPC ability scores, and creature campaign/location linkage).
 
 ---
 
@@ -258,6 +258,8 @@ Tracks combat Presets, enemies, and monsters under the DM's management.
   * `name`: `TEXT NOT NULL UNIQUE`
   * `current_hp`, `max_hp`, `ac`: `INTEGER DEFAULT 10`
   * `status_effects`, `resistances`, `vulnerabilities`, `immunities`, `attacks`, `story_role`, `last_action`: `TEXT`
+  * `campaign_id`: `INTEGER DEFAULT 0` (Campaign Association)
+  * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
 
 ---
 

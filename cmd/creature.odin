@@ -19,27 +19,31 @@ CreatureStats :: struct {
 	attacks: string,
 	story_role: string,
 	last_action: string,
+	campaign_id: int,
+	location_id: int,
+	location_name: string,
 }
 
 creature_create :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 6 {
+	if len(args) < 7 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role>"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role>")
+			fmt.eprintln("Usage: dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>")
 		}
 		return 1
 	}
 
 	name := args[1]
-	max_hp := strconv.atoi(args[2])
-	ac := strconv.atoi(args[3])
+	max_hp, _ := strconv.parse_int(args[2])
+	ac, _ := strconv.parse_int(args[3])
 	attacks := args[4]
 	story_role := args[5]
+	campaign_id, _ := strconv.parse_int(args[6])
 
 	sql := fmt.tprintf(
-		"INSERT INTO creatures (name,current_hp,max_hp,ac,attacks,story_role) VALUES('%s',%d,%d,%d,'%s','%s')",
-		escape_sql(name), max_hp, max_hp, ac, escape_sql(attacks), escape_sql(story_role),
+		"INSERT INTO creatures (name,current_hp,max_hp,ac,attacks,story_role,campaign_id) VALUES('%s',%d,%d,%d,'%s','%s',%d)",
+		escape_sql(name), max_hp, max_hp, ac, escape_sql(attacks), escape_sql(story_role), campaign_id,
 	)
 
 	if lib.db_exec(db, sql) != lib.Error.None {
@@ -52,7 +56,8 @@ creature_create :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"message":"Created creature: %s"}}\n`, name)
+		fmt.printf(`{{"success":true,"message":"Created creature: %s"}}`, name)
+		fmt.println()
 	} else {
 		fmt.println("Created creature:", name)
 	}
@@ -61,7 +66,7 @@ creature_create :: proc(db: ^lib.Db, args: []string) -> int {
 
 creature_list :: proc(db: ^lib.Db) -> int {
 	stmt: ^sqlite.Statement
-	sql_str := "SELECT id, name, current_hp, max_hp, ac FROM creatures ORDER BY id"
+	sql_str := "SELECT id, name, current_hp, max_hp, ac, campaign_id FROM creatures ORDER BY id"
 	sql_c := cstring(raw_data(sql_str))
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
@@ -81,24 +86,26 @@ creature_list :: proc(db: ^lib.Db) -> int {
 		for sqlite.step(stmt) == .Row {
 			if !first do strings.write_byte(&builder, ',')
 			first = false
-			fmt.sbprintf(&builder, `{{"id":{},"name":"{}","current_hp":{},"max_hp":{},"ac":{}}}`,
+			fmt.sbprintf(&builder, `{{"id":{},"name":"{}","current_hp":{},"max_hp":{},"ac":{},"campaign_id":{}}}`,
 				sqlite.column_int(stmt, 0),
 				sqlite.column_text(stmt, 1),
 				sqlite.column_int(stmt, 2),
 				sqlite.column_int(stmt, 3),
 				sqlite.column_int(stmt, 4),
+				sqlite.column_int(stmt, 5),
 			)
 		}
 		strings.write_byte(&builder, ']')
 		fmt.println(strings.to_string(builder))
 	} else {
 		for sqlite.step(stmt) == .Row {
-			fmt.printf("[%d] %s HP:%d/%d AC:%d\n",
+			fmt.printf("[%d] %s HP:%d/%d AC:%d (Camp:%d)\n",
 				sqlite.column_int(stmt, 0),
 				sqlite.column_text(stmt, 1),
 				sqlite.column_int(stmt, 2),
 				sqlite.column_int(stmt, 3),
 				sqlite.column_int(stmt, 4),
+				sqlite.column_int(stmt, 5),
 			)
 		}
 	}
@@ -108,7 +115,7 @@ creature_list :: proc(db: ^lib.Db) -> int {
 fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT id, name, current_hp, max_hp, ac, status_effects, resistances, vulnerabilities, immunities, attacks, story_role, last_action FROM creatures WHERE id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, '') FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -134,6 +141,9 @@ fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: 
 	c.attacks = fmt.tprintf("%s", sqlite.column_text(stmt, 9))
 	c.story_role = fmt.tprintf("%s", sqlite.column_text(stmt, 10))
 	c.last_action = fmt.tprintf("%s", sqlite.column_text(stmt, 11))
+	c.campaign_id = int(sqlite.column_int(stmt, 12))
+	c.location_id = int(sqlite.column_int(stmt, 13))
+	c.location_name = fmt.tprintf("%s", sqlite.column_text(stmt, 14))
 
 	return c, true
 }
@@ -161,11 +171,14 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if db.is_json {
 		fmt.printf(
-			`{{"id":%d,"name":"%s","current_hp":%d,"max_hp":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","attacks":"%s","story_role":"%s","last_action":"%s"}}\n`,
+			`{{"id":%d,"name":"%s","current_hp":%d,"max_hp":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","attacks":"%s","story_role":"%s","last_action":"%s","campaign_id":%d,"location_id":%d,"location_name":"%s"}}`,
 			c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action,
+			c.campaign_id, c.location_id, c.location_name,
 		)
+		fmt.println()
 	} else {
-		fmt.printf("[%d] %s HP:%d/%d AC:%d\n", c.id, c.name, c.current_hp, c.max_hp, c.ac)
+		fmt.printf("[%d] %s HP:%d/%d AC:%d Campaign:%d\n", c.id, c.name, c.current_hp, c.max_hp, c.ac, c.campaign_id)
+		fmt.printf("  Location: %s (ID: %d)\n", len(c.location_name) > 0 ? c.location_name : "None", c.location_id)
 		fmt.printf("  Attacks: %s\n", c.attacks)
 		fmt.printf("  Status: %s\n", len(c.status_effects) > 0 ? c.status_effects : "None")
 		fmt.printf("  Resistances: %s\n", len(c.resistances) > 0 ? c.resistances : "None")
@@ -211,7 +224,8 @@ creature_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"id":%d,"current_hp":%d,"max_hp":%d}}\n`, id, new_hp, c.max_hp)
+		fmt.printf(`{{"success":true,"id":%d,"current_hp":%d,"max_hp":%d}}`, id, new_hp, c.max_hp)
+		fmt.println()
 	} else {
 		fmt.printf("Creature HP now: %d/%d\n", new_hp, c.max_hp)
 	}
@@ -241,7 +255,8 @@ creature_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"message":"Updated status for creature %d"}}\n`, id)
+		fmt.printf(`{{"success":true,"message":"Updated status for creature %d"}}`, id)
+		fmt.println()
 	} else {
 		fmt.println("Status updated for creature", id)
 	}
@@ -273,7 +288,8 @@ creature_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"message":"Updated combat meta for creature %d"}}\n`, id)
+		fmt.printf(`{{"success":true,"message":"Updated combat meta for creature %d"}}`, id)
+		fmt.println()
 	} else {
 		fmt.println("Combat meta updated for creature", id)
 	}
@@ -303,7 +319,8 @@ creature_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"message":"Updated action for creature %d"}}\n`, id)
+		fmt.printf(`{{"success":true,"message":"Updated action for creature %d"}}`, id)
+		fmt.println()
 	} else {
 		fmt.println("Action updated for creature", id)
 	}
@@ -336,7 +353,8 @@ creature_damage :: proc(db: ^lib.Db, args: []string) -> int {
 		attack_roll := strconv.atoi(d.attack_or_save)
 		if attack_roll < c.ac {
 			if db.is_json {
-				fmt.printf(`{{"success":true,"id":%d,"attack_hit":false,"damage_applied":0,"current_hp":%d,"max_hp":%d}}\n`, c.id, c.current_hp, c.max_hp)
+				fmt.printf(`{{"success":true,"id":%d,"attack_hit":false,"damage_applied":0,"current_hp":%d,"max_hp":%d}}`, c.id, c.current_hp, c.max_hp)
+				fmt.println()
 			} else {
 				fmt.printf("Attack roll %d missed creature AC %d. 0 damage applied.\n", attack_roll, c.ac)
 			}
@@ -391,12 +409,50 @@ creature_damage :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if db.is_json {
 		fmt.printf(
-			`{{"success":true,"id":%d,"damage_applied":%d,"current_hp":%d,"max_hp":%d,"attack_hit":%t,"save_success":%t,"save_log":"%s"}}\n`,
+			`{{"success":true,"id":%d,"damage_applied":%d,"current_hp":%d,"max_hp":%d,"attack_hit":%t,"save_success":%t,"save_log":"%s"}}`,
 			c.id, final_dmg, new_hp, c.max_hp, attack_hit, save_success, save_log,
 		)
+		fmt.println()
 	} else {
 		if len(save_log) > 0 do fmt.println(save_log)
 		fmt.printf("Creature HP now: %d/%d (Took %d damage)\n", new_hp, c.max_hp, final_dmg)
+	}
+	return 0
+}
+
+creature_set_location :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-location <creature_id> <location_id>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-location <creature_id> <location_id>")
+		}
+		return 1
+	}
+	creature_id, _ := strconv.parse_int(args[1])
+	loc_id, _ := strconv.parse_int(args[2])
+
+	sql := ""
+	if loc_id > 0 {
+		sql = fmt.tprintf("UPDATE creatures SET location_id=%d WHERE id=%d", loc_id, creature_id)
+	} else {
+		sql = fmt.tprintf("UPDATE creatures SET location_id=NULL WHERE id=%d", creature_id)
+	}
+
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set creature location"}`)
+		} else {
+			fmt.eprintln("Failed to set creature location")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Location set for creature %d","id":%d,"location_id":%d}}`, creature_id, creature_id, loc_id)
+		fmt.println()
+	} else {
+		fmt.printf("Set location for creature %d to %d\n", creature_id, loc_id)
 	}
 	return 0
 }
