@@ -31,10 +31,16 @@ jobs:
           tar -xzf odin.tar.gz
         shell: bash
 
+      - name: Install Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+
       - name: Build
         run: |
           ODIN_DIR=$(ls -d odin-* 2>/dev/null | head -1)
-          ./$ODIN_DIR/odin build . -file -collection:ext=./vendor -out:dnd-agent
+          ./$ODIN_DIR/odin build . -collection:ext=./vendor -out:dnd-agent -define:SQLITE3_SYSTEM_LIB=true
 
       - name: Package
         run: tar -czvf dnd-agent-${{ matrix.target }}.tar.gz dnd-agent
