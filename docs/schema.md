@@ -6,7 +6,7 @@ This document details the SQLite database schema (`dnd-agent.db`) used by the D&
 
 ## Database Versioning
 The database schema utilizes SQLite's built-in `PRAGMA user_version` value to manage forward-only schema migrations.
-* **Current Version**: `1` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, and story progression).
+* **Current Version**: `2` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, story progression, and NPC ability scores).
 
 ---
 
@@ -147,7 +147,7 @@ Tracks character companions, pets, mounts, and familiars linked directly to a ch
 ---
 
 ### 6. `npcs`
-Tracks non-player characters, daily/story roles, notes, currency, active location, and campaign associations.
+Tracks non-player characters, daily/story roles, notes, currency, active location, campaign associations, and ability scores.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
   * `name`: `TEXT NOT NULL`
@@ -165,6 +165,7 @@ Tracks non-player characters, daily/story roles, notes, currency, active locatio
   * `faction_id`: `INTEGER DEFAULT 0`
   * `last_action`: `TEXT DEFAULT ''`
   * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
+  * `str`, `dex`, `con`, `int_`, `wis`, `cha`: `INTEGER DEFAULT 10` (Ability scores)
 
 ---
 

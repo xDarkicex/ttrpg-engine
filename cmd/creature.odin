@@ -367,10 +367,13 @@ creature_damage :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if has_string_in_list(c.immunities, d.damage_type) {
 		final_dmg = 0
-	} else if has_res {
-		final_dmg /= 2
-	} else if has_string_in_list(c.vulnerabilities, d.damage_type) {
-		final_dmg *= 2
+	} else {
+		if has_res {
+			final_dmg /= 2
+		}
+		if has_string_in_list(c.vulnerabilities, d.damage_type) {
+			final_dmg *= 2
+		}
 	}
 
 	new_hp := c.current_hp - final_dmg

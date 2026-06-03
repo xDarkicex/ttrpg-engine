@@ -189,12 +189,17 @@ apply_type_modifiers :: proc(char: CharacterStats, amount: int, damage_type: str
 	log_parts: [4]string
 	log_count := 0
 
+	has_res := has_string_in_list(char.resistances, damage_type)
+	has_vuln := has_string_in_list(char.vulnerabilities, damage_type)
+
 	if has_string_in_list(char.status_effects, "petrified") {
+		has_res = true
 		log_parts[log_count] = "Petrified: Resistant to all damage"
 		log_count += 1
 	}
 
 	if damage_type == "poison" && char.race == "Dwarf" {
+		has_res = true
 		log_parts[log_count] = "Dwarven Resilience: Poison Resistance"
 		log_count += 1
 	}
@@ -203,15 +208,14 @@ apply_type_modifiers :: proc(char: CharacterStats, amount: int, damage_type: str
 		return 0, fmt.tprintf("Immunity to %s: 0 damage.", damage_type)
 	}
 
-	has_res := has_string_in_list(char.resistances, damage_type)
-	has_vuln := has_string_in_list(char.vulnerabilities, damage_type)
-
 	// Resistance and Vulnerability BOTH apply if present (no stacking for same type, but order matters)
 	// Order: apply Resistance first (round down), then Vulnerability (double)
 	if has_res {
 		dmg /= 2
-		log_parts[log_count] = fmt.tprintf("Resistance to %s: halved", damage_type)
-		log_count += 1
+		if has_string_in_list(char.resistances, damage_type) {
+			log_parts[log_count] = fmt.tprintf("Resistance to %s: halved", damage_type)
+			log_count += 1
+		}
 	}
 
 	if has_vuln {
@@ -220,15 +224,7 @@ apply_type_modifiers :: proc(char: CharacterStats, amount: int, damage_type: str
 		log_count += 1
 	}
 
-	// Build log string
-	log_str := ""
-	for i := 0; i < log_count; i += 1 {
-		if i > 0 {
-			log_str += ", "
-		}
-		log_str += log_parts[i]
-	}
-
+	log_str := strings.join(log_parts[:log_count], ", ", context.temp_allocator)
 	return dmg, log_str
 }
 

@@ -29,6 +29,12 @@ NpcStats :: struct {
 	last_action: string,
 	location_id: int,
 	location_name: string,
+	str: int,
+	dex: int,
+	con: int,
+	int_: int,
+	wis: int,
+	cha: int,
 }
 
 npc_create :: proc(db: ^lib.Db, args: []string) -> int {
@@ -118,7 +124,7 @@ npc_list :: proc(db: ^lib.Db) -> int {
 fetch_npc_stats :: proc(db: ^lib.Db, id: int) -> (npc: NpcStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT n.id, n.name, n.description, n.current_hp, n.max_hp, n.dm_notes, n.campaign_id, n.gold, n.silver, n.copper, n.ac, n.status_effects, n.resistances, n.vulnerabilities, n.immunities, n.story_role, n.daily_role, n.backstory, n.faction_id, n.last_action, n.location_id, COALESCE(l.name, '') FROM npcs n LEFT JOIN locations l ON n.location_id = l.id WHERE n.id=%d",
+		"SELECT n.id, n.name, n.description, n.current_hp, n.max_hp, n.dm_notes, n.campaign_id, n.gold, n.silver, n.copper, n.ac, n.status_effects, n.resistances, n.vulnerabilities, n.immunities, n.story_role, n.daily_role, n.backstory, n.faction_id, n.last_action, n.location_id, COALESCE(l.name, ''), n.str, n.dex, n.con, n.int_, n.wis, n.cha FROM npcs n LEFT JOIN locations l ON n.location_id = l.id WHERE n.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -154,6 +160,12 @@ fetch_npc_stats :: proc(db: ^lib.Db, id: int) -> (npc: NpcStats, found: bool) {
 	npc.last_action = fmt.tprintf("%s", sqlite.column_text(stmt, 19))
 	npc.location_id = int(sqlite.column_int(stmt, 20))
 	npc.location_name = fmt.tprintf("%s", sqlite.column_text(stmt, 21))
+	npc.str = int(sqlite.column_int(stmt, 22))
+	npc.dex = int(sqlite.column_int(stmt, 23))
+	npc.con = int(sqlite.column_int(stmt, 24))
+	npc.int_ = int(sqlite.column_int(stmt, 25))
+	npc.wis = int(sqlite.column_int(stmt, 26))
+	npc.cha = int(sqlite.column_int(stmt, 27))
 
 	return npc, true
 }
@@ -181,16 +193,18 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if db.is_json {
 		fmt.printf(
-			`{{"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s"}}\n`,
+			`{{"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}}}}\n`,
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.dm_notes, npc.campaign_id,
 			npc.gold, npc.silver, npc.copper, npc.ac, npc.status_effects, npc.resistances, npc.vulnerabilities, npc.immunities,
 			npc.story_role, npc.daily_role, npc.backstory, npc.faction_id, npc.last_action, npc.location_id, npc.location_name,
+			npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha,
 		)
 	} else {
 		fmt.printf("[%d] %s (%s) HP:%d/%d AC:%d Campaign:%d Faction:%d\n",
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.ac, npc.campaign_id, npc.faction_id,
 		)
 		fmt.printf("  Location: %s (ID: %d)\n", len(npc.location_name) > 0 ? npc.location_name : "None", npc.location_id)
+		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha)
 		fmt.printf("  Money: GP:%d SP:%d CP:%d\n", npc.gold, npc.silver, npc.copper)
 		fmt.printf("  Story Role: %s\n", npc.story_role)
 		fmt.printf("  Daily Role: %s\n", npc.daily_role)
@@ -334,10 +348,13 @@ npc_damage :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if has_string_in_list(npc.immunities, d.damage_type) {
 		final_dmg = 0
-	} else if has_res {
-		final_dmg /= 2
-	} else if has_string_in_list(npc.vulnerabilities, d.damage_type) {
-		final_dmg *= 2
+	} else {
+		if has_res {
+			final_dmg /= 2
+		}
+		if has_string_in_list(npc.vulnerabilities, d.damage_type) {
+			final_dmg *= 2
+		}
 	}
 
 	new_hp := npc.current_hp - final_dmg
@@ -674,6 +691,44 @@ npc_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf(`{{"success":true,"message":"Location set for NPC %d","id":%d,"location_id":%d}}\n`, npc_id, npc_id, loc_id)
 	} else {
 		fmt.printf("Set location for NPC %d to %d\n", npc_id, loc_id)
+	}
+	return 0
+}
+
+npc_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 8 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
+		}
+		return 1
+	}
+	id, _ := strconv.parse_int(args[1])
+	str, _ := strconv.parse_int(args[2])
+	dex, _ := strconv.parse_int(args[3])
+	con, _ := strconv.parse_int(args[4])
+	int_, _ := strconv.parse_int(args[5])
+	wis, _ := strconv.parse_int(args[6])
+	cha, _ := strconv.parse_int(args[7])
+
+	sql := fmt.tprintf(
+		"UPDATE npcs SET str=%d, dex=%d, con=%d, int_=%d, wis=%d, cha=%d WHERE id=%d",
+		str, dex, con, int_, wis, cha, id,
+	)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to update stats"}`)
+		} else {
+			fmt.eprintln("Failed to update stats")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Updated stats for NPC %d"}}\n`, id)
+	} else {
+		fmt.println("Stats updated for NPC", id)
 	}
 	return 0
 }

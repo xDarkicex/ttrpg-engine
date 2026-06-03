@@ -122,6 +122,7 @@ HELP_COMMANDS := []CommandHelp{
 			{"damage", "<id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]", "Apply combat damage to an NPC."},
 			{"heal", "<id> <amount>", "Heal an NPC."},
 			{"set-details", "<id> <ac> <story_role> <daily_role> <backstory>", "Set detailed NPC role and backstory information."},
+			{"set-stats", "<id> <str> <dex> <con> <int> <wis> <cha>", "Set NPC ability scores."},
 			{"set-combat-meta", "<id> <resistances> <vulnerabilities> <immunities>", "Configure NPC combat vulnerabilities/resistances."},
 			{"set-status", "<id> <status_effects>", "Set active status conditions."},
 			{"add-money", "<id> <gold> <silver> <copper>", "Add coins to NPC inventory."},
@@ -595,7 +596,7 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_npc_core(db, sub, args)
-	case "set-details", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location":
+	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location":
 		return route_npc_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -622,6 +623,7 @@ route_npc_core :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	switch sub {
 	case "set-details":      return cmd.npc_set_details(db, args)
+	case "set-stats":        return cmd.npc_set_stats(db, args)
 	case "set-combat-meta":  return cmd.npc_set_combat_meta(db, args)
 	case "set-status":       return cmd.npc_set_status(db, args)
 	case "add-money":        return cmd.npc_add_money(db, args)
