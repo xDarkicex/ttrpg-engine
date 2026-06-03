@@ -411,6 +411,84 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		if set_version_err != Error.None do return set_version_err
 	}
 
+	current_version = get_db_version(db)
+	if current_version < 6 {
+		// Character: combat + spellcasting + initiative + perception + languages + max hit dice
+		db_exec(db, "ALTER TABLE characters ADD COLUMN proficiency_bonus INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN spell_save_dc INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN spell_attack_bonus INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN initiative INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN passive_perception INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN languages TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN max_hit_dice INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN concentrating_on TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN combat INTEGER DEFAULT 0;")
+
+		// NPC: CR + attack + initiative + perception + languages + combat
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN cr INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN attack_bonus INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN damage_dice TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN damage_type TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN initiative INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN passive_perception INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN languages TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN concentrating_on TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN combat INTEGER DEFAULT 0;")
+
+		// Creature: structured attack + CR + initiative + perception + reactions + legendary + combat
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN attack_bonus INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN damage_dice TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN damage_type TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN challenge_rating INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN initiative INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN passive_perception INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN reactions TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN legendary_actions TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN combat INTEGER DEFAULT 0;")
+
+		// Junction tables for proficiencies
+		db_exec(db, `CREATE TABLE IF NOT EXISTS character_weapon_profs (
+			id INTEGER PRIMARY KEY,
+			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+			weapon_name TEXT NOT NULL,
+			UNIQUE(character_id, weapon_name)
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS character_armor_profs (
+			id INTEGER PRIMARY KEY,
+			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+			armor_name TEXT NOT NULL,
+			UNIQUE(character_id, armor_name)
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS character_tool_profs (
+			id INTEGER PRIMARY KEY,
+			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+			tool_name TEXT NOT NULL,
+			UNIQUE(character_id, tool_name)
+		);`)
+
+		// Junction table for NPC skills (creatures don't get skills)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS npc_skills (
+			id INTEGER PRIMARY KEY,
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE CASCADE,
+			skill_name TEXT NOT NULL,
+			modifier INTEGER DEFAULT 0,
+			UNIQUE(npc_id, skill_name)
+		);`)
+
+		// Spell slots (track max + used per level for each character)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS character_spell_slots (
+			id INTEGER PRIMARY KEY,
+			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+			slot_level INTEGER NOT NULL,
+			max_slots INTEGER DEFAULT 0,
+			used_slots INTEGER DEFAULT 0,
+			UNIQUE(character_id, slot_level)
+		);`)
+
+		set_version_err := set_db_version(db, 6)
+		if set_version_err != Error.None do return set_version_err
+	}
+
 	return Error.None
 }
 

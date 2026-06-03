@@ -343,7 +343,7 @@ route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_character_core(db, sub, args)
-	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources":
+	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot":
 		return route_character_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -397,6 +397,17 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 	case "use-resource":    return cmd.character_use_resource(db, args)
 	case "reset-resources": return cmd.character_reset_resources(db, args)
 	case "list-resources":  return cmd.character_list_resources(db, args)
+	case "set-proficiency":         return cmd.character_set_proficiency(db, args)
+	case "set-spellcasting":        return cmd.character_set_spellcasting(db, args)
+	case "set-initiative":          return cmd.character_set_initiative(db, args)
+	case "set-passive-perception":  return cmd.character_set_passive_perception(db, args)
+	case "set-languages":           return cmd.character_set_languages(db, args)
+	case "set-max-hit-dice":        return cmd.character_set_max_hit_dice(db, args)
+	case "set-combat":              return cmd.character_set_combat(db, args)
+	case "set-concentrating":       return cmd.character_set_concentrating(db, args)
+	case "add-prof":                return cmd.character_add_prof(db, args)
+	case "remove-prof":             return cmd.character_remove_prof(db, args)
+	case "set-spell-slot":          return cmd.character_set_spell_slot(db, args)
 	}
 	return 1
 }
@@ -543,7 +554,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get":
 		return route_creature_core(db, sub, args)
-	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities":
+	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat":
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
@@ -578,6 +589,13 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "add-ability":     return cmd.creature_add_ability(db, args)
 	case "remove-ability":  return cmd.creature_remove_ability(db, args)
 	case "list-abilities":  return cmd.creature_list_abilities(db, args)
+	case "set-attack":              return cmd.creature_set_attack(db, args)
+	case "set-cr":                  return cmd.creature_set_cr(db, args)
+	case "set-initiative":          return cmd.creature_set_initiative(db, args)
+	case "set-passive-perception":  return cmd.creature_set_passive_perception(db, args)
+	case "set-reactions":           return cmd.creature_set_reactions(db, args)
+	case "set-legendary":           return cmd.creature_set_legendary(db, args)
+	case "set-combat":              return cmd.creature_set_combat(db, args)
 	}
 	return 1
 }
@@ -621,7 +639,7 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_npc_core(db, sub, args)
-	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities":
+	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities", "set-cr", "set-attack", "set-initiative", "set-combat", "set-languages", "set-passive-perception", "set-concentrating", "set-skill", "remove-skill":
 		return route_npc_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -660,6 +678,15 @@ route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "add-ability":      return cmd.npc_add_ability(db, args)
 	case "remove-ability":   return cmd.npc_remove_ability(db, args)
 	case "list-abilities":   return cmd.npc_list_abilities(db, args)
+	case "set-cr":                   return cmd.npc_set_cr(db, args)
+	case "set-attack":               return cmd.npc_set_attack(db, args)
+	case "set-initiative":           return cmd.npc_set_initiative(db, args)
+	case "set-combat":               return cmd.npc_set_combat(db, args)
+	case "set-languages":            return cmd.npc_set_languages(db, args)
+	case "set-passive-perception":   return cmd.npc_set_passive_perception(db, args)
+	case "set-concentrating":        return cmd.npc_set_concentrating(db, args)
+	case "set-skill":                return cmd.npc_set_skill(db, args)
+	case "remove-skill":             return cmd.npc_remove_skill(db, args)
 	}
 	return 1
 }

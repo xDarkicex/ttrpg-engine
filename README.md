@@ -55,15 +55,16 @@ odin build . -file -collection:ext=./vendor -out:dnd-agent
 4. [CLI Command Reference](#cli-command-reference)
    - [Characters & Multiclassing](#1-characters--multiclassing)
    - [Vitals & Resting Setters](#2-vitals--resting-setters)
-   - [Skills & Proficiencies](#3-skills--proficiencies)
-   - [Class Resources & Spell Slots](#4-class-resources--spell-slots)
-   - [Companions & Pets](#5-companions--pets)
-   - [NPCs & Relationships](#6-npcs--relationships)
-   - [Creatures & Monsters](#7-creatures--monsters)
-   - [Campaigns, Locations, & Story Tracking](#8-campaigns-locations--story-tracking)
-   - [Factions & Standings](#9-factions--standings)
-   - [Spells & Features](#10-spells--features)
-   - [Items & Inventory Management](#11-items--inventory-management)
+   - [Combat Stats & Spellcasting](#3-combat-stats--spellcasting)
+   - [Skills & Proficiencies](#4-skills--proficiencies)
+   - [Class Resources & Spell Slots](#5-class-resources--spell-slots)
+   - [Companions & Pets](#6-companions--pets)
+   - [NPCs & Relationships](#7-npcs--relationships)
+   - [Creatures & Monsters](#8-creatures--monsters)
+   - [Campaigns, Locations, & Story Tracking](#9-campaigns-locations--story-tracking)
+   - [Factions & Standings](#10-factions--standings)
+   - [Spells & Features](#11-spells--features)
+   - [Items & Inventory Management](#12-items--inventory-management)
 5. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
 6. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
@@ -200,7 +201,50 @@ Manage combat conditions, resting metrics, and temporary states.
 
 ---
 
-### 3. Skills & Proficiencies
+### 3. Combat Stats & Spellcasting
+Set D&D 5e combat math: proficiency bonus, initiative, spell save DC, spell attack bonus, passive perception, languages, max hit dice, concentration, and the combat-engaged flag (consumed by an external combat engine).
+
+- **Set Proficiency Bonus**:
+  ```bash
+  ./dnd-agent character set-proficiency <id> <bonus>
+  ```
+- **Set Spellcasting (DC + Spell Attack)**:
+  ```bash
+  ./dnd-agent character set-spellcasting <id> <dc> <attack_bonus>
+  ```
+- **Set Initiative Modifier**:
+  ```bash
+  ./dnd-agent character set-initiative <id> <modifier>
+  ```
+- **Set Passive Perception**:
+  ```bash
+  ./dnd-agent character set-passive-perception <id> <value>
+  ```
+- **Set Languages (Comma-Separated)**:
+  ```bash
+  ./dnd-agent character set-languages <id> <csv>
+  ```
+- **Set Max Hit Dice**:
+  ```bash
+  ./dnd-agent character set-max-hit-dice <id> <amount>
+  ```
+- **Set Concentration Spell (Blank to Clear)**:
+  ```bash
+  ./dnd-agent character set-concentrating <id> <spell_name_or_blank>
+  ```
+- **Toggle Combat State (0 = out, 1 = in combat)**:
+  ```bash
+  ./dnd-agent character set-combat <id> <0|1>
+  ```
+- **Add Weapon / Armor / Tool Proficiency**:
+  ```bash
+  ./dnd-agent character add-prof <id> <weapon|armor|tool> <name>
+  ./dnd-agent character remove-prof <id> <weapon|armor|tool> <name>
+  ```
+
+---
+
+### 4. Skills & Proficiencies
 Manage skill proficiencies. Modifiers are calculated dynamically based on 5e rules.
 
 - **Set Skill Proficiency Level**:
@@ -215,7 +259,7 @@ Manage skill proficiencies. Modifiers are calculated dynamically based on 5e rul
 
 ---
 
-### 4. Class Resources & Spell Slots
+### 5. Class Resources & Spell Slots
 Track custom class resource pools (Rage, Ki, Sorcery Points) and spell slots.
 
 - **Configure Resource Pool**:
@@ -236,10 +280,14 @@ Track custom class resource pools (Rage, Ki, Sorcery Points) and spell slots.
   ./dnd-agent character reset-resources <char_id> [reset_condition]
   ```
   *A `long_rest` automatically triggers reset for both `long_rest` and `short_rest` resource types.*
+- **Set Spell Slot by Level (Track Max and Used)**:
+  ```bash
+  ./dnd-agent character set-spell-slot <id> <slot_level> <max> <used>
+  ```
 
 ---
 
-### 5. Companions & Pets
+### 6. Companions & Pets
 Track character companions, mounts, pets, and familiars.
 
 - **Create Companion**:
@@ -266,7 +314,7 @@ Track character companions, mounts, pets, and familiars.
 
 ---
 
-### 6. NPCs & Relationships
+### 7. NPCs & Relationships
 Manage campaign NPCs, daily roles, location, and interpersonal relationships.
 
 - **Create NPC**:
@@ -300,10 +348,43 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ```bash
   ./dnd-agent npc set-location <npc_id> <location_id>
   ```
+- **Set Challenge Rating**:
+  ```bash
+  ./dnd-agent npc set-cr <id> <cr>
+  ```
+- **Set NPC Attack (Bonus, Damage Dice, Damage Type)**:
+  ```bash
+  ./dnd-agent npc set-attack <id> <bonus> <damage_dice> <damage_type>
+  ```
+- **Set NPC Initiative**:
+  ```bash
+  ./dnd-agent npc set-initiative <id> <modifier>
+  ```
+- **Set NPC Passive Perception**:
+  ```bash
+  ./dnd-agent npc set-passive-perception <id> <value>
+  ```
+- **Set NPC Languages (Comma-Separated)**:
+  ```bash
+  ./dnd-agent npc set-languages <id> <csv>
+  ```
+- **Set NPC Concentration (Blank to Clear)**:
+  ```bash
+  ./dnd-agent npc set-concentrating <id> <spell_name_or_blank>
+  ```
+- **Toggle NPC Combat State (0/1)**:
+  ```bash
+  ./dnd-agent npc set-combat <id> <0|1>
+  ```
+- **Set NPC Skill (Skill + Modifier)**:
+  ```bash
+  ./dnd-agent npc set-skill <npc_id> <skill_name> <modifier>
+  ./dnd-agent npc remove-skill <npc_id> <skill_name>
+  ```
 
 ---
 
-### 7. Creatures & Monsters
+### 8. Creatures & Monsters
 Manage active monsters, beasts, and campaign enemies. Supports ability scores, loot currencies, loot inventory tables, and custom traits.
 
 - **Create Creature Preset**:
@@ -345,6 +426,34 @@ Manage active monsters, beasts, and campaign enemies. Supports ability scores, l
   ./dnd-agent creature set-combat-meta <id> <resistances> <vulnerabilities> <immunities>
   ./dnd-agent creature set-action <id> <action>
   ```
+- **Set Creature Attack (Bonus, Damage Dice, Damage Type)**:
+  ```bash
+  ./dnd-agent creature set-attack <id> <bonus> <damage_dice> <damage_type>
+  ```
+- **Set Creature Challenge Rating**:
+  ```bash
+  ./dnd-agent creature set-cr <id> <cr>
+  ```
+- **Set Creature Initiative**:
+  ```bash
+  ./dnd-agent creature set-initiative <id> <modifier>
+  ```
+- **Set Creature Passive Perception**:
+  ```bash
+  ./dnd-agent creature set-passive-perception <id> <value>
+  ```
+- **Set Creature Reactions (Free-Form Text)**:
+  ```bash
+  ./dnd-agent creature set-reactions <id> <text>
+  ```
+- **Set Creature Legendary Actions (Free-Form Text)**:
+  ```bash
+  ./dnd-agent creature set-legendary <id> <text>
+  ```
+- **Toggle Creature Combat State (0/1)**:
+  ```bash
+  ./dnd-agent creature set-combat <id> <0|1>
+  ```
 - **Link Creature to Campaign Location**:
   ```bash
   ./dnd-agent creature set-location <creature_id> <location_id>
@@ -352,7 +461,7 @@ Manage active monsters, beasts, and campaign enemies. Supports ability scores, l
 
 ---
 
-### 8. Campaigns, Locations, & Story Tracking
+### 9. Campaigns, Locations, & Story Tracking
 Track the session number, current location, logged events, and generate a comprehensive campaign status report.
 
 - **Create Campaign**:
@@ -387,7 +496,7 @@ Track the session number, current location, logged events, and generate a compre
 
 ---
 
-### 9. Factions & Standings
+### 10. Factions & Standings
 Configure factions and standings metrics.
 
 - **Create Faction**:
@@ -409,7 +518,7 @@ Configure factions and standings metrics.
 
 ---
 
-### 10. Spells & Features
+### 11. Spells & Features
 Manage spell libraries, features, and character spellbooks.
 
 - **Spells Library**:
@@ -439,7 +548,7 @@ Manage spell libraries, features, and character spellbooks.
 
 ---
 
-### 11. Items & Inventory Management
+### 12. Items & Inventory Management
 Enforce items configurations and map item ownership, equipment, and attunement status.
 
 - **Create/Modify Item Blueprint**:

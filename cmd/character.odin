@@ -18,6 +18,7 @@ CharacterStats :: struct {
 	death_saves_failure: int,
 	exhaustion: int,
 	hit_dice_expended: int,
+	max_hit_dice: int,
 	str: int,
 	dex: int,
 	con: int,
@@ -56,6 +57,14 @@ CharacterStats :: struct {
 	chapter_id: string,
 	location_id: int,
 	location_name: string,
+	proficiency_bonus: int,
+	spell_save_dc: int,
+	spell_attack_bonus: int,
+	initiative: int,
+	passive_perception: int,
+	languages: string,
+	concentrating_on: string,
+	combat: int,
 }
 
 escape_sql :: proc(s: string) -> string {
@@ -265,7 +274,7 @@ fetch_character_class_summary :: proc(db: ^lib.Db, char_id: int) -> (class_summa
 fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.temp_hp, c.death_saves_success, c.death_saves_failure, c.exhaustion, c.hit_dice_expended, c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.save_prof_str, c.save_prof_dex, c.save_prof_con, c.save_prof_int, c.save_prof_wis, c.save_prof_cha, c.ac, c.race, c.speed, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.inspiration, c.alignment, c.size, c.xp, c.faction_id, c.campaign_id, c.last_action, c.party, c.backstory, c.owner, c.chapter_id, c.location_id, COALESCE(f.name, ''), COALESCE(l.name, '') FROM characters c LEFT JOIN factions f ON c.faction_id = f.id LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.temp_hp, c.death_saves_success, c.death_saves_failure, c.exhaustion, c.hit_dice_expended, c.max_hit_dice, c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.save_prof_str, c.save_prof_dex, c.save_prof_con, c.save_prof_int, c.save_prof_wis, c.save_prof_cha, c.ac, c.race, c.speed, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.inspiration, c.alignment, c.size, c.xp, c.faction_id, c.campaign_id, c.last_action, c.party, c.backstory, c.owner, c.chapter_id, c.location_id, COALESCE(f.name, ''), COALESCE(l.name, ''), c.proficiency_bonus, c.spell_save_dc, c.spell_attack_bonus, c.initiative, c.passive_perception, c.languages, c.concentrating_on, c.combat FROM characters c LEFT JOIN factions f ON c.faction_id = f.id LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -288,44 +297,53 @@ fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, fo
 	char.death_saves_failure = int(sqlite.column_int(stmt, 6))
 	char.exhaustion = int(sqlite.column_int(stmt, 7))
 	char.hit_dice_expended = int(sqlite.column_int(stmt, 8))
-	char.str = int(sqlite.column_int(stmt, 9))
-	char.dex = int(sqlite.column_int(stmt, 10))
-	char.con = int(sqlite.column_int(stmt, 11))
-	char.int_ = int(sqlite.column_int(stmt, 12))
-	char.wis = int(sqlite.column_int(stmt, 13))
-	char.cha = int(sqlite.column_int(stmt, 14))
-	char.save_prof_str = int(sqlite.column_int(stmt, 15))
-	char.save_prof_dex = int(sqlite.column_int(stmt, 16))
-	char.save_prof_con = int(sqlite.column_int(stmt, 17))
-	char.save_prof_int = int(sqlite.column_int(stmt, 18))
-	char.save_prof_wis = int(sqlite.column_int(stmt, 19))
-	char.save_prof_cha = int(sqlite.column_int(stmt, 20))
-	char.ac = int(sqlite.column_int(stmt, 21))
-	char.race = fmt.tprintf("%s", sqlite.column_text(stmt, 22))
-	char.speed = int(sqlite.column_int(stmt, 23))
-	char.status_effects = fmt.tprintf("%s", sqlite.column_text(stmt, 24))
-	char.resistances = fmt.tprintf("%s", sqlite.column_text(stmt, 25))
-	char.vulnerabilities = fmt.tprintf("%s", sqlite.column_text(stmt, 26))
-	char.immunities = fmt.tprintf("%s", sqlite.column_text(stmt, 27))
-	char.gold = int(sqlite.column_int(stmt, 28))
-	char.silver = int(sqlite.column_int(stmt, 29))
-	char.copper = int(sqlite.column_int(stmt, 30))
-	char.platinum = int(sqlite.column_int(stmt, 31))
-	char.electrum = int(sqlite.column_int(stmt, 32))
-	char.inspiration = int(sqlite.column_int(stmt, 33))
-	char.alignment = fmt.tprintf("%s", sqlite.column_text(stmt, 34))
-	char.size = fmt.tprintf("%s", sqlite.column_text(stmt, 35))
-	char.xp = int(sqlite.column_int(stmt, 36))
-	char.faction_id = int(sqlite.column_int(stmt, 37))
-	char.campaign_id = int(sqlite.column_int(stmt, 38))
-	char.last_action = fmt.tprintf("%s", sqlite.column_text(stmt, 39))
-	char.party = fmt.tprintf("%s", sqlite.column_text(stmt, 40))
-	char.backstory = fmt.tprintf("%s", sqlite.column_text(stmt, 41))
-	char.owner = fmt.tprintf("%s", sqlite.column_text(stmt, 42))
-	char.chapter_id = fmt.tprintf("%s", sqlite.column_text(stmt, 43))
-	char.location_id = int(sqlite.column_int(stmt, 44))
-	char.faction_name = fmt.tprintf("%s", sqlite.column_text(stmt, 45))
-	char.location_name = fmt.tprintf("%s", sqlite.column_text(stmt, 46))
+	char.max_hit_dice = int(sqlite.column_int(stmt, 9))
+	char.str = int(sqlite.column_int(stmt, 10))
+	char.dex = int(sqlite.column_int(stmt, 11))
+	char.con = int(sqlite.column_int(stmt, 12))
+	char.int_ = int(sqlite.column_int(stmt, 13))
+	char.wis = int(sqlite.column_int(stmt, 14))
+	char.cha = int(sqlite.column_int(stmt, 15))
+	char.save_prof_str = int(sqlite.column_int(stmt, 16))
+	char.save_prof_dex = int(sqlite.column_int(stmt, 17))
+	char.save_prof_con = int(sqlite.column_int(stmt, 18))
+	char.save_prof_int = int(sqlite.column_int(stmt, 19))
+	char.save_prof_wis = int(sqlite.column_int(stmt, 20))
+	char.save_prof_cha = int(sqlite.column_int(stmt, 21))
+	char.ac = int(sqlite.column_int(stmt, 22))
+	char.race = fmt.tprintf("%s", sqlite.column_text(stmt, 23))
+	char.speed = int(sqlite.column_int(stmt, 24))
+	char.status_effects = fmt.tprintf("%s", sqlite.column_text(stmt, 25))
+	char.resistances = fmt.tprintf("%s", sqlite.column_text(stmt, 26))
+	char.vulnerabilities = fmt.tprintf("%s", sqlite.column_text(stmt, 27))
+	char.immunities = fmt.tprintf("%s", sqlite.column_text(stmt, 28))
+	char.gold = int(sqlite.column_int(stmt, 29))
+	char.silver = int(sqlite.column_int(stmt, 30))
+	char.copper = int(sqlite.column_int(stmt, 31))
+	char.platinum = int(sqlite.column_int(stmt, 32))
+	char.electrum = int(sqlite.column_int(stmt, 33))
+	char.inspiration = int(sqlite.column_int(stmt, 34))
+	char.alignment = fmt.tprintf("%s", sqlite.column_text(stmt, 35))
+	char.size = fmt.tprintf("%s", sqlite.column_text(stmt, 36))
+	char.xp = int(sqlite.column_int(stmt, 37))
+	char.faction_id = int(sqlite.column_int(stmt, 38))
+	char.campaign_id = int(sqlite.column_int(stmt, 39))
+	char.last_action = fmt.tprintf("%s", sqlite.column_text(stmt, 40))
+	char.party = fmt.tprintf("%s", sqlite.column_text(stmt, 41))
+	char.backstory = fmt.tprintf("%s", sqlite.column_text(stmt, 42))
+	char.owner = fmt.tprintf("%s", sqlite.column_text(stmt, 43))
+	char.chapter_id = fmt.tprintf("%s", sqlite.column_text(stmt, 44))
+	char.location_id = int(sqlite.column_int(stmt, 45))
+	char.faction_name = fmt.tprintf("%s", sqlite.column_text(stmt, 46))
+	char.location_name = fmt.tprintf("%s", sqlite.column_text(stmt, 47))
+	char.proficiency_bonus = int(sqlite.column_int(stmt, 48))
+	char.spell_save_dc = int(sqlite.column_int(stmt, 49))
+	char.spell_attack_bonus = int(sqlite.column_int(stmt, 50))
+	char.initiative = int(sqlite.column_int(stmt, 51))
+	char.passive_perception = int(sqlite.column_int(stmt, 52))
+	char.languages = fmt.tprintf("%s", sqlite.column_text(stmt, 53))
+	char.concentrating_on = fmt.tprintf("%s", sqlite.column_text(stmt, 54))
+	char.combat = int(sqlite.column_int(stmt, 55))
 
 	char.class, char.level = fetch_character_class_summary(db, id)
 
@@ -588,16 +606,25 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,"last_action":"%s","party":"%s","backstory":"%s","owner":"%s","chapter_id":"%s","location_id":%d,"location_name":"%s",`,
-			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.death_saves_success, char.death_saves_failure, char.exhaustion, char.hit_dice_expended, char.ac, char.race, char.speed,
+			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"max_hit_dice":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,"last_action":"%s","party":"%s","backstory":"%s","owner":"%s","chapter_id":"%s","location_id":%d,"location_name":"%s","proficiency_bonus":%d,"spell_save_dc":%d,"spell_attack_bonus":%d,"initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,`,
+			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.death_saves_success, char.death_saves_failure, char.exhaustion, char.hit_dice_expended, char.max_hit_dice, char.ac, char.race, char.speed,
 			char.str, char.dex, char.con, char.int_, char.wis, char.cha,
 			char.save_prof_str, char.save_prof_dex, char.save_prof_con, char.save_prof_int, char.save_prof_wis, char.save_prof_cha,
 			char.status_effects, char.resistances, char.vulnerabilities, char.immunities,
 			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, escape_json_string(char.faction_name), char.campaign_id, escape_json_string(char.last_action), escape_json_string(char.party), escape_json_string(char.backstory),
 			escape_json_string(char.owner), escape_json_string(char.chapter_id), char.location_id, escape_json_string(char.location_name),
+			char.proficiency_bonus, char.spell_save_dc, char.spell_attack_bonus, char.initiative, char.passive_perception, escape_json_string(char.languages), escape_json_string(char.concentrating_on), char.combat,
 		)
 		fmt.print(`"skills":`)
 		print_character_skills_json(db, char)
+		fmt.print(`,"weapon_profs":`)
+		print_character_profs_json(db, char.id, "weapon")
+		fmt.print(`,"armor_profs":`)
+		print_character_profs_json(db, char.id, "armor")
+		fmt.print(`,"tool_profs":`)
+		print_character_profs_json(db, char.id, "tool")
+		fmt.print(`,"spell_slots":`)
+		print_character_spell_slots_json(db, char.id)
 		fmt.print(`,"resources":`)
 		print_character_resources_json(db, char.id)
 		fmt.print(`,"inventory":`)
@@ -636,6 +663,14 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n",
 			char.str, char.dex, char.con, char.int_, char.wis, char.cha,
 		)
+		fmt.printf("  Combat Stats: Prof Bonus: +%d | Initiative: +%d | Passive Perception: %d | Spell DC: %d | Spell Atk: +%d | Combat: %s\n",
+			char.proficiency_bonus, char.initiative, char.passive_perception, char.spell_save_dc, char.spell_attack_bonus,
+			char.combat == 1 ? "YES" : "no",
+		)
+		fmt.printf("  Languages: %s\n", len(char.languages) > 0 ? char.languages : "None")
+		if len(char.concentrating_on) > 0 {
+			fmt.printf("  Concentrating On: %s\n", char.concentrating_on)
+		}
 		fmt.printf("  Save Proficiencies: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n",
 			char.save_prof_str, char.save_prof_dex, char.save_prof_con, char.save_prof_int, char.save_prof_wis, char.save_prof_cha,
 		)
@@ -647,6 +682,10 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Backstory: %s\n", len(char.backstory) > 0 ? char.backstory : "None")
 
 		print_character_skills_text(db, char)
+		print_character_profs_text(db, char.id, "weapon", "Weapon Proficiencies")
+		print_character_profs_text(db, char.id, "armor", "Armor Proficiencies")
+		print_character_profs_text(db, char.id, "tool", "Tool Proficiencies")
+		print_character_spell_slots_text(db, char.id)
 		print_character_resources_text(db, char.id)
 		print_character_inventory_text(db, char.id)
 		print_character_abilities_text(db, char.id)
@@ -1458,6 +1497,110 @@ print_character_resources_text :: proc(db: ^lib.Db, char_id: int) {
 	}
 }
 
+print_character_profs_json :: proc(db: ^lib.Db, char_id: int, prof_type: string) {
+	stmt: ^sqlite.Statement
+	table_name := ""
+	switch prof_type {
+	case "weapon": table_name = "character_weapon_profs"
+	case "armor":  table_name = "character_armor_profs"
+	case "tool":   table_name = "character_tool_profs"
+	case: return
+	}
+	sql := fmt.tprintf("SELECT name FROM %s WHERE character_id=%d ORDER BY name", table_name, char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_string(&builder, "[")
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_string(&builder, ",")
+		first = false
+		name := column_text_safe(stmt, 0)
+		fmt.sbprintf(&builder, `{"name":"%s"}`, escape_json_string(name))
+	}
+	strings.write_string(&builder, "]")
+	fmt.print(strings.to_string(builder))
+}
+
+print_character_profs_text :: proc(db: ^lib.Db, char_id: int, prof_type: string, label: string) {
+	stmt: ^sqlite.Statement
+	table_name := ""
+	switch prof_type {
+	case "weapon": table_name = "character_weapon_profs"
+	case "armor":  table_name = "character_armor_profs"
+	case "tool":   table_name = "character_tool_profs"
+	case: return
+	}
+	sql := fmt.tprintf("SELECT name FROM %s WHERE character_id=%d ORDER BY name", table_name, char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	has_rows := false
+	for sqlite.step(stmt) == .Row {
+		if !has_rows {
+			fmt.printf("  %s:\n", label)
+			has_rows = true
+		}
+		name := column_text_safe(stmt, 0)
+		fmt.printf("    - %s\n", name)
+	}
+}
+
+print_character_spell_slots_json :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT slot_level, max_slots, used_slots FROM character_spell_slots WHERE character_id=%d ORDER BY slot_level", char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_string(&builder, "[")
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_string(&builder, ",")
+		first = false
+		slot_lvl := int(sqlite.column_int(stmt, 0))
+		max_v := int(sqlite.column_int(stmt, 1))
+		used_v := int(sqlite.column_int(stmt, 2))
+		fmt.sbprintf(&builder, `{"slot_level":%d,"max_slots":%d,"used_slots":%d}`, slot_lvl, max_v, used_v)
+	}
+	strings.write_string(&builder, "]")
+	fmt.print(strings.to_string(builder))
+}
+
+print_character_spell_slots_text :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT slot_level, max_slots, used_slots FROM character_spell_slots WHERE character_id=%d ORDER BY slot_level", char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	has_rows := false
+	for sqlite.step(stmt) == .Row {
+		if !has_rows {
+			fmt.println("  Spell Slots:")
+			has_rows = true
+		}
+		slot_lvl := int(sqlite.column_int(stmt, 0))
+		max_v := int(sqlite.column_int(stmt, 1))
+		used_v := int(sqlite.column_int(stmt, 2))
+		fmt.printf("    Level %d: %d/%d\n", slot_lvl, max_v - used_v, max_v)
+	}
+}
+
 character_set_temp_hp :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
@@ -2066,6 +2209,381 @@ character_set_owner :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.println("}")
 	} else {
 		fmt.printf("Owner set to '%s' for character %d\n", owner, id)
+	}
+	return 0
+}
+
+character_set_proficiency :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-proficiency <id> <bonus>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-proficiency <id> <bonus>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	bonus := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE characters SET proficiency_bonus=%d WHERE id=%d", bonus, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set proficiency bonus"}`)
+		} else {
+			fmt.eprintln("Failed to set proficiency bonus")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Proficiency bonus set","id":%d,"proficiency_bonus":%d}` + "\n", id, bonus)
+	} else {
+		fmt.printf("Proficiency bonus set to +%d for character %d\n", bonus, id)
+	}
+	return 0
+}
+
+character_set_spellcasting :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-spellcasting <id> <dc> <attack_bonus>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-spellcasting <id> <dc> <attack_bonus>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	dc := strconv.atoi(args[2])
+	atk := strconv.atoi(args[3])
+
+	sql := fmt.tprintf("UPDATE characters SET spell_save_dc=%d, spell_attack_bonus=%d WHERE id=%d", dc, atk, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set spellcasting"}`)
+		} else {
+			fmt.eprintln("Failed to set spellcasting")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Spellcasting set","id":%d,"spell_save_dc":%d,"spell_attack_bonus":%d}` + "\n", id, dc, atk)
+	} else {
+		fmt.printf("Spellcasting set: DC %d, Attack +%d for character %d\n", dc, atk, id)
+	}
+	return 0
+}
+
+character_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-initiative <id> <modifier>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-initiative <id> <modifier>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	mod := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE characters SET initiative=%d WHERE id=%d", mod, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set initiative"}`)
+		} else {
+			fmt.eprintln("Failed to set initiative")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Initiative set","id":%d,"initiative":%d}` + "\n", id, mod)
+	} else {
+		fmt.printf("Initiative set to +%d for character %d\n", mod, id)
+	}
+	return 0
+}
+
+character_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-passive-perception <id> <value>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-passive-perception <id> <value>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	val := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE characters SET passive_perception=%d WHERE id=%d", val, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set passive perception"}`)
+		} else {
+			fmt.eprintln("Failed to set passive perception")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Passive perception set","id":%d,"passive_perception":%d}` + "\n", id, val)
+	} else {
+		fmt.printf("Passive perception set to %d for character %d\n", val, id)
+	}
+	return 0
+}
+
+character_set_languages :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-languages <id> <csv>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-languages <id> <csv>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	langs := args[2]
+
+	sql := fmt.tprintf("UPDATE characters SET languages='%s' WHERE id=%d", escape_sql(langs), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set languages"}`)
+		} else {
+			fmt.eprintln("Failed to set languages")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Languages set","id":%d,"languages":"%s"}` + "\n", id, escape_json_string(langs))
+	} else {
+		fmt.printf("Languages set to '%s' for character %d\n", langs, id)
+	}
+	return 0
+}
+
+character_set_max_hit_dice :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-max-hit-dice <id> <amount>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-max-hit-dice <id> <amount>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	amount := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE characters SET max_hit_dice=%d WHERE id=%d", amount, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set max hit dice"}`)
+		} else {
+			fmt.eprintln("Failed to set max hit dice")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Max hit dice set","id":%d,"max_hit_dice":%d}` + "\n", id, amount)
+	} else {
+		fmt.printf("Max hit dice set to %d for character %d\n", amount, id)
+	}
+	return 0
+}
+
+character_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-combat <id> <0|1>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-combat <id> <0|1>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	state := strconv.atoi(args[2])
+	if state != 0 && state != 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Combat state must be 0 or 1"}`)
+		} else {
+			fmt.eprintln("Combat state must be 0 or 1")
+		}
+		return 1
+	}
+
+	sql := fmt.tprintf("UPDATE characters SET combat=%d WHERE id=%d", state, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set combat state"}`)
+		} else {
+			fmt.eprintln("Failed to set combat state")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Combat state set","id":%d,"combat":%d}` + "\n", id, state)
+	} else {
+		fmt.printf("Combat %s for character %d\n", state == 1 ? "started" : "ended", id)
+	}
+	return 0
+}
+
+character_set_concentrating :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-concentrating <id> <spell_name_or_blank>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-concentrating <id> <spell_name_or_blank>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	spell := args[2]
+
+	sql := fmt.tprintf("UPDATE characters SET concentrating_on='%s' WHERE id=%d", escape_sql(spell), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set concentration"}`)
+		} else {
+			fmt.eprintln("Failed to set concentration")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Concentration set","id":%d,"concentrating_on":"%s"}` + "\n", id, escape_json_string(spell))
+	} else {
+		if len(spell) > 0 {
+			fmt.printf("Character %d now concentrating on: %s\n", id, spell)
+		} else {
+			fmt.printf("Character %d concentration cleared\n", id)
+		}
+	}
+	return 0
+}
+
+character_add_prof :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character add-prof <id> <weapon|armor|tool> <name>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character add-prof <id> <weapon|armor|tool> <name>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	prof_type := args[2]
+	name := args[3]
+
+	table_name := ""
+	switch prof_type {
+	case "weapon": table_name = "character_weapon_profs"
+	case "armor":  table_name = "character_armor_profs"
+	case "tool":   table_name = "character_tool_profs"
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Prof type must be weapon, armor, or tool"}`)
+		} else {
+			fmt.eprintln("Prof type must be weapon, armor, or tool")
+		}
+		return 1
+	}
+
+	sql := fmt.tprintf("INSERT OR REPLACE INTO %s (character_id, name) VALUES(%d, '%s')", table_name, id, escape_sql(name))
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to add proficiency"}`)
+		} else {
+			fmt.eprintln("Failed to add proficiency")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Prof added","id":%d,"type":"%s","name":"%s"}` + "\n", id, prof_type, escape_json_string(name))
+	} else {
+		fmt.printf("Added %s proficiency '%s' to character %d\n", prof_type, name, id)
+	}
+	return 0
+}
+
+character_remove_prof :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character remove-prof <id> <weapon|armor|tool> <name>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character remove-prof <id> <weapon|armor|tool> <name>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	prof_type := args[2]
+	name := args[3]
+
+	table_name := ""
+	switch prof_type {
+	case "weapon": table_name = "character_weapon_profs"
+	case "armor":  table_name = "character_armor_profs"
+	case "tool":   table_name = "character_tool_profs"
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Prof type must be weapon, armor, or tool"}`)
+		} else {
+			fmt.eprintln("Prof type must be weapon, armor, or tool")
+		}
+		return 1
+	}
+
+	sql := fmt.tprintf("DELETE FROM %s WHERE character_id=%d AND name='%s'", table_name, id, escape_sql(name))
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to remove proficiency"}`)
+		} else {
+			fmt.eprintln("Failed to remove proficiency")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Prof removed","id":%d,"type":"%s","name":"%s"}` + "\n", id, prof_type, escape_json_string(name))
+	} else {
+		fmt.printf("Removed %s proficiency '%s' from character %d\n", prof_type, name, id)
+	}
+	return 0
+}
+
+character_set_spell_slot :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 5 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-spell-slot <id> <slot_level> <max> <used>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-spell-slot <id> <slot_level> <max> <used>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	slot_level := strconv.atoi(args[2])
+	max_v := strconv.atoi(args[3])
+	used_v := strconv.atoi(args[4])
+
+	sql := fmt.tprintf("INSERT OR REPLACE INTO character_spell_slots (character_id, slot_level, max_slots, used_slots) VALUES(%d, %d, %d, %d)", id, slot_level, max_v, used_v)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set spell slot"}`)
+		} else {
+			fmt.eprintln("Failed to set spell slot")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Spell slot set","id":%d,"slot_level":%d,"max_slots":%d,"used_slots":%d}` + "\n", id, slot_level, max_v, used_v)
+	} else {
+		fmt.printf("Character %d spell slot level %d: %d/%d\n", id, slot_level, max_v - used_v, max_v)
 	}
 	return 0
 }

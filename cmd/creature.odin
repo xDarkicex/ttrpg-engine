@@ -33,6 +33,15 @@ CreatureStats :: struct {
 	copper: int,
 	platinum: int,
 	electrum: int,
+	attack_bonus: int,
+	damage_dice: string,
+	damage_type: string,
+	challenge_rating: int,
+	initiative: int,
+	passive_perception: int,
+	reactions: string,
+	legendary_actions: string,
+	combat: int,
 }
 
 creature_create :: proc(db: ^lib.Db, args: []string) -> int {
@@ -126,7 +135,7 @@ creature_list :: proc(db: ^lib.Db) -> int {
 fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, ''), c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, ''), c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.attack_bonus, c.damage_dice, c.damage_type, c.challenge_rating, c.initiative, c.passive_perception, c.reactions, c.legendary_actions, c.combat FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -166,6 +175,15 @@ fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: 
 	c.copper = int(sqlite.column_int(stmt, 23))
 	c.platinum = int(sqlite.column_int(stmt, 24))
 	c.electrum = int(sqlite.column_int(stmt, 25))
+	c.attack_bonus = int(sqlite.column_int(stmt, 26))
+	c.damage_dice = fmt.tprintf("%s", sqlite.column_text(stmt, 27))
+	c.damage_type = fmt.tprintf("%s", sqlite.column_text(stmt, 28))
+	c.challenge_rating = int(sqlite.column_int(stmt, 29))
+	c.initiative = int(sqlite.column_int(stmt, 30))
+	c.passive_perception = int(sqlite.column_int(stmt, 31))
+	c.reactions = fmt.tprintf("%s", sqlite.column_text(stmt, 32))
+	c.legendary_actions = fmt.tprintf("%s", sqlite.column_text(stmt, 33))
+	c.combat = int(sqlite.column_int(stmt, 34))
 
 	return c, true
 }
@@ -199,8 +217,10 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 			c.campaign_id, c.location_id, c.location_name,
 		)
 		fmt.printf(
-			`"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,`,
+			`"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","challenge_rating":%d,"initiative":%d,"passive_perception":%d,"reactions":"%s","legendary_actions":"%s","combat":%d,`,
 			c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum,
+			c.attack_bonus, escape_json_string(c.damage_dice), escape_json_string(c.damage_type),
+			c.challenge_rating, c.initiative, c.passive_perception, escape_json_string(c.reactions), escape_json_string(c.legendary_actions), c.combat,
 		)
 		fmt.print(`"abilities":`)
 		print_creature_abilities_json(db, c.id)
@@ -211,6 +231,16 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("[%d] %s HP:%d/%d AC:%d Campaign:%d\n", c.id, c.name, c.current_hp, c.max_hp, c.ac, c.campaign_id)
 		fmt.printf("  Location: %s (ID: %d)\n", len(c.location_name) > 0 ? c.location_name : "None", c.location_id)
 		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", c.str, c.dex, c.con, c.int_, c.wis, c.cha)
+		fmt.printf("  Combat: CR:%d | Initiative: +%d | Passive Perception: %d | Attack: +%d (%s %s) | Combat: %s\n",
+			c.challenge_rating, c.initiative, c.passive_perception, c.attack_bonus, c.damage_dice, c.damage_type,
+			c.combat == 1 ? "YES" : "no",
+		)
+		if len(c.reactions) > 0 {
+			fmt.printf("  Reactions: %s\n", c.reactions)
+		}
+		if len(c.legendary_actions) > 0 {
+			fmt.printf("  Legendary Actions: %s\n", c.legendary_actions)
+		}
 		fmt.printf("  Loot Money: GP:%d SP:%d CP:%d PP:%d EP:%d\n", c.gold, c.silver, c.copper, c.platinum, c.electrum)
 		fmt.printf("  Attacks: %s\n", c.attacks)
 		fmt.printf("  Status: %s\n", len(c.status_effects) > 0 ? c.status_effects : "None")
@@ -799,6 +829,226 @@ creature_list_abilities :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.println()
 	} else {
 		print_creature_abilities_text(db, creature_id)
+	}
+	return 0
+}
+
+creature_set_attack :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 5 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-attack <id> <bonus> <damage_dice> <damage_type>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-attack <id> <bonus> <damage_dice> <damage_type>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	bonus := strconv.atoi(args[2])
+	dice := args[3]
+	dtype := args[4]
+
+	sql := fmt.tprintf("UPDATE creatures SET attack_bonus=%d, damage_dice='%s', damage_type='%s' WHERE id=%d", bonus, escape_sql(dice), escape_sql(dtype), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set attack"}`)
+		} else {
+			fmt.eprintln("Failed to set attack")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Attack set","id":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s"}` + "\n", id, bonus, escape_json_string(dice), escape_json_string(dtype))
+	} else {
+		fmt.printf("Creature %d attack: +%d, %s %s\n", id, bonus, dice, dtype)
+	}
+	return 0
+}
+
+creature_set_cr :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-cr <id> <cr>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-cr <id> <cr>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	cr := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE creatures SET challenge_rating=%d WHERE id=%d", cr, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set CR"}`)
+		} else {
+			fmt.eprintln("Failed to set CR")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"CR set","id":%d,"challenge_rating":%d}` + "\n", id, cr)
+	} else {
+		fmt.printf("CR set to %d for creature %d\n", cr, id)
+	}
+	return 0
+}
+
+creature_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-initiative <id> <modifier>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-initiative <id> <modifier>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	mod := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE creatures SET initiative=%d WHERE id=%d", mod, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set initiative"}`)
+		} else {
+			fmt.eprintln("Failed to set initiative")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Initiative set","id":%d,"initiative":%d}` + "\n", id, mod)
+	} else {
+		fmt.printf("Initiative set to +%d for creature %d\n", mod, id)
+	}
+	return 0
+}
+
+creature_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-passive-perception <id> <value>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-passive-perception <id> <value>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	val := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("UPDATE creatures SET passive_perception=%d WHERE id=%d", val, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set passive perception"}`)
+		} else {
+			fmt.eprintln("Failed to set passive perception")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Passive perception set","id":%d,"passive_perception":%d}` + "\n", id, val)
+	} else {
+		fmt.printf("Passive perception set to %d for creature %d\n", val, id)
+	}
+	return 0
+}
+
+creature_set_reactions :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-reactions <id> <text>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-reactions <id> <text>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	text := args[2]
+
+	sql := fmt.tprintf("UPDATE creatures SET reactions='%s' WHERE id=%d", escape_sql(text), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set reactions"}`)
+		} else {
+			fmt.eprintln("Failed to set reactions")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Reactions set","id":%d,"reactions":"%s"}` + "\n", id, escape_json_string(text))
+	} else {
+		fmt.printf("Reactions set for creature %d\n", id)
+	}
+	return 0
+}
+
+creature_set_legendary :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-legendary <id> <text>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-legendary <id> <text>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	text := args[2]
+
+	sql := fmt.tprintf("UPDATE creatures SET legendary_actions='%s' WHERE id=%d", escape_sql(text), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set legendary actions"}`)
+		} else {
+			fmt.eprintln("Failed to set legendary actions")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Legendary actions set","id":%d,"legendary_actions":"%s"}` + "\n", id, escape_json_string(text))
+	} else {
+		fmt.printf("Legendary actions set for creature %d\n", id)
+	}
+	return 0
+}
+
+creature_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-combat <id> <0|1>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature set-combat <id> <0|1>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	state := strconv.atoi(args[2])
+	if state != 0 && state != 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Combat state must be 0 or 1"}`)
+		} else {
+			fmt.eprintln("Combat state must be 0 or 1")
+		}
+		return 1
+	}
+
+	sql := fmt.tprintf("UPDATE creatures SET combat=%d WHERE id=%d", state, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set combat state"}`)
+		} else {
+			fmt.eprintln("Failed to set combat state")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Combat state set","id":%d,"combat":%d}` + "\n", id, state)
+	} else {
+		fmt.printf("Combat %s for creature %d\n", state == 1 ? "started" : "ended", id)
 	}
 	return 0
 }

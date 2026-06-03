@@ -6,7 +6,9 @@ This document details the SQLite database schema (`dnd-agent.db`) used by the D&
 
 ## Database Versioning
 The database schema utilizes SQLite's built-in `PRAGMA user_version` value to manage forward-only schema migrations.
-* **Current Version**: `4` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, story progression, NPC ability scores, creature campaign/location linkage, creature stats/loot, and NPC/creature abilities).
+* **Current Version**: `6` (v1 base tables; v2 NPC ability scores; v3 creature campaign/location linkage; v4 creature stats/loot, NPC/creature feature junction tables; v5 character location/chapter; v6 combat stats, spellcasting, initiative, perception, languages, concentration, prof/skill/spell-slot junction tables).
+
+The canonical source of truth for the schema lives in `lib/db.odin` — `db_init_schema` constructs each version's `CREATE TABLE` / `ALTER TABLE` statements. This document is a reference derived from that code.
 
 ---
 
@@ -17,12 +19,17 @@ erDiagram
     characters ||--o{ character_classes : "has"
     characters ||--o{ character_skills : "has"
     characters ||--o{ character_resources : "has"
+    characters ||--o{ character_weapon_profs : "proficient_in"
+    characters ||--o{ character_armor_profs : "proficient_in"
+    characters ||--o{ character_tool_profs : "proficient_in"
+    characters ||--o{ character_spell_slots : "has"
     characters ||--o{ companions : "has"
     characters ||--o{ character_spells : "knows"
     characters ||--o{ character_features : "has"
     characters ||--o{ faction_standings : "has"
     characters ||--o{ inventory : "holds"
     npcs ||--o{ inventory : "holds"
+    npcs ||--o{ npc_skills : "has"
     creatures ||--o{ inventory : "holds"
     items ||--o{ inventory : "contained_in"
     spells ||--o{ character_spells : "known_by"
@@ -33,6 +40,8 @@ erDiagram
     features ||--o{ creature_features : "possessed_by"
     campaigns ||--o{ locations : "contains"
     locations ||--o{ npcs : "contains"
+    locations ||--o{ characters : "contains"
+    locations ||--o{ creatures : "contains"
     factions ||--o{ faction_standings : "reputation"
     npcs ||--o{ npc_relationships : "relationship"
     campaigns ||--o{ story_actions : "logs"
@@ -91,6 +100,17 @@ Tracks player characters, base stats, current saving throw proficiencies, combat
   * `campaign_id`: `INTEGER DEFAULT 0`
   * `last_action`: `TEXT DEFAULT ''` (Record of last combat action)
   * `party`: `TEXT DEFAULT ''` (Name of assigned party group)
+  * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL) — *v5*
+  * `chapter_id`: `TEXT DEFAULT ''` — *v5*
+  * `proficiency_bonus`: `INTEGER DEFAULT 0` (Stored bonus, e.g. +2 at levels 1-4) — *v6*
+  * `spell_save_dc`: `INTEGER DEFAULT 0` (Spell save DC for casters) — *v6*
+  * `spell_attack_bonus`: `INTEGER DEFAULT 0` (Spell attack roll modifier) — *v6*
+  * `initiative`: `INTEGER DEFAULT 0` (Initiative roll modifier) — *v6*
+  * `passive_perception`: `INTEGER DEFAULT 10` (10 + WIS mod + perception prof) — *v6*
+  * `languages`: `TEXT DEFAULT ''` (Comma-separated languages) — *v6*
+  * `concentrating_on`: `TEXT DEFAULT ''` (Active concentration spell name; blank = none) — *v6*
+  * `combat`: `INTEGER DEFAULT 0` (Combat state flag: 0/1) — *v6*
+  * `max_hit_dice`: `INTEGER DEFAULT 0` (Total hit dice pool; expended tracked separately) — *v6*
 
 ---
 
@@ -132,7 +152,31 @@ Tracks custom resource pools and spell slots that recharge on resting.
 
 ---
 
-### 5. `companions`
+### 5. `character_weapon_profs`, `character_armor_profs`, `character_tool_profs`
+Junction tables for character proficiencies beyond the basic save/skill system. Each tracks a flat list of named proficiencies per character.
+* **Columns** (identical across all three tables):
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `character_id`: `INTEGER` (REFERENCES `characters(id)` ON DELETE CASCADE)
+  * `weapon_name` / `armor_name` / `tool_name`: `TEXT NOT NULL`
+* **Constraints**: `UNIQUE(character_id, <name>)`
+* **Added in**: v6
+
+---
+
+### 6. `character_spell_slots`
+Tracks max/used spell slots per level for each character. Pre-cast-table use; per-slot-level breakdown separate from `character_resources`.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `character_id`: `INTEGER` (REFERENCES `characters(id)` ON DELETE CASCADE)
+  * `slot_level`: `INTEGER NOT NULL` (Spell level 1-9)
+  * `max_slots`: `INTEGER DEFAULT 0`
+  * `used_slots`: `INTEGER DEFAULT 0`
+* **Constraints**: `UNIQUE(character_id, slot_level)`
+* **Added in**: v6
+
+---
+
+### 7. `companions`
 Tracks character companions, pets, mounts, and familiars linked directly to a character.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -150,7 +194,7 @@ Tracks character companions, pets, mounts, and familiars linked directly to a ch
 
 ---
 
-### 6. `npcs`
+### 8. `npcs`
 Tracks non-player characters, daily/story roles, notes, currency, active location, campaign associations, and ability scores.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -170,10 +214,31 @@ Tracks non-player characters, daily/story roles, notes, currency, active locatio
   * `last_action`: `TEXT DEFAULT ''`
   * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
   * `str`, `dex`, `con`, `int_`, `wis`, `cha`: `INTEGER DEFAULT 10` (Ability scores)
+  * `cr`: `INTEGER DEFAULT 0` (Challenge Rating; NPCs do not use class/level) — *v6*
+  * `attack_bonus`: `INTEGER DEFAULT 0` (Attack roll modifier) — *v6*
+  * `damage_dice`: `TEXT DEFAULT ''` (e.g. `2d6+4`) — *v6*
+  * `damage_type`: `TEXT DEFAULT ''` (e.g. `slashing`) — *v6*
+  * `initiative`: `INTEGER DEFAULT 0` (Initiative roll modifier) — *v6*
+  * `passive_perception`: `INTEGER DEFAULT 10` — *v6*
+  * `languages`: `TEXT DEFAULT ''` (Comma-separated) — *v6*
+  * `concentrating_on`: `TEXT DEFAULT ''` (Active concentration spell; blank = none) — *v6*
+  * `combat`: `INTEGER DEFAULT 0` (Combat state flag: 0/1) — *v6*
 
 ---
 
-### 7. `npc_relationships`
+### 9. `npc_skills`
+NPCs use a flat skill+modifier store (no per-skill proficiency levels like characters). Each row is one skill for one NPC.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
+  * `skill_name`: `TEXT NOT NULL` (e.g. `persuasion`, `insight`)
+  * `modifier`: `INTEGER DEFAULT 0`
+* **Constraints**: `UNIQUE(npc_id, skill_name)`
+* **Added in**: v6
+
+---
+
+### 10. `npc_relationships`
 Enforces reputation/friendship matrices between two specific NPCs.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -186,7 +251,7 @@ Enforces reputation/friendship matrices between two specific NPCs.
 
 ---
 
-### 8. `factions` & `faction_standings`
+### 11. `factions` & `faction_standings`
 Defines factions and maps character standing reputations within those factions.
 * **`factions` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -202,7 +267,7 @@ Defines factions and maps character standing reputations within those factions.
 
 ---
 
-### 9. `items` & `inventory`
+### 12. `items` & `inventory`
 Stores item blueprints and records entities' holdings.
 * **`items` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -225,7 +290,7 @@ Stores item blueprints and records entities' holdings.
 
 ---
 
-### 10. `spells` & `character_spells`
+### 13. `spells` & `character_spells`
 Stores spell configurations and tracks spellbook links.
 * **`spells` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -241,7 +306,7 @@ Stores spell configurations and tracks spellbook links.
 
 ---
 
-### 11. `features` & `character_features`
+### 14. `features` & `character_features`
 Manages special abilities (feats, racial features, class features) and links them to characters.
 * **`features` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -255,7 +320,7 @@ Manages special abilities (feats, racial features, class features) and links the
 
 ---
 
-### 12. `creatures`
+### 15. `creatures`
 Tracks combat Presets, enemies, and monsters under the DM's management.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -266,10 +331,19 @@ Tracks combat Presets, enemies, and monsters under the DM's management.
   * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
   * `str`, `dex`, `con`, `int_`, `wis`, `cha`: `INTEGER DEFAULT 10` (Ability scores)
   * `gold`, `silver`, `copper`, `platinum`, `electrum`: `INTEGER DEFAULT 0` (Loot currency)
+  * `attack_bonus`: `INTEGER DEFAULT 0` (Attack roll modifier) — *v6*
+  * `damage_dice`: `TEXT DEFAULT ''` (e.g. `1d6+2`) — *v6*
+  * `damage_type`: `TEXT DEFAULT ''` (e.g. `slashing`) — *v6*
+  * `challenge_rating`: `INTEGER DEFAULT 0` (CR; 0 = non-threatening) — *v6*
+  * `initiative`: `INTEGER DEFAULT 0` (Initiative roll modifier) — *v6*
+  * `passive_perception`: `INTEGER DEFAULT 10` — *v6*
+  * `reactions`: `TEXT DEFAULT ''` (Free-form description of reaction abilities) — *v6*
+  * `legendary_actions`: `TEXT DEFAULT ''` (Free-form description of legendary actions for boss-tier creatures) — *v6*
+  * `combat`: `INTEGER DEFAULT 0` (Combat state flag: 0/1) — *v6*
 
 ---
 
-### 13. `class_specialties`
+### 16. `class_specialties`
 Configures level-unlocked class specialty information.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -282,7 +356,7 @@ Configures level-unlocked class specialty information.
 
 ---
 
-### 14. `campaigns` & `locations`
+### 17. `campaigns` & `locations`
 * **`campaigns` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
   * `name`: `TEXT NOT NULL`
@@ -300,7 +374,7 @@ Configures level-unlocked class specialty information.
 
 ---
 
-### 15. `story_actions` & `story_action_actors`
+### 18. `story_actions` & `story_action_actors`
 Tracks chronological logs of campaign plot steps and maps actors involved.
 * **`story_actions` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -321,7 +395,7 @@ Tracks chronological logs of campaign plot steps and maps actors involved.
 
 ---
 
-### 16. `npc_features` & `creature_features`
+### 19. `npc_features` & `creature_features`
 Junction tables linking NPCs and creatures to abilities/features.
 * **`npc_features` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
