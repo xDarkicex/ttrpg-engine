@@ -175,6 +175,10 @@ Manage combat conditions, resting metrics, and temporary states.
   ```bash
   ./dnd-agent character set-inspiration <id> <0/1>
   ```
+- **Set Backstory**:
+  ```bash
+  ./dnd-agent character set-backstory <id> <backstory>
+  ```
 - **Configure Ability Scores & Base Details**:
   ```bash
   ./dnd-agent character set-stats <id> <str> <dex> <con> <int> <wis> <cha>

@@ -47,6 +47,7 @@ HELP_COMMANDS := []CommandHelp{
 			{"set-exhaustion", "<id> <level>", "Set exhaustion level (0 to 6)."},
 			{"set-hit-dice", "<id> <expended>", "Set expended hit dice count."},
 			{"set-inspiration", "<id> <0/1>", "Set DM-awarded inspiration (0 or 1)."},
+			{"set-backstory", "<id> <backstory>", "Set character backstory."},
 			{"set-skill", "<char_id> <skill_name> <proficiency_level>", "Set skill level (0=none, 1=prof, 2=expertise)."},
 			{"list-skills", "<char_id>", "List character skills and proficiencies."},
 			{"set-resource", "<char_id> <resource_name> <max> <current> [reset_condition]", "Configure a class resource or spell slot pool."},
@@ -339,7 +340,7 @@ route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_character_core(db, sub, args)
-	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources":
+	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-backstory", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources":
 		return route_character_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -383,6 +384,7 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 	case "set-exhaustion":  return cmd.character_set_exhaustion(db, args)
 	case "set-hit-dice":    return cmd.character_set_hit_dice(db, args)
 	case "set-inspiration": return cmd.character_set_inspiration(db, args)
+	case "set-backstory":   return cmd.character_set_backstory(db, args)
 	case "set-skill":       return cmd.character_set_skill(db, args)
 	case "list-skills":     return cmd.character_list_skills(db, args)
 	case "set-resource":    return cmd.character_set_resource(db, args)

@@ -50,6 +50,7 @@ CharacterStats :: struct {
 	campaign_id: int,
 	last_action: string,
 	party: string,
+	backstory: string,
 }
 
 escape_sql :: proc(s: string) -> string {
@@ -259,7 +260,7 @@ fetch_character_class_summary :: proc(db: ^lib.Db, char_id: int) -> (class_summa
 fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT id, name, current_hp, max_hp, temp_hp, death_saves_success, death_saves_failure, exhaustion, hit_dice_expended, str, dex, con, int_, wis, cha, save_prof_str, save_prof_dex, save_prof_con, save_prof_int, save_prof_wis, save_prof_cha, ac, race, speed, status_effects, resistances, vulnerabilities, immunities, gold, silver, copper, platinum, electrum, inspiration, alignment, size, xp, faction_id, campaign_id, last_action, party FROM characters WHERE id=%d",
+		"SELECT id, name, current_hp, max_hp, temp_hp, death_saves_success, death_saves_failure, exhaustion, hit_dice_expended, str, dex, con, int_, wis, cha, save_prof_str, save_prof_dex, save_prof_con, save_prof_int, save_prof_wis, save_prof_cha, ac, race, speed, status_effects, resistances, vulnerabilities, immunities, gold, silver, copper, platinum, electrum, inspiration, alignment, size, xp, faction_id, campaign_id, last_action, party, backstory FROM characters WHERE id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -314,6 +315,7 @@ fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, fo
 	char.campaign_id = int(sqlite.column_int(stmt, 38))
 	char.last_action = fmt.tprintf("%s", sqlite.column_text(stmt, 39))
 	char.party = fmt.tprintf("%s", sqlite.column_text(stmt, 40))
+	char.backstory = fmt.tprintf("%s", sqlite.column_text(stmt, 41))
 
 	char.class, char.level = fetch_character_class_summary(db, id)
 
@@ -461,12 +463,12 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"campaign_id":%d,"last_action":"%s","party":"%s",`,
+			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"campaign_id":%d,"last_action":"%s","party":"%s","backstory":"%s",`,
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.death_saves_success, char.death_saves_failure, char.exhaustion, char.hit_dice_expended, char.ac, char.race, char.speed,
 			char.str, char.dex, char.con, char.int_, char.wis, char.cha,
 			char.save_prof_str, char.save_prof_dex, char.save_prof_con, char.save_prof_int, char.save_prof_wis, char.save_prof_cha,
 			char.status_effects, char.resistances, char.vulnerabilities, char.immunities,
-			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, char.campaign_id, char.last_action, char.party,
+			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, char.campaign_id, char.last_action, char.party, escape_json_string(char.backstory),
 		)
 		fmt.print(`"skills":`)
 		print_character_skills_json(db, char)
@@ -492,6 +494,7 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Resistances: %s\n", len(char.resistances) > 0 ? char.resistances : "None")
 		fmt.printf("  Last Action: %s\n", len(char.last_action) > 0 ? char.last_action : "None")
 		fmt.printf("  Party: %s\n", len(char.party) > 0 ? char.party : "None")
+		fmt.printf("  Backstory: %s\n", len(char.backstory) > 0 ? char.backstory : "None")
 
 		print_character_skills_text(db, char)
 		print_character_resources_text(db, char.id)
@@ -1783,6 +1786,38 @@ character_list_resources :: proc(db: ^lib.Db, args: []string) -> int {
 				fmt.println("  No resources configured.")
 			}
 		}
+	}
+	return 0
+}
+
+character_set_backstory :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-backstory <id> <backstory>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-backstory <id> <backstory>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	backstory := args[2]
+
+	sql := fmt.tprintf("UPDATE characters SET backstory='%s' WHERE id=%d", escape_sql(backstory), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set backstory"}`)
+		} else {
+			fmt.eprintln("Failed to set backstory")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.print("{")
+		fmt.printf(`"success":true,"message":"Backstory set","id":%d,"backstory":"%s"`, id, escape_json_string(backstory))
+		fmt.println("}")
+	} else {
+		fmt.printf("Backstory set for character %d\n", id)
 	}
 	return 0
 }
