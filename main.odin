@@ -1,0 +1,731 @@
+package main
+
+import "core:fmt"
+import "core:os"
+import "core:strings"
+import lib "lib"
+import cmd "cmd"
+
+SubcommandHelp :: struct {
+	name: string,
+	args: string,
+	description: string,
+}
+
+CommandHelp :: struct {
+	command: string,
+	description: string,
+	subcommands: []SubcommandHelp,
+}
+
+HELP_COMMANDS := []CommandHelp{
+	{
+		command = "character",
+		description = "Manage player characters and their stats.",
+		subcommands = []SubcommandHelp{
+			{"create", "<name> <class> <level> <max_hp>", "Create a new character sheet."},
+			{"list", "", "List all characters."},
+			{"get", "<id>", "Show detailed character sheet (stats, saves, equipment, party, last action)."},
+			{"delete", "<id>", "Delete a character."},
+			{"damage", "<id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]", "Apply damage, taking resistances, vulnerabilities, and saves into account."},
+			{"heal", "<id> <amount>", "Restore hit points (up to max HP)."},
+			{"set-stats", "<id> <str> <dex> <con> <int> <wis> <cha>", "Configure base ability scores."},
+			{"set-save-prof", "<id> <str> <dex> <con> <int> <wis> <cha>", "Set saving throw proficiencies (0 or 1)."},
+			{"set-details", "<id> <ac> <race> <speed> [alignment] [size]", "Set AC, race, movement speed, alignment, and size."},
+			{"set-combat-meta", "<id> <resistances> <vulnerabilities> <immunities>", "Configure damage modifications (comma-separated)."},
+			{"set-status", "<id> <status_effects>", "Set active status conditions (comma-separated)."},
+			{"set-action", "<id> <action>", "Record the last action performed by this character."},
+			{"set-party", "<id> <party_name>", "Assign character to a party."},
+			{"set-campaign", "<id> <campaign_id>", "Assign character to a campaign."},
+			{"add-class", "<char_id> <class_name> <level>", "Add or update levels in a class (supports multiclassing)."},
+			{"list-classes", "<char_id>", "List classes and levels for a character."},
+			{"add-xp", "<id> <amount>", "Reward experience points (XP)."},
+			{"add-money", "<id> <gold> <silver> <copper> [platinum] [electrum]", "Add coins to character inventory."},
+			{"remove-money", "<id> <gold> <silver> <copper> [platinum] [electrum]", "Deduct coins from character inventory."},
+			{"set-temp-hp", "<id> <amount>", "Set temporary hit points."},
+			{"set-death-saves", "<id> <successes> <failures>", "Set death saves (0 to 3)."},
+			{"set-exhaustion", "<id> <level>", "Set exhaustion level (0 to 6)."},
+			{"set-hit-dice", "<id> <expended>", "Set expended hit dice count."},
+			{"set-inspiration", "<id> <0/1>", "Set DM-awarded inspiration (0 or 1)."},
+			{"set-skill", "<char_id> <skill_name> <proficiency_level>", "Set skill level (0=none, 1=prof, 2=expertise)."},
+			{"list-skills", "<char_id>", "List character skills and proficiencies."},
+			{"set-resource", "<char_id> <resource_name> <max> <current> [reset_condition]", "Configure a class resource or spell slot pool."},
+			{"use-resource", "<char_id> <resource_name> [amount]", "Use a specific resource amount (default 1)."},
+			{"reset-resources", "<char_id> [reset_condition]", "Reset character resources (e.g. on long_rest)."},
+			{"list-resources", "<char_id>", "List resources for a character."},
+		},
+	},
+	{
+		command = "companion",
+		description = "Manage character companions, familiars, and pets.",
+		subcommands = []SubcommandHelp{
+			{"create", "<char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>", "Spawn a companion linked to a character."},
+			{"set-stats", "<id> <str> <dex> <con> <int> <wis> <cha>", "Set companion ability scores."},
+			{"list", "[char_id]", "List all companions (optionally filtered by owner character ID)."},
+			{"get", "<id>", "Display companion sheet."},
+			{"damage", "<id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]", "Apply damage with saving throws and resistances."},
+			{"heal", "<id> <amount>", "Heal a companion."},
+		},
+	},
+	{
+		command = "creature",
+		description = "Manage enemies, villains, and monsters for DM combat tracking.",
+		subcommands = []SubcommandHelp{
+			{"create", "<name> <max_hp> <ac> <attacks> <story_role>", "Create a new creature preset."},
+			{"list", "", "List active creatures."},
+			{"get", "<id>", "Display creature details."},
+			{"damage", "<id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]", "Apply damage to a creature."},
+			{"heal", "<id> <amount>", "Heal a creature."},
+			{"set-status", "<id> <status_effects>", "Update active status conditions."},
+			{"set-combat-meta", "<id> <resistances> <vulnerabilities> <immunities>", "Configure creature resistances/vulnerabilities/immunities."},
+			{"set-action", "<id> <action>", "Set creature's last combat action."},
+		},
+	},
+	{
+		command = "faction",
+		description = "Manage campaign factions and character standings.",
+		subcommands = []SubcommandHelp{
+			{"create", "<name> <description>", "Define a new faction."},
+			{"list", "", "List all active factions."},
+			{"join", "<char|npc> <id> <faction_id>", "Make a character or NPC join a faction."},
+			{"set-standing", "<character_id> <faction_id> <standing> [notes]", "Set standing reputation (integer) and notes with a faction."},
+			{"get-standing", "<character_id> [faction_id]", "Retrieve faction standings for a character (all or filtered by faction ID)."},
+		},
+	},
+	{
+		command = "item",
+		description = "Upsert and list campaign items.",
+		subcommands = []SubcommandHelp{
+			{"upsert", "<name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]", "Create or update an item definition."},
+			{"list", "", "List all items in the campaign database."},
+		},
+	},
+	{
+		command = "inventory",
+		description = "Manage character, NPC, and creature inventories.",
+		subcommands = []SubcommandHelp{
+			{"add", "<char|npc|creature> <id> <item_id> <qty>", "Add items to inventory."},
+			{"remove", "<char|npc|creature> <id> <item_id> <qty>", "Deduct items from inventory."},
+			{"get", "<char|npc|creature> <id>", "Display entity inventory list."},
+			{"equip", "<char|npc|creature> <id> <item_id> <0/1>", "Toggle item equipment status."},
+			{"attune", "<char|npc|creature> <id> <item_id> <0/1>", "Toggle item attunement status."},
+		},
+	},
+	{
+		command = "npc",
+		description = "Manage story NPCs, Daily/Story Roles, and Relationships.",
+		subcommands = []SubcommandHelp{
+			{"create", "<name> <desc> <max_hp> <camp_id>", "Create a new NPC."},
+			{"list", "", "List all NPCs."},
+			{"get", "<id>", "Display NPC details including active location and relationships."},
+			{"delete", "<id>", "Delete an NPC."},
+			{"damage", "<id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]", "Apply combat damage to an NPC."},
+			{"heal", "<id> <amount>", "Heal an NPC."},
+			{"set-details", "<id> <ac> <story_role> <daily_role> <backstory>", "Set detailed NPC role and backstory information."},
+			{"set-combat-meta", "<id> <resistances> <vulnerabilities> <immunities>", "Configure NPC combat vulnerabilities/resistances."},
+			{"set-status", "<id> <status_effects>", "Set active status conditions."},
+			{"add-money", "<id> <gold> <silver> <copper>", "Add coins to NPC inventory."},
+			{"remove-money", "<id> <gold> <silver> <copper>", "Deduct coins from NPC inventory."},
+			{"set-action", "<id> <action>", "Record last action by NPC."},
+			{"set-relationship", "<npc_id_1> <npc_id_2> <friendship_level> [notes]", "Define relationship standing (-10 to +10) between two NPCs."},
+			{"list-relationships", "<npc_id>", "List relationships of a specific NPC."},
+			{"set-location", "<npc_id> <location_id>", "Link NPC to a campaign location."},
+		},
+	},
+	{
+		command = "spell",
+		description = "Manage spell definitions and character spellbooks.",
+		subcommands = []SubcommandHelp{
+			{"upsert", "<name> <level> <school> <casting_time> <range> <components> <duration> <description>", "Define or update a spell."},
+			{"list", "", "List all spells in the spell library."},
+			{"learn", "<char_id> <spell_id> [prepared (0/1)]", "Make a character learn a spell."},
+			{"prepare", "<char_id> <spell_id> <0/1>", "Prepare or unprepare a spell for a character."},
+			{"list-character", "<char_id>", "List spellbook and preparation state for a character."},
+		},
+	},
+	{
+		command = "feature",
+		description = "Configure race/class features and character trait benefits.",
+		subcommands = []SubcommandHelp{
+			{"upsert", "<name> <source> <description>", "Create/modify a special feature."},
+			{"list", "", "List all features in database."},
+			{"add-to-char", "<char_id> <feature_id>", "Grant a feature to a character."},
+			{"list-character", "<char_id>", "List features possessed by a character."},
+		},
+	},
+	{
+		command = "class-specialty",
+		description = "Define class specialties and special level-gained abilities.",
+		subcommands = []SubcommandHelp{
+			{"upsert", "<class_name> <level> <ability_name> <description>", "Define level-specific class specialty."},
+			{"list", "[class_name]", "List all specialties (optionally filtered by class)."},
+		},
+	},
+	{
+		command = "campaign",
+		description = "Track sessions, chapters, current active locations, story progress, and DM campaign logs.",
+		subcommands = []SubcommandHelp{
+			{"create", "<name>", "Start a new campaign."},
+			{"list", "", "List campaigns."},
+			{"get", "<id>", "Display brief campaign stats."},
+			{"delete", "<id>", "Delete a campaign."},
+			{"set-chapter", "<id> <chapter>", "Configure campaign's current chapter."},
+			{"next-session", "<id>", "Advance campaign session number by 1."},
+			{"add-location", "<campaign_id> <name> <description> [chapter]", "Add location to campaign."},
+			{"set-location", "<campaign_id> <location_id>", "Set campaign's current active location."},
+			{"list-locations", "<campaign_id>", "List all locations in campaign."},
+			{"add-action", "<campaign_id> <description> [location_id] [faction_id] [standing_impact] [story_progression] [status]", "Log a plot/story action impacting factions/story state."},
+			{"link-actor", "<action_id> <char|npc> <actor_id>", "Link character/NPC to a logged campaign action."},
+			{"list-actions", "<campaign_id> [location_id]", "List story actions in campaign."},
+			{"get-story-state", "<campaign_id>", "Show detailed chronological story log, plot standing, and active location data."},
+		},
+	},
+	{
+		command = "init",
+		description = "Create and initialize database schema.",
+		subcommands = nil,
+	},
+	{
+		command = "help",
+		description = "Print commands list and usage.",
+		subcommands = nil,
+	},
+}
+
+main :: proc() {
+	is_json := false
+	filtered_args := make([dynamic]string, context.temp_allocator)
+	for arg in os.args {
+		if arg == "--json" || arg == "-j" {
+			is_json = true
+		} else {
+			append(&filtered_args, arg)
+		}
+	}
+
+	if len(filtered_args) < 2 {
+		print_usage(is_json)
+		os.exit(1)
+	}
+
+	db, db_err := lib.db_open("dnd-agent.db")
+	if db_err != lib.Error.None {
+		fmt.eprintln("Failed to open DB:", db_err)
+		os.exit(1)
+	}
+	db.is_json = is_json
+
+	if lib.db_init_schema(&db) != lib.Error.None {
+		fmt.eprintln("Failed to init schema")
+		lib.db_close(&db)
+		os.exit(1)
+	}
+
+	ec := route_command(&db, filtered_args[1], filtered_args[2:])
+	lib.db_close(&db)
+	os.exit(ec)
+}
+
+route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
+	switch cmd_name {
+	case "character", "item", "inventory", "npc", "spell", "feature", "companion", "creature", "faction", "class-specialty":
+		return route_game_command(db, cmd_name, args)
+	case "campaign", "init", "help":
+		return route_meta_command(db, cmd_name, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown command"}`)
+		} else {
+			fmt.eprintln("Unknown command:", cmd_name)
+			print_usage()
+		}
+		return 1
+	}
+}
+
+route_game_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
+	switch cmd_name {
+	case "character", "npc", "companion", "creature":
+		return route_actor_command(db, cmd_name, args)
+	case "item", "inventory", "spell", "feature", "faction", "class-specialty":
+		return route_asset_command(db, cmd_name, args)
+	}
+	return 1
+}
+
+route_actor_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
+	switch cmd_name {
+	case "character": return route_character(db, args)
+	case "npc":       return route_npc(db, args)
+	case "companion": return route_companion(db, args)
+	case "creature":  return route_creature(db, args)
+	}
+	return 1
+}
+
+route_asset_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
+	switch cmd_name {
+	case "item":      return route_item(db, args)
+	case "inventory": return route_inventory(db, args)
+	case "spell":     return route_spell(db, args)
+	case "feature":   return route_feature(db, args)
+	case "faction":   return route_faction(db, args)
+	case "class-specialty": return route_specialty(db, args)
+	}
+	return 1
+}
+
+route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent class-specialty <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent class-specialty <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "upsert": return cmd.specialty_upsert(db, args)
+	case "list":   return cmd.specialty_list(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown class-specialty subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown class-specialty subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_meta_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
+	switch cmd_name {
+	case "campaign": return route_campaign(db, args)
+	case "init":
+		if db.is_json {
+			fmt.println(`{"success":true,"message":"dnd-agent initialized"}`)
+		} else {
+			fmt.println("dnd-agent initialized.")
+		}
+		return 0
+	case "help":
+		print_usage(db.is_json)
+		return 0
+	}
+	return 1
+}
+
+route_character :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "create", "list", "get", "delete", "damage", "heal":
+		return route_character_core(db, sub, args)
+	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources":
+		return route_character_setters(db, sub, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown character subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown character subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_character_core :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "create": return cmd.character_create(db, args)
+	case "list":   return cmd.character_list(db)
+	case "get":    return cmd.character_get(db, args)
+	case "delete": return cmd.character_delete(db, args)
+	case "damage": return cmd.character_damage(db, args)
+	case "heal":   return cmd.character_heal(db, args)
+	}
+	return 1
+}
+
+route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "set-stats":       return cmd.character_set_stats(db, args)
+	case "set-save-prof":   return cmd.character_set_save_prof(db, args)
+	case "set-details":     return cmd.character_set_details(db, args)
+	case "set-combat-meta": return cmd.character_set_combat_meta(db, args)
+	case "set-status":      return cmd.character_set_status(db, args)
+	case "set-action":      return cmd.character_set_action(db, args)
+	case "add-class":       return cmd.character_add_class(db, args)
+	case "list-classes":    return cmd.character_list_classes(db, args)
+	case "add-xp":          return cmd.character_add_xp(db, args)
+	case "add-money":       return cmd.character_add_money(db, args)
+	case "remove-money":    return cmd.character_remove_money(db, args)
+	case "set-party":       return cmd.character_set_party(db, args)
+	case "set-campaign":    return cmd.character_set_campaign(db, args)
+	case "set-temp-hp":     return cmd.character_set_temp_hp(db, args)
+	case "set-death-saves": return cmd.character_set_death_saves(db, args)
+	case "set-exhaustion":  return cmd.character_set_exhaustion(db, args)
+	case "set-hit-dice":    return cmd.character_set_hit_dice(db, args)
+	case "set-inspiration": return cmd.character_set_inspiration(db, args)
+	case "set-skill":       return cmd.character_set_skill(db, args)
+	case "list-skills":     return cmd.character_list_skills(db, args)
+	case "set-resource":    return cmd.character_set_resource(db, args)
+	case "use-resource":    return cmd.character_use_resource(db, args)
+	case "reset-resources": return cmd.character_reset_resources(db, args)
+	case "list-resources":  return cmd.character_list_resources(db, args)
+	}
+	return 1
+}
+
+route_item :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent item <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent item <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "upsert":
+		return cmd.item_upsert(db, args)
+	case "list":
+		return cmd.item_list(db)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown item subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown item subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_inventory :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent inventory <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "add":    return cmd.inventory_add(db, args)
+	case "get":    return cmd.inventory_get(db, args)
+	case "remove": return cmd.inventory_remove(db, args)
+	case "equip":  return cmd.inventory_equip(db, args)
+	case "attune": return cmd.inventory_attune(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown inventory subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown inventory subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_spell :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent spell <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "upsert":         return cmd.spell_upsert(db, args)
+	case "list":           return cmd.spell_list(db)
+	case "learn":          return cmd.spell_learn(db, args)
+	case "prepare":        return cmd.spell_prepare(db, args)
+	case "list-character": return cmd.spell_list_character(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown spell subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown spell subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_feature :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent feature <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent feature <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "upsert":         return cmd.feature_upsert(db, args)
+	case "list":           return cmd.feature_list(db)
+	case "add-to-char":    return cmd.feature_add_to_char(db, args)
+	case "list-character": return cmd.feature_list_character(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown feature subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown feature subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_companion :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent companion <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "create":    return cmd.companion_create(db, args)
+	case "list":      return cmd.companion_list(db, args)
+	case "get":       return cmd.companion_get(db, args)
+	case "set-stats": return cmd.companion_set_stats(db, args)
+	case "damage":    return cmd.companion_damage(db, args)
+	case "heal":      return cmd.companion_heal(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown companion subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown companion subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_creature :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent creature <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "create", "list", "get":
+		return route_creature_core(db, sub, args)
+	case "set-status", "set-combat-meta", "set-action", "damage", "heal":
+		return route_creature_ops(db, sub, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown creature subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown creature subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_creature_core :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "create": return cmd.creature_create(db, args)
+	case "list":   return cmd.creature_list(db)
+	case "get":    return cmd.creature_get(db, args)
+	}
+	return 1
+}
+
+route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "set-status":      return cmd.creature_set_status(db, args)
+	case "set-combat-meta": return cmd.creature_set_combat_meta(db, args)
+	case "set-action":      return cmd.creature_set_action(db, args)
+	case "damage":          return cmd.creature_damage(db, args)
+	case "heal":            return cmd.creature_heal(db, args)
+	}
+	return 1
+}
+
+route_faction :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent faction <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent faction <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "create": return cmd.faction_create(db, args)
+	case "list":   return cmd.faction_list(db)
+	case "join":   return cmd.faction_join(db, args)
+	case "set-standing": return cmd.faction_set_standing(db, args)
+	case "get-standing": return cmd.faction_get_standing(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown faction subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown faction subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_npc :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent npc <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "create", "list", "get", "delete", "damage", "heal":
+		return route_npc_core(db, sub, args)
+	case "set-details", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location":
+		return route_npc_setters(db, sub, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown npc subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown npc subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_npc_core :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "create": return cmd.npc_create(db, args)
+	case "list":   return cmd.npc_list(db)
+	case "get":    return cmd.npc_get(db, args)
+	case "delete": return cmd.npc_delete(db, args)
+	case "damage": return cmd.npc_damage(db, args)
+	case "heal":   return cmd.npc_heal(db, args)
+	}
+	return 1
+}
+
+route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "set-details":      return cmd.npc_set_details(db, args)
+	case "set-combat-meta":  return cmd.npc_set_combat_meta(db, args)
+	case "set-status":       return cmd.npc_set_status(db, args)
+	case "add-money":        return cmd.npc_add_money(db, args)
+	case "remove-money":     return cmd.npc_remove_money(db, args)
+	case "set-action":       return cmd.npc_set_action(db, args)
+	case "set-relationship":  return cmd.npc_set_relationship(db, args)
+	case "list-relationships": return cmd.npc_list_relationships(db, args)
+	case "set-location":     return cmd.npc_set_location(db, args)
+	}
+	return 1
+}
+
+route_campaign :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent campaign <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "create", "list", "get", "delete", "set-chapter", "next-session":
+		return route_campaign_core(db, sub, args)
+	case "add-location", "set-location", "list-locations", "add-action", "link-actor", "list-actions", "get-story-state":
+		return route_campaign_story(db, sub, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown campaign subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown campaign subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_campaign_core :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "create":       return cmd.campaign_create(db, args)
+	case "list":         return cmd.campaign_list(db)
+	case "get":          return cmd.campaign_get(db, args)
+	case "delete":       return cmd.campaign_delete(db, args)
+	case "set-chapter":  return cmd.campaign_set_chapter(db, args)
+	case "next-session": return cmd.campaign_next_session(db, args)
+	}
+	return 1
+}
+
+route_campaign_story :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
+	switch sub {
+	case "add-location":    return cmd.campaign_add_location(db, args)
+	case "set-location":    return cmd.campaign_set_location(db, args)
+	case "list-locations":  return cmd.campaign_list_locations(db, args)
+	case "add-action":      return cmd.campaign_add_action(db, args)
+	case "link-actor":      return cmd.campaign_link_actor(db, args)
+	case "list-actions":    return cmd.campaign_list_actions(db, args)
+	case "get-story-state": return cmd.campaign_get_story_state(db, args)
+	}
+	return 1
+}
+
+print_usage_json :: proc() {
+	fmt.println("[")
+	for cmd, idx in HELP_COMMANDS {
+		if idx > 0 do fmt.println(",")
+		fmt.printf("  {{\"command\":\"%s\",\"description\":\"%s\"", cmd.command, cmd.description)
+		if cmd.subcommands != nil {
+			fmt.println(",")
+			fmt.println("   \"subcommands\":[")
+			for sub, sub_idx in cmd.subcommands {
+				if sub_idx > 0 do fmt.println(",")
+				fmt.printf("     {{\"name\":\"%s\",\"args\":\"%s\",\"description\":\"%s\"}}", sub.name, sub.args, sub.description)
+			}
+			fmt.println()
+			fmt.printf("   ]")
+		}
+		fmt.printf("}}")
+	}
+	fmt.println()
+	fmt.println("]")
+}
+
+print_usage_text :: proc() {
+	fmt.println("dnd-agent - D&D campaign management CLI")
+	fmt.println()
+	fmt.println("Usage: dnd-agent <command> [args] [--json]")
+	fmt.println()
+	fmt.println("Commands:")
+	for cmd in HELP_COMMANDS {
+		fmt.printf("  %-16s %s\n", cmd.command, cmd.description)
+		if cmd.subcommands != nil {
+			for sub in cmd.subcommands {
+				fmt.printf("    %-14s %-40s %s\n", sub.name, sub.args, sub.description)
+			}
+			fmt.println()
+		}
+	}
+}
+
+print_usage :: proc(is_json: bool = false) {
+	if is_json {
+		print_usage_json()
+	} else {
+		print_usage_text()
+	}
+}

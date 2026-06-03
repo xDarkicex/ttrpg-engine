@@ -1,0 +1,19 @@
+# Build artifacts
+dnd-agent
+*.exe
+
+# Database
+*.db
+
+# OS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Vendor (use -collection flag instead)
+vendor/**/*.a
+vendor/**/*.dylib
+vendor/**/*.so
