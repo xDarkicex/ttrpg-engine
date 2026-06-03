@@ -59,10 +59,11 @@ odin build . -file -collection:ext=./vendor -out:dnd-agent
    - [Class Resources & Spell Slots](#4-class-resources--spell-slots)
    - [Companions & Pets](#5-companions--pets)
    - [NPCs & Relationships](#6-npcs--relationships)
-   - [Campaigns, Locations, & Story Tracking](#7-campaigns-locations--story-tracking)
-   - [Factions & Standings](#8-factions--standings)
-   - [Spells & Features](#9-spells--features)
-   - [Items & Inventory Management](#10-items--inventory-management)
+   - [Creatures & Monsters](#7-creatures--monsters)
+   - [Campaigns, Locations, & Story Tracking](#8-campaigns-locations--story-tracking)
+   - [Factions & Standings](#9-factions--standings)
+   - [Spells & Features](#10-spells--features)
+   - [Items & Inventory Management](#11-items--inventory-management)
 5. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
 6. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
@@ -260,6 +261,16 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ```bash
   ./dnd-agent npc set-details <id> <ac> <story_role> <daily_role> <backstory>
   ```
+- **Configure NPC Ability Scores**:
+  ```bash
+  ./dnd-agent npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>
+  ```
+- **Manage NPC Abilities/Traits**:
+  ```bash
+  ./dnd-agent npc add-ability <npc_id> <feature_id>
+  ./dnd-agent npc remove-ability <npc_id> <feature_id>
+  ./dnd-agent npc list-abilities <npc_id>
+  ```
 - **Manage Relationship (Friendship metrics)**:
   ```bash
   ./dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [notes]
@@ -276,7 +287,56 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
 
 ---
 
-### 7. Campaigns, Locations, & Story Tracking
+### 7. Creatures & Monsters
+Manage active monsters, beasts, and campaign enemies. Supports ability scores, loot currencies, loot inventory tables, and custom traits.
+
+- **Create Creature Preset**:
+  ```bash
+  ./dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>
+  ```
+- **List Active Creatures**:
+  ```bash
+  ./dnd-agent creature list
+  ```
+- **Get Creature Details**:
+  ```bash
+  ./dnd-agent creature get <id> [--json]
+  ```
+  *Displays HP, AC, linked campaign/location, full ability scores, loot currency, abilities, and inventory items.*
+- **Apply Combat Damage/Healing**:
+  ```bash
+  ./dnd-agent creature damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]
+  ./dnd-agent creature heal <id> <amount>
+  ```
+- **Configure Creature Ability Scores**:
+  ```bash
+  ./dnd-agent creature set-stats <id> <str> <dex> <con> <int> <wis> <cha>
+  ```
+- **Manage Loot Currency**:
+  ```bash
+  ./dnd-agent creature add-money <id> <gp> <sp> <cp> [pp] [ep]
+  ./dnd-agent creature remove-money <id> <gp> <sp> <cp> [pp] [ep]
+  ```
+- **Manage Creature Abilities/Traits**:
+  ```bash
+  ./dnd-agent creature add-ability <creature_id> <feature_id>
+  ./dnd-agent creature remove-ability <creature_id> <feature_id>
+  ./dnd-agent creature list-abilities <creature_id>
+  ```
+- **Update Active Status/Combat Conditions**:
+  ```bash
+  ./dnd-agent creature set-status <id> <status_effects>
+  ./dnd-agent creature set-combat-meta <id> <resistances> <vulnerabilities> <immunities>
+  ./dnd-agent creature set-action <id> <action>
+  ```
+- **Link Creature to Campaign Location**:
+  ```bash
+  ./dnd-agent creature set-location <creature_id> <location_id>
+  ```
+
+---
+
+### 8. Campaigns, Locations, & Story Tracking
 Track the session number, current location, logged events, and generate a comprehensive campaign status report.
 
 - **Create Campaign**:
@@ -311,7 +371,7 @@ Track the session number, current location, logged events, and generate a compre
 
 ---
 
-### 8. Factions & Standings
+### 9. Factions & Standings
 Configure factions and standings metrics.
 
 - **Create Faction**:
@@ -333,7 +393,7 @@ Configure factions and standings metrics.
 
 ---
 
-### 9. Spells & Features
+### 10. Spells & Features
 Manage spell libraries, features, and character spellbooks.
 
 - **Spells Library**:
@@ -351,13 +411,19 @@ Manage spell libraries, features, and character spellbooks.
   ```bash
   ./dnd-agent feature upsert <name> <source> <description>
   ./dnd-agent feature list
+  ```
+- **Grant Feature to Character**:
+  ```bash
   ./dnd-agent feature add-to-char <char_id> <feature_id>
+  ```
+- **List Character Features**:
+  ```bash
   ./dnd-agent feature list-character <char_id>
   ```
 
 ---
 
-### 10. Items & Inventory Management
+### 11. Items & Inventory Management
 Enforce items configurations and map item ownership, equipment, and attunement status.
 
 - **Create/Modify Item Blueprint**:
