@@ -47,6 +47,7 @@ CharacterStats :: struct {
 	size: string,
 	xp: int,
 	faction_id: int,
+	faction_name: string,
 	campaign_id: int,
 	last_action: string,
 	party: string,
@@ -260,7 +261,7 @@ fetch_character_class_summary :: proc(db: ^lib.Db, char_id: int) -> (class_summa
 fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT id, name, current_hp, max_hp, temp_hp, death_saves_success, death_saves_failure, exhaustion, hit_dice_expended, str, dex, con, int_, wis, cha, save_prof_str, save_prof_dex, save_prof_con, save_prof_int, save_prof_wis, save_prof_cha, ac, race, speed, status_effects, resistances, vulnerabilities, immunities, gold, silver, copper, platinum, electrum, inspiration, alignment, size, xp, faction_id, campaign_id, last_action, party, backstory FROM characters WHERE id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.temp_hp, c.death_saves_success, c.death_saves_failure, c.exhaustion, c.hit_dice_expended, c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.save_prof_str, c.save_prof_dex, c.save_prof_con, c.save_prof_int, c.save_prof_wis, c.save_prof_cha, c.ac, c.race, c.speed, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.inspiration, c.alignment, c.size, c.xp, c.faction_id, c.campaign_id, c.last_action, c.party, c.backstory, COALESCE(f.name, '') FROM characters c LEFT JOIN factions f ON c.faction_id = f.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -316,6 +317,7 @@ fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, fo
 	char.last_action = fmt.tprintf("%s", sqlite.column_text(stmt, 39))
 	char.party = fmt.tprintf("%s", sqlite.column_text(stmt, 40))
 	char.backstory = fmt.tprintf("%s", sqlite.column_text(stmt, 41))
+	char.faction_name = fmt.tprintf("%s", sqlite.column_text(stmt, 42))
 
 	char.class, char.level = fetch_character_class_summary(db, id)
 
@@ -439,6 +441,121 @@ character_list :: proc(db: ^lib.Db) -> int {
 	return 0
 }
 
+print_character_inventory_json :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.character_id=%d", char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		builder := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&builder, '[')
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do strings.write_byte(&builder, ',')
+			first = false
+			name := fmt.tprintf("%s", sqlite.column_text(stmt, 0))
+			qty := int(sqlite.column_int(stmt, 1))
+			eq := int(sqlite.column_int(stmt, 2))
+			at := int(sqlite.column_int(stmt, 3))
+			item_id := int(sqlite.column_int(stmt, 4))
+			fmt.sbprintf(&builder, `{{"name":"{}","quantity":{},"equipped":{},"attuned":{},"item_id":{}}}`,
+				escape_json_string(name), qty, eq, at, item_id,
+			)
+		}
+		strings.write_byte(&builder, ']')
+		fmt.print(strings.to_string(builder))
+	} else {
+		fmt.print("[]")
+	}
+}
+
+print_character_inventory_text :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.character_id=%d", char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		fmt.println("  Inventory:")
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			name := sqlite.column_text(stmt, 0)
+			qty := sqlite.column_int(stmt, 1)
+			eq := sqlite.column_int(stmt, 2)
+			at := sqlite.column_int(stmt, 3)
+			item_id := sqlite.column_int(stmt, 4)
+
+			status := ""
+			if eq == 1 && at == 1 {
+				status = " [E] [A]"
+			} else if eq == 1 {
+				status = " [E]"
+			} else if at == 1 {
+				status = " [A]"
+			}
+			fmt.printf("    %s x%d%s (ID: %d)\n", name, qty, status, item_id)
+		}
+		if !has_any do fmt.println("    Empty")
+	}
+}
+
+print_character_abilities_json :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT f.id, f.name, f.source, f.description FROM character_features cf JOIN features f ON cf.feature_id = f.id WHERE cf.character_id = %d ORDER BY f.source, f.name",
+		char_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		builder := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&builder, '[')
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do strings.write_byte(&builder, ',')
+			first = false
+			id := sqlite.column_int(stmt, 0)
+			name := fmt.tprintf("%s", sqlite.column_text(stmt, 1))
+			source := fmt.tprintf("%s", sqlite.column_text(stmt, 2))
+			desc := fmt.tprintf("%s", sqlite.column_text(stmt, 3))
+			fmt.sbprintf(&builder, `{{"id":{},"name":"{}","source":"{}","description":"{}"}}`,
+				id,
+				escape_json_string(name),
+				escape_json_string(source),
+				escape_json_string(desc),
+			)
+		}
+		strings.write_byte(&builder, ']')
+		fmt.print(strings.to_string(builder))
+	} else {
+		fmt.print("[]")
+	}
+}
+
+print_character_abilities_text :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT f.id, f.name, f.source, f.description FROM character_features cf JOIN features f ON cf.feature_id = f.id WHERE cf.character_id = %d ORDER BY f.source, f.name",
+		char_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		fmt.println("  Abilities & Racial Traits:")
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			fmt.printf("    [%d] %s (%s) - %s\n",
+				sqlite.column_int(stmt, 0),
+				sqlite.column_text(stmt, 1),
+				sqlite.column_text(stmt, 2),
+				sqlite.column_text(stmt, 3),
+			)
+		}
+		if !has_any do fmt.println("    None")
+	}
+}
+
 character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
@@ -463,22 +580,34 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"campaign_id":%d,"last_action":"%s","party":"%s","backstory":"%s",`,
+			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,"last_action":"%s","party":"%s","backstory":"%s",`,
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.death_saves_success, char.death_saves_failure, char.exhaustion, char.hit_dice_expended, char.ac, char.race, char.speed,
 			char.str, char.dex, char.con, char.int_, char.wis, char.cha,
 			char.save_prof_str, char.save_prof_dex, char.save_prof_con, char.save_prof_int, char.save_prof_wis, char.save_prof_cha,
 			char.status_effects, char.resistances, char.vulnerabilities, char.immunities,
-			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, char.campaign_id, char.last_action, char.party, escape_json_string(char.backstory),
+			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, escape_json_string(char.faction_name), char.campaign_id, escape_json_string(char.last_action), escape_json_string(char.party), escape_json_string(char.backstory),
 		)
 		fmt.print(`"skills":`)
 		print_character_skills_json(db, char)
 		fmt.print(`,"resources":`)
 		print_character_resources_json(db, char.id)
+		fmt.print(`,"inventory":`)
+		print_character_inventory_json(db, char.id)
+		fmt.print(`,"abilities":`)
+		print_character_abilities_json(db, char.id)
 		fmt.println("}")
 	} else {
-		fmt.printf("[%d] %s (%s) Lvl%d HP:%d/%d (Temp: %d) AC:%d Race:%s Speed:%d XP:%d Faction:%d Campaign:%d\n",
+		faction_str := "None"
+		if char.faction_id > 0 {
+			if len(char.faction_name) > 0 {
+				faction_str = fmt.tprintf("%s (ID: %d)", char.faction_name, char.faction_id)
+			} else {
+				faction_str = fmt.tprintf("ID: %d", char.faction_id)
+			}
+		}
+		fmt.printf("[%d] %s (%s) Lvl%d HP:%d/%d (Temp: %d) AC:%d Race:%s Speed:%d XP:%d Faction: %s Campaign:%d\n",
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.ac, char.race, char.speed,
-			char.xp, char.faction_id, char.campaign_id,
+			char.xp, faction_str, char.campaign_id,
 		)
 		fmt.printf("  Identity: Alignment: %s | Size: %s | Inspiration: %d | Exhaustion: %d | Spent Hit Dice: %d\n",
 			char.alignment, char.size, char.inspiration, char.exhaustion, char.hit_dice_expended,
@@ -498,6 +627,8 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 
 		print_character_skills_text(db, char)
 		print_character_resources_text(db, char.id)
+		print_character_inventory_text(db, char.id)
+		print_character_abilities_text(db, char.id)
 	}
 
 	return 0
