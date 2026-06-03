@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: apple-darwin
+            odin_url: https://github.com/odin-lang/Odin/releases/download/dev-2026-05/odin-macos-amd64-dev-2026-05.tar.gz
+          - os: ubuntu-latest
+            target: unknown-linux
+            odin_url: https://github.com/odin-lang/Odin/releases/download/dev-2026-05/odin-linux-amd64-dev-2026-05.tar.gz
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Odin
+        run: |
+          curl -sL "${{ matrix.odin_url }}" -o odin.tar.gz
+          tar -xzf odin.tar.gz
+        shell: bash
+
+      - name: Build
+        run: |
+          ODIN_DIR=$(ls -d odin-* 2>/dev/null | head -1)
+          ./$ODIN_DIR/odin build . -file -collection:ext=./vendor -out:dnd-agent
+
+      - name: Package
+        run: tar -czvf dnd-agent-${{ matrix.target }}.tar.gz dnd-agent
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dnd-agent-*.tar.gz
+
+  update-homebrew:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: xDarkicex/homebrew-dnd-agent
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          ref: main
+
+      - name: Compute SHAs
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION_NUM=${VERSION#v}
+          curl -sL https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-apple-darwin.tar.gz -o dnd-agent-apple-darwin.tar.gz
+          curl -sL https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-unknown-linux.tar.gz -o dnd-agent-unknown-linux.tar.gz
+          SHA_MAC=$(shasum -a 256 dnd-agent-apple-darwin.tar.gz | cut -d' ' -f1)
+          SHA_LINUX=$(shasum -a 256 dnd-agent-unknown-linux.tar.gz | cut -d' ' -f1)
+          echo "SHA_MAC=$SHA_MAC" >> $GITHUB_ENV
+          echo "SHA_LINUX=$SHA_LINUX" >> $GITHUB_ENV
+          echo "VERSION_NUM=$VERSION_NUM" >> $GITHUB_ENV
+
+      - name: Create formula
+        env:
+          VERSION_NUM: ${{ env.VERSION_NUM }}
+          SHA_MAC: ${{ env.SHA_MAC }}
+          SHA_LINUX: ${{ env.SHA_LINUX }}
+        run: |
+          mkdir -p homebrew-tap/Formula
+          cat > homebrew-tap/Formula/dnd-agent.rb << RUBY
+          class DndAgent < Formula
+            desc "D&D campaign management CLI"
+            homepage "https://github.com/xDarkicex/dnd-agent"
+            license "MIT"
+            version "${VERSION_NUM}"
+
+            on_macos do
+              url "https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-apple-darwin.tar.gz"
+              sha256 "${SHA_MAC}"
+            end
+
+            on_linux do
+              url "https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-unknown-linux.tar.gz"
+              sha256 "${SHA_LINUX}"
+            end
+
+            def install
+              bin.install "dnd-agent"
+            end
+          end
+          RUBY
+
+      - name: Push formula
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add Formula/dnd-agent.rb
+          git commit -m "Update dnd-agent to v${{ github.ref_name }}"
+          git remote set-url origin https://xDarkicex:${HOMEBREW_TAP_TOKEN}@github.com/xDarkicex/homebrew-dnd-agent.git
+          git push
