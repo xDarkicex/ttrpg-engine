@@ -179,6 +179,18 @@ Manage combat conditions, resting metrics, and temporary states.
   ```bash
   ./dnd-agent character set-backstory <id> <backstory>
   ```
+- **Set Location**:
+  ```bash
+  ./dnd-agent character set-location <id> <location_id>
+  ```
+- **Set Chapter**:
+  ```bash
+  ./dnd-agent character set-chapter <id> <chapter_id>
+  ```
+- **Set Owner**:
+  ```bash
+  ./dnd-agent character set-owner <id> <owner_name>
+  ```
 - **Configure Ability Scores & Base Details**:
   ```bash
   ./dnd-agent character set-stats <id> <str> <dex> <con> <int> <wis> <cha>
