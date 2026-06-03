@@ -1,12 +1,50 @@
-# ⚔️ D&D Agent CLI - The DM's Command Center ⚔️
+# dnd-agent
 
-`dnd-agent` is a blazing fast, SQLite-backed command line utility and programmatic backend built in the **Odin programming language**. It functions as the ultimate digital screen for Dungeon Masters and AI-driven DMs, keeping all your session metrics organized and instantly queryable.
+> D&D campaign management CLI — track characters, NPCs, items, spells, factions, and campaign storylines from your terminal.
 
-### Why Choose `dnd-agent`?
-- **Designed for Both Humans & AI**: Run standard text subcommands for human-readable DM sheets, or append `--json` to output perfectly structured JSON for AI agent DM pipelines.
-- **Deep 5e Character Sheets**: Fully normalized player sheets tracking multiclass levels, vitals (temporary HP, death saves, exhaustion levels), expended rest hit dice, coin economy (including electrum/platinum), and dynamic skill modifier math.
-- **Rich Story Engine**: Map locations, factions, and character reputations. Log session story events and link player/NPC actors to build a detailed chronological chronicle of your campaign.
-- **Zero-Config Database**: Automatic forward-only schema migrations powered by `PRAGMA user_version` ensure the app is always up to date without deleting your existing campaign files.
+[![Odin](https://img.shields.io/badge/Odin-dev--2026--05-blue?logo=odin&logoColor=white)](https://odin-lang.org)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Linux](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-blue?logo=linux&logoColor=white)](https://github.com/xDarkicex/dnd-agent/actions)
+[![Build](https://github.com/xDarkicex/dnd-agent/actions/workflows/build.yml/badge.svg)](https://github.com/xDarkicex/dnd-agent/actions)
+
+## Why dnd-agent?
+
+- **Script-friendly** — `--json` output for piping into AI agent pipelines, bots, or automation.
+- **Rich 5e tracking** — multiclass characters, spell slots, companions, factions, story log.
+- **Zero-config** — automatic SQLite schema migrations on first run.
+- **Fast** — arena-based memory, O(1) DB lookups, zero heap allocations after startup.
+- **Deep inventory** — items, equipment, attuned status across characters, NPCs, and creatures.
+
+## Install
+
+### macOS — Homebrew (recommended)
+
+```sh
+brew tap xDarkicex/dnd-agent
+brew install dnd-agent
+```
+
+### Linux — Tarball
+
+```sh
+curl -sL https://github.com/xDarkicex/dnd-agent/releases/latest/download/dnd-agent-unknown-linux.tar.gz | tar -xz
+chmod +x dnd-agent
+./dnd-agent init
+```
+
+### macOS — Tarball
+
+```sh
+curl -sL https://github.com/xDarkicex/dnd-agent/releases/latest/download/dnd-agent-apple-darwin.tar.gz | tar -xz
+chmod +x dnd-agent
+./dnd-agent init
+```
+
+### Build from source
+
+```sh
+odin build . -file -collection:ext=./vendor -out:dnd-agent
+```
 
 ---
 
