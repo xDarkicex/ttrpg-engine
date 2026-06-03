@@ -6,7 +6,7 @@ This document details the SQLite database schema (`dnd-agent.db`) used by the D&
 
 ## Database Versioning
 The database schema utilizes SQLite's built-in `PRAGMA user_version` value to manage forward-only schema migrations.
-* **Current Version**: `3` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, story progression, NPC ability scores, and creature campaign/location linkage).
+* **Current Version**: `4` (Base tables, combat states, multi-classing tables, skills, resources, locations, factions, story progression, NPC ability scores, creature campaign/location linkage, creature stats/loot, and NPC/creature abilities).
 
 ---
 
@@ -27,6 +27,10 @@ erDiagram
     items ||--o{ inventory : "contained_in"
     spells ||--o{ character_spells : "known_by"
     features ||--o{ character_features : "possessed_by"
+    npcs ||--o{ npc_features : "has"
+    features ||--o{ npc_features : "possessed_by"
+    creatures ||--o{ creature_features : "has"
+    features ||--o{ creature_features : "possessed_by"
     campaigns ||--o{ locations : "contains"
     locations ||--o{ npcs : "contains"
     factions ||--o{ faction_standings : "reputation"
@@ -260,6 +264,8 @@ Tracks combat Presets, enemies, and monsters under the DM's management.
   * `status_effects`, `resistances`, `vulnerabilities`, `immunities`, `attacks`, `story_role`, `last_action`: `TEXT`
   * `campaign_id`: `INTEGER DEFAULT 0` (Campaign Association)
   * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
+  * `str`, `dex`, `con`, `int_`, `wis`, `cha`: `INTEGER DEFAULT 10` (Ability scores)
+  * `gold`, `silver`, `copper`, `platinum`, `electrum`: `INTEGER DEFAULT 0` (Loot currency)
 
 ---
 
@@ -312,3 +318,19 @@ Tracks chronological logs of campaign plot steps and maps actors involved.
   * `actor_type`: `TEXT NOT NULL` (e.g. `'char'`, `'npc'`)
   * `actor_id`: `INTEGER` NOT NULL
   * **Constraints**: `UNIQUE(action_id, actor_type, actor_id)`
+
+---
+
+### 16. `npc_features` & `creature_features`
+Junction tables linking NPCs and creatures to abilities/features.
+* **`npc_features` Table**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
+  * `feature_id`: `INTEGER` (REFERENCES `features(id)` ON DELETE CASCADE)
+  * **Constraints**: `UNIQUE(npc_id, feature_id)`
+* **`creature_features` Table**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `creature_id`: `INTEGER` (REFERENCES `creatures(id)` ON DELETE CASCADE)
+  * `feature_id`: `INTEGER` (REFERENCES `features(id)` ON DELETE CASCADE)
+  * **Constraints**: `UNIQUE(creature_id, feature_id)`
+

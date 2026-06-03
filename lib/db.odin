@@ -256,7 +256,18 @@ db_init_schema :: proc(db: ^Db) -> Error {
 			story_role TEXT DEFAULT '',
 			last_action TEXT DEFAULT '',
 			campaign_id INTEGER DEFAULT 0,
-			location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
+			location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+			str INTEGER DEFAULT 10,
+			dex INTEGER DEFAULT 10,
+			con INTEGER DEFAULT 10,
+			int_ INTEGER DEFAULT 10,
+			wis INTEGER DEFAULT 10,
+			cha INTEGER DEFAULT 10,
+			gold INTEGER DEFAULT 0,
+			silver INTEGER DEFAULT 0,
+			copper INTEGER DEFAULT 0,
+			platinum INTEGER DEFAULT 0,
+			electrum INTEGER DEFAULT 0
 		);
 		CREATE TABLE IF NOT EXISTS class_specialties (
 			id INTEGER PRIMARY KEY,
@@ -317,6 +328,18 @@ db_init_schema :: proc(db: ^Db) -> Error {
 			reset_condition TEXT DEFAULT 'long_rest',
 			UNIQUE(character_id, resource_name)
 		);
+		CREATE TABLE IF NOT EXISTS npc_features (
+			id INTEGER PRIMARY KEY,
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE CASCADE,
+			feature_id INTEGER REFERENCES features(id) ON DELETE CASCADE,
+			UNIQUE(npc_id, feature_id)
+		);
+		CREATE TABLE IF NOT EXISTS creature_features (
+			id INTEGER PRIMARY KEY,
+			creature_id INTEGER REFERENCES creatures(id) ON DELETE CASCADE,
+			feature_id INTEGER REFERENCES features(id) ON DELETE CASCADE,
+			UNIQUE(creature_id, feature_id)
+		);
 		`
 		err := db_exec(db, schema)
 		if err != Error.None do return err
@@ -344,6 +367,38 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		db_exec(db, "ALTER TABLE creatures ADD COLUMN location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;")
 
 		set_version_err := set_db_version(db, 3)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	current_version = get_db_version(db)
+	if current_version < 4 {
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN str INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN dex INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN con INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN int_ INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN wis INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN cha INTEGER DEFAULT 10;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN gold INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN silver INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN copper INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN platinum INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN electrum INTEGER DEFAULT 0;")
+
+		db_exec(db, `CREATE TABLE IF NOT EXISTS npc_features (
+			id INTEGER PRIMARY KEY,
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE CASCADE,
+			feature_id INTEGER REFERENCES features(id) ON DELETE CASCADE,
+			UNIQUE(npc_id, feature_id)
+		);`)
+
+		db_exec(db, `CREATE TABLE IF NOT EXISTS creature_features (
+			id INTEGER PRIMARY KEY,
+			creature_id INTEGER REFERENCES creatures(id) ON DELETE CASCADE,
+			feature_id INTEGER REFERENCES features(id) ON DELETE CASCADE,
+			UNIQUE(creature_id, feature_id)
+		);`)
+
+		set_version_err := set_db_version(db, 4)
 		if set_version_err != Error.None do return set_version_err
 	}
 

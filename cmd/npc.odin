@@ -192,13 +192,19 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
+		fmt.print("{")
 		fmt.printf(
-			`{{"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}}}}\n`,
+			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},`,
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.dm_notes, npc.campaign_id,
 			npc.gold, npc.silver, npc.copper, npc.ac, npc.status_effects, npc.resistances, npc.vulnerabilities, npc.immunities,
 			npc.story_role, npc.daily_role, npc.backstory, npc.faction_id, npc.last_action, npc.location_id, npc.location_name,
 			npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha,
 		)
+		fmt.print(`"abilities":`)
+		print_npc_abilities_json(db, npc.id)
+		fmt.print(`,"inventory":`)
+		print_npc_inventory_json(db, npc.id)
+		fmt.println("}")
 	} else {
 		fmt.printf("[%d] %s (%s) HP:%d/%d AC:%d Campaign:%d Faction:%d\n",
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.ac, npc.campaign_id, npc.faction_id,
@@ -212,6 +218,8 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Status: %s\n", len(npc.status_effects) > 0 ? npc.status_effects : "None")
 		fmt.printf("  Resistances: %s\n", len(npc.resistances) > 0 ? npc.resistances : "None")
 		fmt.printf("  Last Action: %s\n", len(npc.last_action) > 0 ? npc.last_action : "None")
+		print_npc_abilities_text(db, npc.id)
+		print_npc_inventory_text(db, npc.id)
 	}
 	return 0
 }
@@ -729,6 +737,198 @@ npc_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf(`{{"success":true,"message":"Updated stats for NPC %d"}}\n`, id)
 	} else {
 		fmt.println("Stats updated for NPC", id)
+	}
+	return 0
+}
+
+print_npc_abilities_json :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT f.id, f.name, f.source, f.description FROM npc_features nf JOIN features f ON nf.feature_id = f.id WHERE nf.npc_id = %d ORDER BY f.source, f.name",
+		npc_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		builder := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&builder, '[')
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do strings.write_byte(&builder, ',')
+			first = false
+			fmt.sbprintf(&builder, `{{"id":{},"name":"{}","source":"{}","description":"{}"}}`,
+				sqlite.column_int(stmt, 0),
+				sqlite.column_text(stmt, 1),
+				sqlite.column_text(stmt, 2),
+				sqlite.column_text(stmt, 3),
+			)
+		}
+		strings.write_byte(&builder, ']')
+		fmt.print(strings.to_string(builder))
+	} else {
+		fmt.print("[]")
+	}
+}
+
+print_npc_abilities_text :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT f.id, f.name, f.source, f.description FROM npc_features nf JOIN features f ON nf.feature_id = f.id WHERE nf.npc_id = %d ORDER BY f.source, f.name",
+		npc_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		fmt.println("  Abilities:")
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			fmt.printf("    [%d] %s (%s) - %s\n",
+				sqlite.column_int(stmt, 0),
+				sqlite.column_text(stmt, 1),
+				sqlite.column_text(stmt, 2),
+				sqlite.column_text(stmt, 3),
+			)
+		}
+		if !has_any do fmt.println("    None")
+	}
+}
+
+print_npc_inventory_json :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.npc_id=%d", npc_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		builder := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&builder, '[')
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do strings.write_byte(&builder, ',')
+			first = false
+			fmt.sbprintf(&builder, `{{"name":"{}","quantity":{},"equipped":{},"attuned":{},"item_id":{}}}`,
+				sqlite.column_text(stmt, 0),
+				sqlite.column_int(stmt, 1),
+				sqlite.column_int(stmt, 2),
+				sqlite.column_int(stmt, 3),
+				sqlite.column_int(stmt, 4),
+			)
+		}
+		strings.write_byte(&builder, ']')
+		fmt.print(strings.to_string(builder))
+	} else {
+		fmt.print("[]")
+	}
+}
+
+print_npc_inventory_text :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.npc_id=%d", npc_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		fmt.println("  Inventory:")
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			name := sqlite.column_text(stmt, 0)
+			qty := sqlite.column_int(stmt, 1)
+			eq := sqlite.column_int(stmt, 2)
+			at := sqlite.column_int(stmt, 3)
+			item_id := sqlite.column_int(stmt, 4)
+
+			status := ""
+			if eq == 1 && at == 1 {
+				status = " [E] [A]"
+			} else if eq == 1 {
+				status = " [E]"
+			} else if at == 1 {
+				status = " [A]"
+			}
+			fmt.printf("    %s x%d%s (ID: %d)\n", name, qty, status, item_id)
+		}
+		if !has_any do fmt.println("    Empty")
+	}
+}
+
+npc_add_ability :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc add-ability <npc_id> <feature_id>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent npc add-ability <npc_id> <feature_id>")
+		}
+		return 1
+	}
+	npc_id, _ := strconv.parse_int(args[1])
+	feature_id, _ := strconv.parse_int(args[2])
+
+	sql := fmt.tprintf("INSERT OR REPLACE INTO npc_features (npc_id,feature_id) VALUES(%d,%d)", npc_id, feature_id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to add ability to NPC"}`)
+		} else {
+			fmt.eprintln("Failed to add ability to NPC")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Added ability %d to NPC %d","npc_id":%d,"feature_id":%d}}`, feature_id, npc_id, npc_id, feature_id)
+		fmt.println()
+	} else {
+		fmt.printf("Added ability %d to NPC %d\n", feature_id, npc_id)
+	}
+	return 0
+}
+
+npc_remove_ability :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc remove-ability <npc_id> <feature_id>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent npc remove-ability <npc_id> <feature_id>")
+		}
+		return 1
+	}
+	npc_id, _ := strconv.parse_int(args[1])
+	feature_id, _ := strconv.parse_int(args[2])
+
+	sql := fmt.tprintf("DELETE FROM npc_features WHERE npc_id=%d AND feature_id=%d", npc_id, feature_id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to remove ability from NPC"}`)
+		} else {
+			fmt.eprintln("Failed to remove ability from NPC")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Removed ability %d from NPC %d","npc_id":%d,"feature_id":%d}}`, feature_id, npc_id, npc_id, feature_id)
+		fmt.println()
+	} else {
+		fmt.printf("Removed ability %d from NPC %d\n", feature_id, npc_id)
+	}
+	return 0
+}
+
+npc_list_abilities :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 2 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc list-abilities <npc_id>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent npc list-abilities <npc_id>")
+		}
+		return 1
+	}
+	npc_id, _ := strconv.parse_int(args[1])
+	
+	if db.is_json {
+		print_npc_abilities_json(db, npc_id)
+		fmt.println()
+	} else {
+		print_npc_abilities_text(db, npc_id)
 	}
 	return 0
 }

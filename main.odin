@@ -80,6 +80,12 @@ HELP_COMMANDS := []CommandHelp{
 			{"set-combat-meta", "<id> <resistances> <vulnerabilities> <immunities>", "Configure creature resistances/vulnerabilities/immunities."},
 			{"set-action", "<id> <action>", "Set creature's last combat action."},
 			{"set-location", "<creature_id> <location_id>", "Link creature to a campaign location."},
+			{"set-stats", "<id> <str> <dex> <con> <int> <wis> <cha>", "Set creature ability scores."},
+			{"add-money", "<id> <gold> <silver> <copper> [platinum] [electrum]", "Add loot money to a creature."},
+			{"remove-money", "<id> <gold> <silver> <copper> [platinum] [electrum]", "Remove loot money from a creature."},
+			{"add-ability", "<creature_id> <feature_id>", "Link a feature/ability to a creature."},
+			{"remove-ability", "<creature_id> <feature_id>", "Remove a feature/ability from a creature."},
+			{"list-abilities", "<creature_id>", "List abilities of a creature."},
 		},
 	},
 	{
@@ -132,6 +138,9 @@ HELP_COMMANDS := []CommandHelp{
 			{"set-relationship", "<npc_id_1> <npc_id_2> <friendship_level> [notes]", "Define relationship standing (-10 to +10) between two NPCs."},
 			{"list-relationships", "<npc_id>", "List relationships of a specific NPC."},
 			{"set-location", "<npc_id> <location_id>", "Link NPC to a campaign location."},
+			{"add-ability", "<npc_id> <feature_id>", "Link a feature/ability to an NPC."},
+			{"remove-ability", "<npc_id> <feature_id>", "Remove a feature/ability from an NPC."},
+			{"list-abilities", "<npc_id>", "List abilities of an NPC."},
 		},
 	},
 	{
@@ -526,7 +535,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get":
 		return route_creature_core(db, sub, args)
-	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal":
+	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities":
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
@@ -555,6 +564,12 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-location":    return cmd.creature_set_location(db, args)
 	case "damage":          return cmd.creature_damage(db, args)
 	case "heal":            return cmd.creature_heal(db, args)
+	case "set-stats":       return cmd.creature_set_stats(db, args)
+	case "add-money":       return cmd.creature_add_money(db, args)
+	case "remove-money":    return cmd.creature_remove_money(db, args)
+	case "add-ability":     return cmd.creature_add_ability(db, args)
+	case "remove-ability":  return cmd.creature_remove_ability(db, args)
+	case "list-abilities":  return cmd.creature_list_abilities(db, args)
 	}
 	return 1
 }
@@ -598,7 +613,7 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_npc_core(db, sub, args)
-	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location":
+	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities":
 		return route_npc_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -634,6 +649,9 @@ route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-relationship":  return cmd.npc_set_relationship(db, args)
 	case "list-relationships": return cmd.npc_list_relationships(db, args)
 	case "set-location":     return cmd.npc_set_location(db, args)
+	case "add-ability":      return cmd.npc_add_ability(db, args)
+	case "remove-ability":   return cmd.npc_remove_ability(db, args)
+	case "list-abilities":   return cmd.npc_list_abilities(db, args)
 	}
 	return 1
 }
