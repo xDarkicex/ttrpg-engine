@@ -186,30 +186,50 @@ apply_save_reduction :: proc(db: ^lib.Db, char_id: int, amount: int, save_succes
 
 apply_type_modifiers :: proc(char: CharacterStats, amount: int, damage_type: string) -> (int, string) {
 	dmg := amount
-	has_res := has_string_in_list(char.resistances, damage_type)
-	log_str := ""
+	log_parts: [4]string
+	log_count := 0
 
 	if has_string_in_list(char.status_effects, "petrified") {
-		log_str = "Petrified status: Resistant to all damage."
-		has_res = true
+		log_parts[log_count] = "Petrified: Resistant to all damage"
+		log_count += 1
 	}
 
 	if damage_type == "poison" && char.race == "Dwarf" {
-		log_str = "Dwarven Resilience: Resistant to poison damage."
-		has_res = true
+		log_parts[log_count] = "Dwarven Resilience: Poison Resistance"
+		log_count += 1
 	}
 
 	if has_string_in_list(char.immunities, damage_type) {
-		return 0, fmt.tprintf("Immunity to %s: Damage reduced to 0.", damage_type)
+		return 0, fmt.tprintf("Immunity to %s: 0 damage.", damage_type)
 	}
 
+	has_res := has_string_in_list(char.resistances, damage_type)
+	has_vuln := has_string_in_list(char.vulnerabilities, damage_type)
+
+	// Resistance and Vulnerability BOTH apply if present (no stacking for same type, but order matters)
+	// Order: apply Resistance first (round down), then Vulnerability (double)
 	if has_res {
-		return dmg / 2, fmt.tprintf("%s Resistance to %s: Damage halved.", log_str, damage_type)
-	} else if has_string_in_list(char.vulnerabilities, damage_type) {
-		return dmg * 2, fmt.tprintf("Vulnerability to %s: Damage doubled.", damage_type)
+		dmg /= 2
+		log_parts[log_count] = fmt.tprintf("Resistance to %s: halved", damage_type)
+		log_count += 1
 	}
 
-	return dmg, ""
+	if has_vuln {
+		dmg *= 2
+		log_parts[log_count] = fmt.tprintf("Vulnerability to %s: doubled", damage_type)
+		log_count += 1
+	}
+
+	// Build log string
+	log_str := ""
+	for i := 0; i < log_count; i += 1 {
+		if i > 0 {
+			log_str += ", "
+		}
+		log_str += log_parts[i]
+	}
+
+	return dmg, log_str
 }
 
 fetch_character_class_summary :: proc(db: ^lib.Db, char_id: int) -> (class_summary: string, total_level: int) {
