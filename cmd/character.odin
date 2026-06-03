@@ -1742,7 +1742,7 @@ character_list_resources :: proc(db: ^lib.Db, args: []string) -> int {
 		}
 		return 1
 	}
-	char_id := strconv.atoi(args[1])
+	char_id, _ := strconv.parse_int(args[1])
 
 	if db.is_json {
 		print_character_resources_json(db, char_id)

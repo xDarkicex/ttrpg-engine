@@ -46,18 +46,10 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Darwin {
 	when USE_SYSTEM_LIB {
-		when USE_DYNAMIC_LIB {
-			when USE_SQLCIPHER {
-				foreign import sqlite "system:libsqlcipher.dylib"
-			} else {
-				foreign import sqlite "system:libsqlite3.dylib"
-			}
+		when USE_SQLCIPHER {
+			foreign import sqlite "system:sqlcipher"
 		} else {
-			when USE_SQLCIPHER {
-				foreign import sqlite "system:libsqlcipher.a"
-			} else {
-				foreign import sqlite "system:libsqlite3.a"
-			}
+			foreign import sqlite "system:sqlite3"
 		}
 	} else {
 		when USE_DYNAMIC_LIB {
@@ -76,18 +68,10 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	when USE_SYSTEM_LIB {
-		when USE_DYNAMIC_LIB {
-			when USE_SQLCIPHER {
-				foreign import sqlite "system:libsqlcipher.so"
-			} else {
-				foreign import sqlite "system:libsqlite3.so"
-			}
+		when USE_SQLCIPHER {
+			foreign import sqlite "system:sqlcipher"
 		} else {
-			when USE_SQLCIPHER {
-				foreign import sqlite "system:libsqlcipher.a"
-			} else {
-				foreign import sqlite "system:libsqlite3.a"
-			}
+			foreign import sqlite "system:sqlite3"
 		}
 	} else {
 		when USE_DYNAMIC_LIB {
