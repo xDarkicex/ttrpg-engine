@@ -298,11 +298,17 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 			fmt.printf("  %s\n", summary)
 		}
 
-		fmt.printf("  Challenge: CR %d | Proficiency Bonus: +%d | Combat: %s\n",
-			c.challenge_rating,
-			2 + (c.challenge_rating - 1) / 4,
-			c.combat == 1 ? "YES" : "no",
-		)
+		if c.combat == 1 {
+			fmt.printf("  Challenge: CR %d | Proficiency Bonus: +%d | Combat: YES\n",
+				c.challenge_rating,
+				2 + (c.challenge_rating - 1) / 4,
+			)
+		} else {
+			fmt.printf("  Challenge: CR %d | Proficiency Bonus: +%d\n",
+				c.challenge_rating,
+				2 + (c.challenge_rating - 1) / 4,
+			)
+		}
 
 		// Speed (with breakdown)
 		speed_str := fmt.tprintf("%d ft", c.speed)  // walk speed from v14 column
@@ -344,21 +350,41 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 			fmt.printf("  Skills: %s\n", c.skills_text)
 		}
 
-		// Senses
+		// Senses (telepathy is NOT a sense — it lives under Languages/Communication)
 		sense_parts := make([dynamic]string, context.temp_allocator)
 		append(&sense_parts, fmt.tprintf("Passive Perception %d", c.passive_perception))
 		if c.darkvision > 0 do append(&sense_parts, fmt.tprintf("Darkvision %d ft", c.darkvision))
 		if c.blindsight > 0 do append(&sense_parts, fmt.tprintf("Blindsight %d ft", c.blindsight))
 		if c.tremorsense > 0 do append(&sense_parts, fmt.tprintf("Tremorsense %d ft", c.tremorsense))
 		if c.truesight > 0 do append(&sense_parts, fmt.tprintf("Truesight %d ft", c.truesight))
-		if c.telepathy > 0 do append(&sense_parts, fmt.tprintf("Telepathy %d ft", c.telepathy))
 		fmt.printf("  Senses: %s\n", strings.join(sense_parts[:], ", ", context.temp_allocator))
 
-		// Languages
-		if len(c.languages_full) > 0 {
-			fmt.printf("  Languages: %s\n", c.languages_full)
-		} else if len(c.status_effects) > 0 {  // placeholder; ignore
-			fmt.printf("  Languages: —\n")
+		// Languages / Communication
+		// Telepathy is a communication mode, not a sense — append to languages if set.
+		// Strip any "telepathy N ft" substring that may already be in languages_full so
+		// we don't double-print when the AI stored it both places.
+		lang_str := c.languages_full
+		if c.telepathy > 0 {
+			tele_str := fmt.tprintf("telepathy %d ft", c.telepathy)
+			// Build stripped version by iterating parts split on commas
+			if len(lang_str) > 0 {
+				parts := strings.split(lang_str, ",", context.temp_allocator)
+				cleaned := make([dynamic]string, context.temp_allocator)
+				for p in parts {
+					trimmed := strings.trim_space(p)
+					tp := strings.to_lower(trimmed, context.temp_allocator)
+					if !strings.contains(tp, "telepathy") {
+						append(&cleaned, trimmed)
+					}
+				}
+				lang_str = strings.join(cleaned[:], ", ", context.temp_allocator)
+				lang_str = fmt.tprintf("%s; %s", lang_str, tele_str)
+			} else {
+				lang_str = tele_str
+			}
+		}
+		if len(lang_str) > 0 {
+			fmt.printf("  Languages: %s\n", lang_str)
 		}
 
 		// Damage
@@ -408,10 +434,9 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 			}
 		}
 
-		// Recharge
-		if len(c.recharge) > 0 {
-			fmt.printf("  Recharge: %s\n", c.recharge)
-		}
+		// Recharge — keep inline on the action that has it (e.g. "Comet Breath (Recharge 5-6)").
+		// The c.recharge field stores the full recharge description; we no longer print it as
+		// a separate line to avoid duplicating what the action already says.
 
 		// Legendary actions
 		if len(c.legendary_actions) > 0 {
@@ -443,10 +468,17 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 
 		fmt.printf("  Story Role: %s\n", c.story_role)
 		fmt.printf("  Last Action: %s\n", len(c.last_action) > 0 ? c.last_action : "None")
-		fmt.printf("  Location: %s (ID: %d)\n", len(c.location_name) > 0 ? c.location_name : "None", c.location_id)
+		// Don't print fake ID 0 for unset locations. Only show ID when name is real.
+		if c.location_id > 0 && len(c.location_name) > 0 {
+			fmt.printf("  Location: %s (ID: %d)\n", c.location_name, c.location_id)
+		} else {
+			fmt.printf("  Location: None\n")
+		}
 		fmt.printf("  Loot Money: GP:%d SP:%d CP:%d PP:%d EP:%d\n", c.gold, c.silver, c.copper, c.platinum, c.electrum)
-		print_creature_abilities_text(db, c.id)
 		print_creature_loot_text(db, c.id)
+		// Abilities table is for character-feature-style abilities, NOT monster traits/actions.
+		// For monsters, traits/actions/legendary are the abilities. Skip the "Abilities: None" line
+		// here so the stat block isn't polluted with misleading empty-section headers.
 	}
 	return 0
 }
