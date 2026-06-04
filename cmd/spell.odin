@@ -92,9 +92,9 @@ spell_list :: proc(db: ^lib.Db) -> int {
 spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell learn <char_id> <spell_id> [prepared (0/1)]"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell learn <char_id> <spell_id> [prepared (0/1)]")
+			fmt.eprintln("Usage: dnd-agent spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]")
 		}
 		return 1
 	}
@@ -104,10 +104,18 @@ spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) >= 4 {
 		prepared = strconv.atoi(args[3])
 	}
+	class_name := ""
+	if len(args) >= 5 {
+		class_name = args[4]
+	}
+	source := ""
+	if len(args) >= 6 {
+		source = args[5]
+	}
 
 	sql := fmt.tprintf(
-		"INSERT OR REPLACE INTO character_spells (character_id,spell_id,prepared) VALUES(%d,%d,%d)",
-		char_id, spell_id, prepared,
+		"INSERT OR REPLACE INTO character_spells (character_id,spell_id,prepared,class_name,source) VALUES(%d,%d,%d,'%s','%s')",
+		char_id, spell_id, prepared, escape_sql(class_name), escape_sql(source),
 	)
 
 	if lib.db_exec(db, sql) != lib.Error.None {
@@ -119,7 +127,7 @@ spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	if db.is_json {
-		fmt.printf(`{{"success":true,"character_id":%d,"spell_id":%d,"prepared":%d}}\n`, char_id, spell_id, prepared)
+		fmt.printf(`{{"success":true,"character_id":%d,"spell_id":%d,"prepared":%d,"class_name":"%s","source":"%s"}}\n`, char_id, spell_id, prepared, escape_json_string(class_name), escape_json_string(source))
 	} else {
 		fmt.println("Character", char_id, "learned spell", spell_id)
 	}
@@ -173,7 +181,7 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT s.id, s.name, s.level, cs.prepared FROM character_spells cs JOIN spells s ON cs.spell_id = s.id WHERE cs.character_id = %d ORDER BY s.level, s.name",
+		"SELECT s.id, s.name, s.level, cs.prepared, cs.class_name FROM character_spells cs JOIN spells s ON cs.spell_id = s.id WHERE cs.character_id = %d ORDER BY cs.class_name, s.level, s.name",
 		char_id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -195,11 +203,13 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 		for sqlite.step(stmt) == .Row {
 			if !first do strings.write_byte(&builder, ',')
 			first = false
-			fmt.sbprintf(&builder, `{{"id":{},"name":"{}","level":{},"prepared":{}}}`,
+			class_name := column_text_safe(stmt, 4)
+			fmt.sbprintf(&builder, `{{"id":{},"name":"{}","level":{},"prepared":{},"class_name":"{}"}}`,
 				sqlite.column_int(stmt, 0),
 				sqlite.column_text(stmt, 1),
 				sqlite.column_int(stmt, 2),
 				sqlite.column_int(stmt, 3),
+				class_name,
 			)
 		}
 		strings.write_byte(&builder, ']')
@@ -208,10 +218,13 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("Spells for character %d:\n", char_id)
 		for sqlite.step(stmt) == .Row {
 			prep_str := sqlite.column_int(stmt, 3) == 1 ? "[Prepared]" : "[Unprepared]"
-			fmt.printf("  [%d] %s (Level %d) %s\n",
+			cls := column_text_safe(stmt, 4)
+			cls_part := len(cls) > 0 ? fmt.tprintf(" (%s)", cls) : ""
+			fmt.printf("  [%d] %s (Level %d)%s %s\n",
 				sqlite.column_int(stmt, 0),
 				sqlite.column_text(stmt, 1),
 				sqlite.column_int(stmt, 2),
+				cls_part,
 				prep_str,
 			)
 		}

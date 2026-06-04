@@ -58,6 +58,8 @@ HELP_COMMANDS := []CommandHelp{
 			{"use-resource", "<char_id> <resource_name> [amount]", "Use a specific resource amount (default 1)."},
 			{"reset-resources", "<char_id> [reset_condition]", "Reset character resources (e.g. on long_rest)."},
 			{"list-resources", "<char_id>", "List resources for a character."},
+			{"set-gender", "<id> <gender>", "Set character gender."},
+			{"set-age", "<id> <age>", "Set character age."},
 		},
 	},
 	{
@@ -355,7 +357,7 @@ route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_character_core(db, sub, args)
-	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-rests", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance":
+	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-rests", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance", "set-gender", "set-age":
 		return route_character_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -427,6 +429,8 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 	case "set-ideal":               return cmd.character_set_ideal(db, args)
 	case "set-personality-traits":  return cmd.character_set_personality_traits(db, args)
 	case "set-appearance":          return cmd.character_set_appearance(db, args)
+	case "set-gender":              return cmd.character_set_gender(db, args)
+	case "set-age":                 return cmd.character_set_age(db, args)
 	}
 	return 1
 }

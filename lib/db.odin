@@ -60,13 +60,9 @@ set_db_version :: proc(db: ^Db, version: int) -> Error {
 	return db_exec(db, sql)
 }
 
-db_init_schema :: proc(db: ^Db) -> Error {
-	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
-	if fk_err != Error.None do return fk_err
-
-	current_version := get_db_version(db)
-
-	if current_version < 1 {
+db_run_migrations_1_4 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 1 {
 		schema := `
 		CREATE TABLE IF NOT EXISTS characters (
 			id INTEGER PRIMARY KEY,
@@ -346,10 +342,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 		set_version_err := set_db_version(db, 1)
 		if set_version_err != Error.None do return set_version_err
+		curr_ver = 1
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 2 {
+	if curr_ver < 2 {
 		db_exec(db, "ALTER TABLE npcs ADD COLUMN str INTEGER DEFAULT 10;")
 		db_exec(db, "ALTER TABLE npcs ADD COLUMN dex INTEGER DEFAULT 10;")
 		db_exec(db, "ALTER TABLE npcs ADD COLUMN con INTEGER DEFAULT 10;")
@@ -359,19 +355,19 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 		set_version_err := set_db_version(db, 2)
 		if set_version_err != Error.None do return set_version_err
+		curr_ver = 2
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 3 {
+	if curr_ver < 3 {
 		db_exec(db, "ALTER TABLE creatures ADD COLUMN campaign_id INTEGER DEFAULT 0;")
 		db_exec(db, "ALTER TABLE creatures ADD COLUMN location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;")
 
 		set_version_err := set_db_version(db, 3)
 		if set_version_err != Error.None do return set_version_err
+		curr_ver = 3
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 4 {
+	if curr_ver < 4 {
 		db_exec(db, "ALTER TABLE creatures ADD COLUMN str INTEGER DEFAULT 10;")
 		db_exec(db, "ALTER TABLE creatures ADD COLUMN dex INTEGER DEFAULT 10;")
 		db_exec(db, "ALTER TABLE creatures ADD COLUMN con INTEGER DEFAULT 10;")
@@ -402,17 +398,21 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		if set_version_err != Error.None do return set_version_err
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 5 {
+	return Error.None
+}
+
+db_run_migrations_5_7 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 5 {
 		db_exec(db, "ALTER TABLE characters ADD COLUMN location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL;")
 		db_exec(db, "ALTER TABLE characters ADD COLUMN chapter_id TEXT DEFAULT '';")
 
 		set_version_err := set_db_version(db, 5)
 		if set_version_err != Error.None do return set_version_err
+		curr_ver = 5
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 6 {
+	if curr_ver < 6 {
 		// Character: combat + spellcasting + initiative + perception + languages + max hit dice
 		db_exec(db, "ALTER TABLE characters ADD COLUMN proficiency_bonus INTEGER DEFAULT 0;")
 		db_exec(db, "ALTER TABLE characters ADD COLUMN spell_save_dc INTEGER DEFAULT 0;")
@@ -487,10 +487,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 		set_version_err := set_db_version(db, 6)
 		if set_version_err != Error.None do return set_version_err
+		curr_ver = 6
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 7 {
+	if curr_ver < 7 {
 		// Senses: darkvision range (0 = none, common 60/120)
 		db_exec(db, "ALTER TABLE characters ADD COLUMN darkvision INTEGER DEFAULT 0;")
 		db_exec(db, "ALTER TABLE npcs ADD COLUMN darkvision INTEGER DEFAULT 0;")
@@ -535,14 +535,95 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		if set_version_err != Error.None do return set_version_err
 	}
 
-	current_version = get_db_version(db)
-	if current_version < 8 {
+	return Error.None
+}
+
+db_run_migrations_8_9 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 8 {
 		db_exec(db, "ALTER TABLE characters ADD COLUMN short_rests_available INTEGER DEFAULT 2;")
 		db_exec(db, "ALTER TABLE characters ADD COLUMN long_rests_available INTEGER DEFAULT 1;")
 
 		set_version_err := set_db_version(db, 8)
 		if set_version_err != Error.None do return set_version_err
+		curr_ver = 8
 	}
+
+	if curr_ver < 9 {
+		db_exec(db, "ALTER TABLE character_spells ADD COLUMN class_name TEXT DEFAULT '';")
+
+		set_version_err := set_db_version(db, 9)
+		if set_version_err != Error.None do return set_version_err
+		curr_ver = 9
+	}
+
+	return Error.None
+}
+
+db_run_migrations_10 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 10 {
+		// Gender and age for characters and NPCs
+		db_exec(db, "ALTER TABLE characters ADD COLUMN gender TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN age INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN gender TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN age INTEGER DEFAULT 0;")
+
+		set_version_err := set_db_version(db, 10)
+		if set_version_err != Error.None do return set_version_err
+		curr_ver = 10
+	}
+
+	if curr_ver < 11 {
+		// Duration type for conditions: rounds (default), concentration, hours, days, until_rest, permanent
+		db_exec(db, "ALTER TABLE conditions ADD COLUMN duration_type TEXT DEFAULT 'rounds';")
+
+		set_version_err := set_db_version(db, 11)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
+db_run_migrations_12 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 12 {
+		// Source attribution: track where a skill prof came from so expertise/unusual profs are auditable.
+		db_exec(db, "ALTER TABLE character_skills ADD COLUMN source TEXT DEFAULT '';")
+		// Source on conditions was already added in v7; spell sources go on character_spells.
+		db_exec(db, "ALTER TABLE character_spells ADD COLUMN source TEXT DEFAULT '';")
+
+		set_version_err := set_db_version(db, 12)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
+db_init_schema :: proc(db: ^Db) -> Error {
+	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
+	if fk_err != Error.None do return fk_err
+
+	current_version := get_db_version(db)
+
+	err := db_run_migrations_1_4(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_5_7(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_8_9(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_10(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_12(db, i32(current_version))
+	if err != Error.None do return err
 
 	return Error.None
 }
