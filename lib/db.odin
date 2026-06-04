@@ -725,6 +725,34 @@ db_run_migrations_16 :: proc(db: ^Db, current_version: i32) -> Error {
 	return Error.None
 }
 
+db_run_migrations_17 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 17 {
+		// NPC skills get a proficiency_level column (0=none, 1=proficient, 2=expertise)
+		// to match the character_skills model. The existing modifier column is kept
+		// for backward compatibility; display now computes total from level + ability.
+		db_exec(db, "ALTER TABLE npc_skills ADD COLUMN proficiency_level INTEGER DEFAULT 0;")
+
+		// Houses can have multiple residents (married couples, families, roommates).
+		// The existing houses.npc_id remains for backward compat; display joins this table.
+		db_exec(db, `CREATE TABLE IF NOT EXISTS house_residents (
+			id INTEGER PRIMARY KEY,
+			house_id INTEGER REFERENCES houses(id) ON DELETE CASCADE,
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE CASCADE,
+			UNIQUE(house_id, npc_id)
+		);`)
+
+		// Migrate existing houses.npc_id into the join table
+		db_exec(db, `INSERT OR IGNORE INTO house_residents (house_id, npc_id)
+			SELECT id, npc_id FROM houses WHERE npc_id IS NOT NULL AND npc_id > 0;`)
+
+		set_version_err := set_db_version(db, 17)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
 db_init_schema :: proc(db: ^Db) -> Error {
 	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
 	if fk_err != Error.None do return fk_err
@@ -764,6 +792,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_16(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_17(db, i32(current_version))
 	if err != Error.None do return err
 
 	return Error.None

@@ -599,3 +599,80 @@ can_enter :: proc(
 	score := compute_relationship_with_decay(db, visitor_npc_id, visitor_char_id, owner_npc_id, in_game_day)
 	return access_band(score, true)
 }
+// ----- house residents (v17 join table for multi-resident properties) -----
+
+house_add_resident :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house add-resident <house_id> <npc_id>"}`) }
+		else { fmt.eprintln("Usage: dnd-agent house add-resident <house_id> <npc_id>") }
+		return 1
+	}
+	house_id := strconv.atoi(args[1])
+	npc_id := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("INSERT OR IGNORE INTO house_residents (house_id, npc_id) VALUES(%d, %d)", house_id, npc_id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add resident"}`) }
+		else { fmt.eprintln("Failed to add resident") }
+		return 1
+	}
+	if db.is_json { fmt.printf(`{"success":true,"message":"Resident added","house_id":%d,"npc_id":%d}` + "\n", house_id, npc_id) }
+	else { fmt.printf("NPC %d added as resident of house %d\n", npc_id, house_id) }
+	return 0
+}
+
+house_remove_resident :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house remove-resident <house_id> <npc_id>"}`) }
+		else { fmt.eprintln("Usage: dnd-agent house remove-resident <house_id> <npc_id>") }
+		return 1
+	}
+	house_id := strconv.atoi(args[1])
+	npc_id := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("DELETE FROM house_residents WHERE house_id=%d AND npc_id=%d", house_id, npc_id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to remove resident"}`) }
+		else { fmt.eprintln("Failed to remove resident") }
+		return 1
+	}
+	if db.is_json { fmt.printf(`{"success":true,"message":"Resident removed","house_id":%d,"npc_id":%d}` + "\n", house_id, npc_id) }
+	else { fmt.printf("NPC %d removed from house %d\n", npc_id, house_id) }
+	return 0
+}
+
+house_list_residents :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 2 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house list-residents <house_id>"}`) }
+		else { fmt.eprintln("Usage: dnd-agent house list-residents <house_id>") }
+		return 1
+	}
+	house_id := strconv.atoi(args[1])
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT hr.npc_id, n.name FROM house_residents hr JOIN npcs n ON hr.npc_id = n.id WHERE hr.house_id=%d ORDER BY n.name", house_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to list residents"}`) }
+		else { fmt.eprintln("Failed to list residents") }
+		return 1
+	}
+	defer sqlite.finalize(stmt)
+	if db.is_json {
+		first := true
+		fmt.print("[")
+		for sqlite.step(stmt) == .Row {
+			if !first do fmt.print(",")
+			first = false
+			fmt.printf(`{"npc_id":%d,"name":"%s"}`, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1))
+		}
+		fmt.println("]")
+	} else {
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			fmt.printf("  NPC %d: %s\n", sqlite.column_int(stmt, 0), column_text_safe(stmt, 1))
+		}
+		if !has_any do fmt.println("  No residents.")
+	}
+	return 0
+}

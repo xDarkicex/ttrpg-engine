@@ -896,6 +896,9 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "list":             return cmd.house_list(db, args)
 		case "set-inventory":    return cmd.house_set_inventory(db, args)
 		case "set-restricted":   return cmd.house_set_restricted(db, args)
+		case "add-resident":     return cmd.house_add_resident(db, args)
+		case "remove-resident":  return cmd.house_remove_resident(db, args)
+		case "list-residents":   return cmd.house_list_residents(db, args)
 		case:
 			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house <add|list|set-inventory|set-restricted> ..."}`) }
 			else { fmt.eprintln("Usage: dnd-agent house <add|list|set-inventory|set-restricted> ...") }

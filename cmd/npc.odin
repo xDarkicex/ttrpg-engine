@@ -230,12 +230,12 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%s,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"cr":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s",`,
+			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%s,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"cr":%s,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s",`,
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.dm_notes, npc.campaign_id,
 			npc.gold, npc.silver, npc.copper, npc.ac, npc.status_effects, npc.resistances, npc.vulnerabilities, npc.immunities,
 			npc.story_role, npc.daily_role, npc.backstory, faction_id_json_str(npc.faction_id), escape_json_string(npc.last_action), npc.location_id, escape_json_string(npc.location_name),
 			npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha,
-			npc.cr, npc.attack_bonus, escape_json_string(npc.damage_dice), escape_json_string(npc.damage_type),
+			faction_id_json_str(npc.cr), npc.attack_bonus, escape_json_string(npc.damage_dice), escape_json_string(npc.damage_type),
 			npc.initiative, npc.passive_perception, escape_json_string(npc.languages), escape_json_string(npc.concentrating_on), npc.combat, npc.darkvision, escape_json_string(npc.bond), escape_json_string(npc.flaw), escape_json_string(npc.ideal), escape_json_string(npc.personality_traits), escape_json_string(npc.appearance),
 		)
 		fmt.print(`"abilities":`)
@@ -1020,7 +1020,7 @@ print_npc_tool_profs_text :: proc(db: ^lib.Db, npc_id: int) {
 
 print_npc_skills_json :: proc(db: ^lib.Db, npc_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT skill_name, modifier FROM npc_skills WHERE npc_id=%d ORDER BY skill_name", npc_id)
+	sql := fmt.tprintf("SELECT skill_name, modifier, COALESCE(proficiency_level, 0) FROM npc_skills WHERE npc_id=%d ORDER BY skill_name", npc_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		fmt.print("[]")
@@ -1035,8 +1035,9 @@ print_npc_skills_json :: proc(db: ^lib.Db, npc_id: int) {
 		if !first do strings.write_string(&builder, ",")
 		first = false
 		name := column_text_safe(stmt, 0)
-		mod := int(sqlite.column_int(stmt, 1))
-		fmt.sbprintf(&builder, `{{"name":"%s","proficiency_rank":%d}}`, escape_json_string(name), mod)
+		total := int(sqlite.column_int(stmt, 1))
+		prof_level := int(sqlite.column_int(stmt, 2))
+		fmt.sbprintf(&builder, `{{"name":"%s","proficiency_level":%d,"modifier":%d}}`, escape_json_string(name), prof_level, total)
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))
@@ -1044,7 +1045,7 @@ print_npc_skills_json :: proc(db: ^lib.Db, npc_id: int) {
 
 print_npc_skills_text :: proc(db: ^lib.Db, npc_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT skill_name, modifier FROM npc_skills WHERE npc_id=%d ORDER BY skill_name", npc_id)
+	sql := fmt.tprintf("SELECT skill_name, modifier, COALESCE(proficiency_level, 0) FROM npc_skills WHERE npc_id=%d ORDER BY skill_name", npc_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		return
@@ -1058,11 +1059,12 @@ print_npc_skills_text :: proc(db: ^lib.Db, npc_id: int) {
 			has_rows = true
 		}
 		name := column_text_safe(stmt, 0)
-		mod := int(sqlite.column_int(stmt, 1))
+		total := int(sqlite.column_int(stmt, 1))
+		prof_level := int(sqlite.column_int(stmt, 2))
 		rank_str := "None"
-		if mod == 1 do rank_str = "Proficient"
-		if mod == 2 do rank_str = "Expertise"
-		fmt.printf("    - %s: %s (+%d)\n", name, rank_str, mod)
+		if prof_level == 1 do rank_str = "Proficient"
+		if prof_level == 2 do rank_str = "Expertise"
+		fmt.printf("    - %s: %s (+%d)\n", name, rank_str, total)
 	}
 }
 
@@ -1372,20 +1374,50 @@ npc_set_concentrating :: proc(db: ^lib.Db, args: []string) -> int {
 	return 0
 }
 
+get_npc_skill_ability_mod :: proc(npc: NpcStats, skill_name: string) -> int {
+	sk := strings.to_lower(skill_name, context.temp_allocator)
+	switch sk {
+	case "acrobatics", "sleight of hand", "stealth":       return (npc.dex - 10) / 2
+	case "arcana", "history", "investigation", "nature", "religion": return (npc.int_ - 10) / 2
+	case "animal handling", "insight", "medicine", "perception", "survival": return (npc.wis - 10) / 2
+	case "athletics":                                        return (npc.str - 10) / 2
+	case "deception", "intimidation", "performance", "persuasion": return (npc.cha - 10) / 2
+	}
+	return 0
+}
+
 npc_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-skill <npc_id> <skill_name> <modifier>"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-skill <npc_id> <skill_name> <proficiency_level>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-skill <npc_id> <skill_name> <modifier>")
+			fmt.eprintln("Usage: dnd-agent npc set-skill <npc_id> <skill_name> <proficiency_level>")
+			fmt.eprintln("  proficiency_level: 0=none, 1=proficient, 2=expertise")
 		}
 		return 1
 	}
 	npc_id, _ := strconv.parse_int(args[1])
 	skill_name := args[2]
-	modifier, _ := strconv.parse_int(args[3])
+	prof_level, _ := strconv.parse_int(args[3])
+	if prof_level < 0 || prof_level > 2 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Proficiency level must be 0, 1, or 2"}`) }
+		else { fmt.eprintln("Proficiency level must be 0, 1, or 2") }
+		return 1
+	}
 
-	sql := fmt.tprintf("INSERT OR REPLACE INTO npc_skills (npc_id, skill_name, modifier) VALUES(%d, '%s', %d)", npc_id, escape_sql(skill_name), modifier)
+	// Compute the ability modifier for this skill
+	npc, found := fetch_npc_stats(db, int(npc_id))
+	ability_mod := 0
+	if found {
+		ability_mod = get_npc_skill_ability_mod(npc, skill_name)
+	}
+	// Total modifier = ability mod + proficiency_level * prof_bonus (default +2 for commoners)
+	prof_bonus := 2 + (npc.cr - 1) / 4
+	if prof_bonus < 2 do prof_bonus = 2
+	total_mod := ability_mod + prof_level * prof_bonus
+	_ = total_mod  // display below
+
+	sql := fmt.tprintf("INSERT OR REPLACE INTO npc_skills (npc_id, skill_name, modifier, proficiency_level) VALUES(%d, '%s', %d, %d)", npc_id, escape_sql(skill_name), total_mod, prof_level)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Failed to set skill"}`)
@@ -1396,9 +1428,9 @@ npc_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{"success":true,"message":"Skill set","npc_id":%d,"skill_name":"%s","modifier":%d}` + "\n", npc_id, escape_json_string(skill_name), modifier)
+		fmt.printf(`{"success":true,"message":"Skill set","npc_id":%d,"skill_name":"%s","proficiency_level":%d,"modifier":%d}` + "\n", npc_id, escape_json_string(skill_name), prof_level, total_mod)
 	} else {
-		fmt.printf("NPC %d %s: %+d\n", npc_id, skill_name, modifier)
+		fmt.printf("NPC %d %s: proficiency level %d, total +%d\n", npc_id, skill_name, prof_level, total_mod)
 	}
 	return 0
 }
