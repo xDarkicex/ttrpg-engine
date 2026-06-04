@@ -63,9 +63,10 @@ odin build . -file -collection:ext=./vendor -out:dnd-agent
    - [NPCs & Relationships](#8-npcs--relationships)
    - [Creatures & Monsters](#9-creatures--monsters)
    - [Campaigns, Locations, & Story Tracking](#10-campaigns-locations--story-tracking)
-   - [Factions & Standings](#11-factions--standings)
-   - [Spells & Features](#12-spells--features)
-   - [Items & Inventory Management](#13-items--inventory-management)
+   - [World & Locations](#11-world--locations)
+   - [Factions & Standings](#12-factions--standings)
+   - [Spells & Features](#13-spells--features)
+   - [Items & Inventory Management](#14-items--inventory-management)
 5. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
 6. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
@@ -367,10 +368,11 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ./dnd-agent npc remove-ability <npc_id> <feature_id>
   ./dnd-agent npc list-abilities <npc_id>
   ```
-- **Manage Relationship (Friendship metrics)**:
+- **Manage Relationship (Friendship + Type)**:
   ```bash
-  ./dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [notes]
+  ./dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]
   ```
+  *Type: spouse, family, friend, rival, enemy, acquaintance, ally. Friendship level: -10 to +10.*
   *Friendship level scale: `-10` (Archnemesis) to `+10` (Close Ally).*
 - **List NPC Relationships**:
   ```bash
@@ -408,11 +410,12 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ```bash
   ./dnd-agent npc set-combat <id> <0|1>
   ```
-- **Set NPC Skill (Skill + Modifier)**:
+- **Set NPC Skill (Proficiency Level)**:
   ```bash
-  ./dnd-agent npc set-skill <npc_id> <skill_name> <modifier>
+  ./dnd-agent npc set-skill <npc_id> <skill_name> <proficiency_level>
   ./dnd-agent npc remove-skill <npc_id> <skill_name>
   ```
+  *proficiency_level: 0=none, 1=proficient, 2=expertise. Total modifier is computed from ability scores + prof_bonus * level.*
 - **Set NPC Darkvision (Range in Feet)**:
   ```bash
   ./dnd-agent npc set-darkvision <id> <range>
@@ -549,7 +552,59 @@ Track the session number, current location, logged events, and generate a compre
 
 ---
 
-### 11. Factions & Standings
+### 11. World & Locations
+Manage the campaign world: locations, sub-locations via `parent_id`, houses, shops, encounters, and setpieces. All commands are O(1) per query.
+
+- **Set a Sub-location Parent (Recursive)**:
+  ```bash
+  ./dnd-agent location set-parent <id> <parent_id|0>
+  ./dnd-agent location breadcrumb <id>
+  ```
+  *Breadcrumb walks the parent chain and prints `Ashwick > Blacksmith District > The Anvil & Flame`.*
+- **Set Location Access Restriction**:
+  ```bash
+  ./dnd-agent location set-restricted <id> <0|1> <until>
+  ```
+- **Houses (Residential Properties)**:
+  ```bash
+  ./dnd-agent house add <location_id> <name> [description] [npc_id] [scale]
+  ./dnd-agent house list <location_id>
+  ./dnd-agent house set-inventory <id> <text>
+  ./dnd-agent house set-restricted <id> <0|1> <until>
+  ```
+  *Inventory text is passed to the AI for on-the-fly item generation.*
+- **House Residents (Multi-Resident, v17)**:
+  ```bash
+  ./dnd-agent house add-resident <house_id> <npc_id>
+  ./dnd-agent house remove-resident <house_id> <npc_id>
+  ./dnd-agent house list-residents <house_id>
+  ```
+- **Shops (Commercial Properties)**:
+  ```bash
+  ./dnd-agent shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]
+  ./dnd-agent shop list <location_id>
+  ./dnd-agent shop set-inventory <id> <text>
+  ```
+- **Encounters**:
+  ```bash
+  ./dnd-agent encounter add <location_id> <type> [description] [npc_id]
+  ./dnd-agent encounter list <location_id>
+  ```
+- **Setpieces (Story-Driving Locations)**:
+  ```bash
+  ./dnd-agent setpiece add <location_id> <name> [description] [chapter_event]
+  ./dnd-agent setpiece list <location_id>
+  ```
+  *When `chapter_event` is non-empty, it becomes an AI system instruction when the party enters.*
+- **Check Property Access (Decay-Aware)**:
+  ```bash
+  ./dnd-agent can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]
+  ```
+  *O(1) access check with exponential relationship decay. Returns `allowed`, `wary`, or `denied`.*
+
+---
+
+### 12. Factions & Standings
 Configure factions and standings metrics.
 
 - **Create Faction**:
@@ -571,7 +626,7 @@ Configure factions and standings metrics.
 
 ---
 
-### 12. Spells & Features
+### 13. Spells & Features
 Manage spell libraries, features, and character spellbooks.
 
 - **Spells Library**:
@@ -581,7 +636,8 @@ Manage spell libraries, features, and character spellbooks.
   ```
 - **Character Spellbook**:
   ```bash
-  ./dnd-agent spell learn <char_id> <spell_id> [prepared_0/1]
+  ./dnd-agent spell learn <char_id> <spell_id> [prepared_0/1] [class_name] [source]
+  ./dnd-agent spell forget <char_id> <spell_id>
   ./dnd-agent spell prepare <char_id> <spell_id> <0/1>
   ./dnd-agent spell list-character <char_id>
   ```
@@ -601,7 +657,7 @@ Manage spell libraries, features, and character spellbooks.
 
 ---
 
-### 13. Items & Inventory Management
+### 14. Items & Inventory Management
 Enforce items configurations and map item ownership, equipment, and attunement status.
 
 - **Create/Modify Item Blueprint**:

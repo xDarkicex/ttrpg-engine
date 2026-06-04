@@ -6,7 +6,7 @@ This document details the SQLite database schema (`dnd-agent.db`) used by the D&
 
 ## Database Versioning
 The database schema utilizes SQLite's built-in `PRAGMA user_version` value to manage forward-only schema migrations.
-* **Current Version**: `7` (v1 base tables; v2 NPC ability scores; v3 creature campaign/location linkage; v4 creature stats/loot, NPC/creature feature junction tables; v5 character location/chapter; v6 combat stats, spellcasting, initiative, perception, languages, concentration, prof/skill/spell-slot junction tables; v7 darkvision, personality hooks (bond/flaw/ideal/traits/appearance), conditions junction table, NPC tool proficiencies).
+* **Current Version**: `17` (v1 base tables; v2 NPC ability scores; v3 creature campaign/location; v4 creature stats/loot + features; v5 character location/chapter; v6 combat stats, spellcasting, initiative, perception, languages, concentration, prof/skill/spell-slot tables; v7 darkvision, personality hooks, conditions, NPC tool profs; v8-9 rest tracking, character_spells.class_name; v10-11 gender, age, conditions.duration_type; v12 skill/spell source columns; v13 legendary creature fields; v14 creature speed; v15 sub-locations, houses, shops, encounters, setpieces, npc_relationships.last_interaction_at; v16 npc_relationships.type; v17 npc_skills.proficiency_level, house_residents join table).
 
 The canonical source of truth for the schema lives in `lib/db.odin` — `db_init_schema` constructs each version's `CREATE TABLE` / `ALTER TABLE` statements. This document is a reference derived from that code.
 
@@ -43,6 +43,14 @@ erDiagram
     creatures ||--o{ conditions : "affected_by"
     npcs ||--o{ npc_tool_profs : "proficient_in"
     campaigns ||--o{ locations : "contains"
+    locations ||--o{ locations : "sub_location" (via parent_id)
+    locations ||--o{ houses : "has"
+    locations ||--o{ shops : "has"
+    locations ||--o{ encounters : "has"
+    locations ||--o{ setpieces : "has"
+    houses ||--o{ house_residents : "residents"
+    npcs ||--o{ house_residents : "resident_of"
+
     locations ||--o{ npcs : "contains"
     locations ||--o{ characters : "contains"
     locations ||--o{ creatures : "contains"
@@ -261,14 +269,15 @@ Tracks non-player characters, daily/story roles, notes, currency, active locatio
 ---
 
 ### 10. `npc_skills`
-NPCs use a flat skill+modifier store (no per-skill proficiency levels like characters). Each row is one skill for one NPC.
+NPC skill proficiencies. Now uses the same proficiency_level model as character_skills (v17).
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
   * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
   * `skill_name`: `TEXT NOT NULL` (e.g. `persuasion`, `insight`)
-  * `modifier`: `INTEGER DEFAULT 0`
+  * `modifier`: `INTEGER DEFAULT 0` (Computed total — ability mod + prof_level * prof_bonus)
+  * `proficiency_level`: `INTEGER DEFAULT 0` (0=none, 1=proficient, 2=expertise) — *v17*
 * **Constraints**: `UNIQUE(npc_id, skill_name)`
-* **Added in**: v6
+* **Added in**: v6, updated v17
 
 ---
 
@@ -290,7 +299,9 @@ Enforces reputation/friendship matrices between two specific NPCs.
   * `npc_id_1`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
   * `npc_id_2`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
   * `friendship_level`: `INTEGER DEFAULT 0` (Scale e.g., `-10` to `+10`)
+  * `type`: `TEXT DEFAULT ''` (Semantic label: spouse, family, friend, rival, enemy, acquaintance, ally) — *v16*
   * `notes`: `TEXT DEFAULT ''`
+  * `last_interaction_at`: `TEXT DEFAULT ''` (ISO date for decay algorithm) — *v15*
 * **Constraints**:
   * `UNIQUE(npc_id_1, npc_id_2)`
 
@@ -454,3 +465,82 @@ Junction tables linking NPCs and creatures to abilities/features.
   * `feature_id`: `INTEGER` (REFERENCES `features(id)` ON DELETE CASCADE)
   * **Constraints**: `UNIQUE(creature_id, feature_id)`
 
+
+---
+
+### 22. `houses`
+Residential properties within a location. Scale affects loot tables and social status.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `location_id`: `INTEGER NOT NULL` (REFERENCES `locations(id)` ON DELETE CASCADE)
+  * `name`: `TEXT NOT NULL`
+  * `description`: `TEXT DEFAULT ''`
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE SET NULL — legacy single-owner column; prefer `house_residents` join table)
+  * `scale`: `TEXT DEFAULT 'mid'` (`abandon`|`slave`|`slum`|`low`|`mid`|`high`|`estate`|`royal`)
+  * `restricted`: `INTEGER DEFAULT 0`
+  * `restricted_until`: `TEXT DEFAULT ''`
+  * `inventory`: `TEXT DEFAULT ''` (Freeform — passed to AI for item generation)
+* **Constraints**: `UNIQUE(location_id, name)`
+* **Added in**: v15
+
+---
+
+### 23. `shops`
+Commercial properties within a location. Scale affects pricing and quality.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `location_id`: `INTEGER NOT NULL` (REFERENCES `locations(id)` ON DELETE CASCADE)
+  * `name`: `TEXT NOT NULL`
+  * `description`: `TEXT DEFAULT ''`
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE SET NULL — proprietor)
+  * `scale`: `TEXT DEFAULT 'mid'` (`slum`|`low`|`mid`|`high`|`estate`|`boutique`|`illegal`)
+  * `open_hours`: `TEXT DEFAULT '06:00-22:00'` (Plain text, LLM interprets the schedule)
+  * `restricted`: `INTEGER DEFAULT 0`
+  * `inventory`: `TEXT DEFAULT ''` (Freeform — passed to AI for item generation)
+* **Constraints**: `UNIQUE(location_id, name)`
+* **Added in**: v15
+
+---
+
+### 24. `encounters`
+Wandering, scripted, or repeatable events in a location.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `location_id`: `INTEGER NOT NULL` (REFERENCES `locations(id)` ON DELETE CASCADE)
+  * `type`: `TEXT DEFAULT 'wander'` (e.g. `crime`, `ally`, `quest_giver`)
+  * `description`: `TEXT DEFAULT ''`
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE SET NULL)
+* **Added in**: v15
+
+---
+
+### 25. `setpieces`
+Story-driving locations tagged to chapter events. When a non-empty `chapter_event` is present, the system injects it as an AI instruction.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `location_id`: `INTEGER NOT NULL` (REFERENCES `locations(id)` ON DELETE CASCADE)
+  * `name`: `TEXT NOT NULL`
+  * `description`: `TEXT DEFAULT ''`
+  * `chapter_event`: `TEXT DEFAULT ''` (Optional AI instruction text; empty = flavor)
+* **Constraints**: `UNIQUE(location_id, name)`
+* **Added in**: v15
+
+---
+
+### 26. `house_residents`
+Join table for multi-resident properties. One house can have many residents (married couples, families, roommates).
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `house_id`: `INTEGER` (REFERENCES `houses(id)` ON DELETE CASCADE)
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
+* **Constraints**: `UNIQUE(house_id, npc_id)`
+* **Added in**: v17
+
+---
+
+### 27. `locations` (updated v15)
+Existing table, now with sub-location support and restricted access.
+* **New columns**:
+  * `parent_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE CASCADE — recursive sub-location chain) — *v15*
+  * `restricted`: `INTEGER DEFAULT 0` (Access restriction flag) — *v15*
+  * `restricted_until`: `TEXT DEFAULT ''` (e.g. `24/7`, `open_hours`, `1492-03-15`) — *v15*
