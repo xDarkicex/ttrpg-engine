@@ -663,6 +663,8 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		print_character_profs_json(db, char.id, "tool")
 		fmt.print(`,"spell_slots":`)
 		print_character_spell_slots_json(db, char.id)
+		fmt.print(`,"spells":`)
+		print_character_spells_json(db, char.id)
 		fmt.print(`,"resources":`)
 		print_character_resources_json(db, char.id)
 		fmt.print(`,"inventory":`)
@@ -743,6 +745,7 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		print_character_profs_text(db, char.id, "armor", "Armor Proficiencies")
 		print_character_profs_text(db, char.id, "tool", "Tool Proficiencies")
 		print_character_spell_slots_text(db, char.id)
+		print_character_spells_text(db, char.id)
 		print_character_resources_text(db, char.id)
 		print_character_inventory_text(db, char.id)
 		print_character_abilities_text(db, char.id)
@@ -1669,6 +1672,61 @@ print_character_spell_slots_text :: proc(db: ^lib.Db, char_id: int) {
 		max_v := int(sqlite.column_int(stmt, 1))
 		used_v := int(sqlite.column_int(stmt, 2))
 		fmt.printf("    Level %d: %d/%d\n", slot_lvl, max_v - used_v, max_v)
+	}
+}
+
+print_character_spells_json :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT s.id, s.name, s.level, cs.prepared FROM character_spells cs JOIN spells s ON cs.spell_id = s.id WHERE cs.character_id = %d ORDER BY s.level, s.name",
+		char_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_string(&builder, "[")
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_string(&builder, ",")
+		first = false
+		id := int(sqlite.column_int(stmt, 0))
+		name := column_text_safe(stmt, 1)
+		level := int(sqlite.column_int(stmt, 2))
+		prepared := int(sqlite.column_int(stmt, 3))
+		fmt.sbprintf(&builder, `{{"id":%d,"name":"%s","level":%d,"prepared":%d}}`, id, escape_json_string(name), level, prepared)
+	}
+	strings.write_string(&builder, "]")
+	fmt.print(strings.to_string(builder))
+}
+
+print_character_spells_text :: proc(db: ^lib.Db, char_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT s.id, s.name, s.level, cs.prepared FROM character_spells cs JOIN spells s ON cs.spell_id = s.id WHERE cs.character_id = %d ORDER BY s.level, s.name",
+		char_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	has_rows := false
+	for sqlite.step(stmt) == .Row {
+		if !has_rows {
+			fmt.println("  Spells:")
+			has_rows = true
+		}
+		name := column_text_safe(stmt, 1)
+		level := int(sqlite.column_int(stmt, 2))
+		prep := int(sqlite.column_int(stmt, 3)) == 1
+		prep_str := prep ? " [P]" : ""
+		fmt.printf("    - %s (Level %d)%s\n", name, level, prep_str)
 	}
 }
 
