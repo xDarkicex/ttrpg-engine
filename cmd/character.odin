@@ -279,6 +279,367 @@ fetch_character_class_summary :: proc(db: ^lib.Db, char_id: int) -> (class_summa
 	return
 }
 
+MULTICLASS_SPELL_SLOTS := [21][10]int{
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 3, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 4, 2, 0, 0, 0, 0, 0, 0, 0},
+	{0, 4, 3, 0, 0, 0, 0, 0, 0, 0},
+	{0, 4, 3, 2, 0, 0, 0, 0, 0, 0},
+	{0, 4, 3, 3, 0, 0, 0, 0, 0, 0},
+	{0, 4, 3, 3, 1, 0, 0, 0, 0, 0},
+	{0, 4, 3, 3, 2, 0, 0, 0, 0, 0},
+	{0, 4, 3, 3, 3, 1, 0, 0, 0, 0},
+	{0, 4, 3, 3, 3, 2, 0, 0, 0, 0},
+	{0, 4, 3, 3, 3, 2, 1, 0, 0, 0},
+	{0, 4, 3, 3, 3, 2, 1, 0, 0, 0},
+	{0, 4, 3, 3, 3, 2, 1, 1, 0, 0},
+	{0, 4, 3, 3, 3, 2, 1, 1, 0, 0},
+	{0, 4, 3, 3, 3, 2, 1, 1, 1, 0},
+	{0, 4, 3, 3, 3, 2, 1, 1, 1, 0},
+	{0, 4, 3, 3, 3, 2, 1, 1, 1, 1},
+	{0, 4, 3, 3, 3, 3, 1, 1, 1, 1},
+	{0, 4, 3, 3, 3, 3, 2, 1, 1, 1},
+	{0, 4, 3, 3, 3, 3, 2, 2, 1, 1},
+}
+
+get_skill_modifier :: proc(db: ^lib.Db, char: CharacterStats, skill_name: string) -> int {
+	ability_score := get_skill_ability(char, skill_name)
+	ability_mod := get_ability_modifier(ability_score)
+	
+	prof_level := 0
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT proficiency_level FROM character_skills WHERE character_id=%d AND skill_name='%s'", char.id, escape_sql(skill_name))
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		if sqlite.step(stmt) == .Row {
+			prof_level = int(sqlite.column_int(stmt, 0))
+		}
+	}
+	
+	prof_bonus := get_prof_bonus(char.level)
+	return ability_mod + prof_level * prof_bonus
+}
+
+ArmorCategory :: enum {
+	Light,
+	Medium,
+	Heavy,
+}
+
+get_armor_category :: proc(name: string, properties: string, ac_bonus: int) -> ArmorCategory {
+	name_lower := strings.to_lower(name, context.temp_allocator)
+	props_lower := strings.to_lower(properties, context.temp_allocator)
+	
+	if strings.contains(name_lower, "plate") || 
+	   strings.contains(name_lower, "splint") || 
+	   strings.contains(name_lower, "ring mail") || 
+	   strings.contains(name_lower, "chain mail") ||
+	   strings.contains(props_lower, "heavy") {
+		return .Heavy
+	}
+	
+	if strings.contains(name_lower, "breastplate") || 
+	   strings.contains(name_lower, "chain shirt") || 
+	   strings.contains(name_lower, "scale mail") || 
+	   strings.contains(name_lower, "hide") ||
+	   strings.contains(props_lower, "medium") {
+		return .Medium
+	}
+	
+	if strings.contains(name_lower, "leather") || 
+	   strings.contains(name_lower, "padded") || 
+	   strings.contains(name_lower, "studded") ||
+	   strings.contains(props_lower, "light") {
+		return .Light
+	}
+	
+	if ac_bonus >= 6 do return .Heavy
+	if ac_bonus >= 3 do return .Medium
+	return .Light
+}
+
+calculate_character_ac :: proc(db: ^lib.Db, char: CharacterStats) -> int {
+	dex_mod := get_ability_modifier(char.dex)
+	wis_mod := get_ability_modifier(char.wis)
+	con_mod := get_ability_modifier(char.con)
+	
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT i.name, i.item_type, i.ac_bonus, i.properties FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.character_id=%d AND inv.equipped=1", char.id)
+	sql_c := cstring(raw_data(sql))
+	
+	has_armor := false
+	armor_name := ""
+	armor_bonus := 0
+	armor_props := ""
+	
+	has_shield := false
+	shield_bonus := 0
+	
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		for sqlite.step(stmt) == .Row {
+			name := column_text_safe(stmt, 0)
+			item_type := column_text_safe(stmt, 1)
+			ac_bonus := int(sqlite.column_int(stmt, 2))
+			properties := column_text_safe(stmt, 3)
+			
+			if item_type == "armor" {
+				has_armor = true
+				armor_name = name
+				armor_bonus = ac_bonus
+				armor_props = properties
+			} else if item_type == "shield" {
+				has_shield = true
+				shield_bonus = ac_bonus
+			}
+		}
+	}
+	
+	ac := 10 + dex_mod
+	
+	if !has_armor {
+		is_monk := strings.contains(strings.to_lower(char.class, context.temp_allocator), "monk")
+		is_barb := strings.contains(strings.to_lower(char.class, context.temp_allocator), "barbarian")
+		
+		unarmored_base := 10 + dex_mod
+		
+		if is_monk && !has_shield {
+			monk_ac := 10 + dex_mod + wis_mod
+			if monk_ac > unarmored_base do unarmored_base = monk_ac
+		}
+		
+		if is_barb {
+			barb_ac := 10 + dex_mod + con_mod
+			if barb_ac > unarmored_base do unarmored_base = barb_ac
+		}
+		
+		if has_string_in_list(char.status_effects, "Mage Armor") || has_string_in_list(char.status_effects, "mage_armor") {
+			mage_ac := 13 + dex_mod
+			if mage_ac > unarmored_base do unarmored_base = mage_ac
+		}
+		
+		ac = unarmored_base
+	} else {
+		cat := get_armor_category(armor_name, armor_props, armor_bonus)
+		switch cat {
+		case .Light:
+			ac = 10 + armor_bonus + dex_mod
+		case .Medium:
+			ac = 10 + armor_bonus + (dex_mod > 2 ? 2 : dex_mod)
+		case .Heavy:
+			ac = 10 + armor_bonus
+		}
+	}
+	
+	if has_shield {
+		ac += shield_bonus
+	}
+	
+	return ac
+}
+
+get_class_level :: proc(db: ^lib.Db, char_id: int, target_class: string) -> int {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT level FROM character_classes WHERE character_id=%d AND class_name='%s'", char_id, escape_sql(target_class))
+	sql_c := cstring(raw_data(sql))
+	
+	level := 0
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		if sqlite.step(stmt) == .Row {
+			level = int(sqlite.column_int(stmt, 0))
+		}
+	}
+	return level
+}
+
+get_character_resource_max :: proc(db: ^lib.Db, char: CharacterStats, resource_name: string, db_max: int) -> int {
+	name_lower := strings.to_lower(resource_name, context.temp_allocator)
+	
+	if name_lower == "ki points" || name_lower == "ki" || name_lower == "discipline points" {
+		monk_lvl := get_class_level(db, char.id, "Monk")
+		if monk_lvl > 0 do return monk_lvl
+	}
+	
+	if name_lower == "bardic inspiration" {
+		bard_lvl := get_class_level(db, char.id, "Bard")
+		if bard_lvl > 0 {
+			cha_mod := get_ability_modifier(char.cha)
+			return cha_mod > 1 ? cha_mod : 1
+		}
+	}
+	
+	if name_lower == "rage" {
+		barb_lvl := get_class_level(db, char.id, "Barbarian")
+		if barb_lvl > 0 {
+			if barb_lvl >= 17 do return 6
+			if barb_lvl >= 12 do return 5
+			if barb_lvl >= 6  do return 4
+			if barb_lvl >= 3  do return 3
+			return 2
+		}
+	}
+	
+	return db_max
+}
+
+sync_character_resources :: proc(db: ^lib.Db, char: CharacterStats) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT resource_name, max_amount, current_amount FROM character_resources WHERE character_id=%d", char.id)
+	sql_c := cstring(raw_data(sql))
+	
+	ResourceEntry :: struct {
+		name: string,
+		max: int,
+		curr: int,
+	}
+	entries := make([dynamic]ResourceEntry, context.temp_allocator)
+	
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		for sqlite.step(stmt) == .Row {
+			name := fmt.tprintf("%s", sqlite.column_text(stmt, 0))
+			max_val := int(sqlite.column_int(stmt, 1))
+			curr_val := int(sqlite.column_int(stmt, 2))
+			append(&entries, ResourceEntry{name, max_val, curr_val})
+		}
+	}
+	
+	for entry in entries {
+		computed_max := get_character_resource_max(db, char, entry.name, entry.max)
+		if computed_max != entry.max {
+			new_curr := entry.curr
+			if new_curr > computed_max do new_curr = computed_max
+			update_sql := fmt.tprintf("UPDATE character_resources SET max_amount=%d, current_amount=%d WHERE character_id=%d AND resource_name='%s'", computed_max, new_curr, char.id, escape_sql(entry.name))
+			lib.db_exec(db, update_sql)
+		}
+	}
+}
+
+get_multiclass_caster_level :: proc(db: ^lib.Db, char_id: int) -> int {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT class_name, level FROM character_classes WHERE character_id=%d", char_id)
+	sql_c := cstring(raw_data(sql))
+	
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return 0
+	}
+	defer sqlite.finalize(stmt)
+	
+	caster_level_sum := 0
+	for sqlite.step(stmt) == .Row {
+		cls := sqlite.column_text(stmt, 0)
+		lvl := int(sqlite.column_int(stmt, 1))
+		cls_lower := strings.to_lower(fmt.tprintf("%s", cls), context.temp_allocator)
+		
+		if cls_lower == "bard" || cls_lower == "cleric" || cls_lower == "druid" || cls_lower == "sorcerer" || cls_lower == "wizard" {
+			caster_level_sum += lvl
+		} else if cls_lower == "paladin" || cls_lower == "ranger" || cls_lower == "artificer" {
+			caster_level_sum += (lvl + 1) / 2
+		} else if cls_lower == "fighter" || cls_lower == "rogue" {
+		}
+	}
+	
+	return caster_level_sum
+}
+
+calculate_spellcasting_stats :: proc(db: ^lib.Db, char: CharacterStats) -> (dc: int, attack: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT class_name, level FROM character_classes WHERE character_id=%d", char.id)
+	sql_c := cstring(raw_data(sql))
+	
+	ability_score := 10
+	has_spellcasting := false
+	
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		
+		highest_lvl := 0
+		highest_mod := -99
+		
+		for sqlite.step(stmt) == .Row {
+			cls := sqlite.column_text(stmt, 0)
+			lvl := int(sqlite.column_int(stmt, 1))
+			cls_lower := strings.to_lower(fmt.tprintf("%s", cls), context.temp_allocator)
+			
+			class_ability_score := 10
+			class_has_spellcasting := false
+			
+			if cls_lower == "bard" || cls_lower == "sorcerer" || cls_lower == "warlock" || cls_lower == "paladin" {
+				class_ability_score = char.cha
+				class_has_spellcasting = true
+			} else if cls_lower == "wizard" || cls_lower == "artificer" {
+				class_ability_score = char.int_
+				class_has_spellcasting = true
+			} else if cls_lower == "cleric" || cls_lower == "druid" || cls_lower == "ranger" {
+				class_ability_score = char.wis
+				class_has_spellcasting = true
+			}
+			
+			if class_has_spellcasting {
+				has_spellcasting = true
+				mod := get_ability_modifier(class_ability_score)
+				
+				if lvl > highest_lvl || (lvl == highest_lvl && mod > highest_mod) {
+					highest_lvl = lvl
+					highest_mod = mod
+					ability_score = class_ability_score
+				}
+			}
+		}
+	}
+	
+	if !has_spellcasting {
+		ability_score = char.cha
+		if char.wis > ability_score do ability_score = char.wis
+		if char.int_ > ability_score do ability_score = char.int_
+	}
+	
+	ability_mod := get_ability_modifier(ability_score)
+	prof := get_prof_bonus(char.level)
+	
+	dc = 8 + prof + ability_mod
+	attack = prof + ability_mod
+	
+	stmt_items: ^sqlite.Statement
+	sql_items := fmt.tprintf("SELECT i.name, i.properties, i.description FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.character_id=%d AND inv.equipped=1", char.id)
+	sql_items_c := cstring(raw_data(sql_items))
+	if sqlite.prepare(db.ptr, sql_items_c, i32(len(sql_items)), &stmt_items, nil) == .Ok {
+		defer sqlite.finalize(stmt_items)
+		for sqlite.step(stmt_items) == .Row {
+			name := column_text_safe(stmt_items, 0)
+			props := column_text_safe(stmt_items, 1)
+			desc := column_text_safe(stmt_items, 2)
+			
+			name_lower := strings.to_lower(name, context.temp_allocator)
+			props_lower := strings.to_lower(props, context.temp_allocator)
+			desc_lower := strings.to_lower(desc, context.temp_allocator)
+			
+			bonus := 0
+			if strings.contains(name_lower, "+1") || strings.contains(props_lower, "+1") || strings.contains(desc_lower, "+1") {
+				bonus = 1
+			} else if strings.contains(name_lower, "+2") || strings.contains(props_lower, "+2") || strings.contains(desc_lower, "+2") {
+				bonus = 2
+			} else if strings.contains(name_lower, "+3") || strings.contains(props_lower, "+3") || strings.contains(desc_lower, "+3") {
+				bonus = 3
+			}
+			
+			if bonus > 0 {
+				if strings.contains(name_lower, "wand") || strings.contains(name_lower, "rod") || strings.contains(name_lower, "staff") || 
+				   strings.contains(name_lower, "amulet") || strings.contains(name_lower, "grimoire") || strings.contains(name_lower, "focus") ||
+				   strings.contains(desc_lower, "spell attack") || strings.contains(desc_lower, "spell save") {
+					dc += bonus
+					attack += bonus
+				}
+			}
+		}
+	}
+	
+	return
+}
+
 fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
@@ -362,6 +723,13 @@ fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, fo
 	char.long_rests_available = int(sqlite.column_int(stmt, 63))
 
 	char.class, char.level = fetch_character_class_summary(db, id)
+
+	char.proficiency_bonus = get_prof_bonus(char.level)
+	char.initiative = get_ability_modifier(char.dex) + (check_has_feature(db, char.id, "Alert") ? 5 : 0)
+	char.passive_perception = 10 + get_skill_modifier(db, char, "perception")
+	char.ac = calculate_character_ac(db, char)
+	char.spell_save_dc, char.spell_attack_bonus = calculate_spellcasting_stats(db, char)
+	sync_character_resources(db, char)
 
 	return char, true
 }
@@ -646,7 +1014,7 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"max_hit_dice":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,`,
+			`"ruleset":"5.5e / 2024","id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"max_hit_dice":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,`,
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.death_saves_success, char.death_saves_failure, char.exhaustion, char.hit_dice_expended, char.max_hit_dice, char.ac, char.race, char.speed,
 			char.str, char.dex, char.con, char.int_, char.wis, char.cha,
 			char.save_prof_str, char.save_prof_dex, char.save_prof_con, char.save_prof_int, char.save_prof_wis, char.save_prof_cha,
@@ -671,7 +1039,7 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.print(`,"tool_profs":`)
 		print_character_profs_json(db, char.id, "tool")
 		fmt.print(`,"spell_slots":`)
-		print_character_spell_slots_json(db, char.id)
+		print_character_spell_slots_json(db, char)
 		fmt.print(`,"spells":`)
 		print_character_spells_json(db, char.id)
 		fmt.print(`,"resources":`)
@@ -690,6 +1058,7 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 				faction_str = fmt.tprintf("ID: %d", char.faction_id)
 			}
 		}
+		fmt.println("Ruleset: 5.5e / 2024")
 		fmt.printf("[%d] %s (%s) Lvl%d HP:%d/%d (Temp: %d) AC:%d Race:%s Speed:%d XP:%d Faction: %s\n",
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.ac, char.race, char.speed,
 			char.xp, faction_str,
@@ -754,7 +1123,7 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 		print_character_profs_text(db, char.id, "weapon", "Weapon Proficiencies")
 		print_character_profs_text(db, char.id, "armor", "Armor Proficiencies")
 		print_character_profs_text(db, char.id, "tool", "Tool Proficiencies")
-		print_character_spell_slots_text(db, char.id)
+		print_character_spell_slots_text(db, char)
 		print_character_spells_text(db, char.id)
 		print_character_resources_text(db, char.id)
 		print_character_inventory_text(db, char.id)
@@ -1638,50 +2007,57 @@ print_character_profs_text :: proc(db: ^lib.Db, char_id: int, prof_type: string,
 	}
 }
 
-print_character_spell_slots_json :: proc(db: ^lib.Db, char_id: int) {
-	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT slot_level, max_slots, used_slots FROM character_spell_slots WHERE character_id=%d ORDER BY slot_level", char_id)
-	sql_c := cstring(raw_data(sql))
-	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		fmt.print("[]")
-		return
-	}
-	defer sqlite.finalize(stmt)
-
+print_character_spell_slots_json :: proc(db: ^lib.Db, char: CharacterStats) {
+	caster_lvl := get_multiclass_caster_level(db, char.id)
+	
 	builder := strings.builder_make(context.temp_allocator)
 	strings.write_string(&builder, "[")
 	first := true
-	for sqlite.step(stmt) == .Row {
-		if !first do strings.write_string(&builder, ",")
-		first = false
-		slot_lvl := int(sqlite.column_int(stmt, 0))
-		max_v := int(sqlite.column_int(stmt, 1))
-		used_v := int(sqlite.column_int(stmt, 2))
-		fmt.sbprintf(&builder, `{{"slot_level":%d,"max_slots":%d,"used_slots":%d}}`, slot_lvl, max_v, used_v)
+	if caster_lvl > 0 {
+		for slot_lvl := 1; slot_lvl <= 9; slot_lvl += 1 {
+			max_slots := MULTICLASS_SPELL_SLOTS[caster_lvl][slot_lvl]
+			if max_slots <= 0 do continue
+			
+			used_slots := 0
+			stmt: ^sqlite.Statement
+			sql := fmt.tprintf("SELECT used_slots FROM character_spell_slots WHERE character_id=%d AND slot_level=%d", char.id, slot_lvl)
+			sql_c := cstring(raw_data(sql))
+			if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+				defer sqlite.finalize(stmt)
+				if sqlite.step(stmt) == .Row {
+					used_slots = int(sqlite.column_int(stmt, 0))
+				}
+			}
+			
+			if !first do strings.write_string(&builder, ",")
+			first = false
+			fmt.sbprintf(&builder, `{{"slot_level":%d,"max_slots":%d,"used_slots":%d}}`, slot_lvl, max_slots, used_slots)
+		}
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))
 }
 
-print_character_spell_slots_text :: proc(db: ^lib.Db, char_id: int) {
-	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT slot_level, max_slots, used_slots FROM character_spell_slots WHERE character_id=%d ORDER BY slot_level", char_id)
-	sql_c := cstring(raw_data(sql))
-	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		return
-	}
-	defer sqlite.finalize(stmt)
-
-	has_rows := false
-	for sqlite.step(stmt) == .Row {
-		if !has_rows {
-			fmt.println("  Spell Slots:")
-			has_rows = true
+print_character_spell_slots_text :: proc(db: ^lib.Db, char: CharacterStats) {
+	caster_lvl := get_multiclass_caster_level(db, char.id)
+	if caster_lvl <= 0 do return
+	
+	fmt.println("  Spell Slots:")
+	for slot_lvl := 1; slot_lvl <= 9; slot_lvl += 1 {
+		max_slots := MULTICLASS_SPELL_SLOTS[caster_lvl][slot_lvl]
+		if max_slots <= 0 do continue
+		
+		used_slots := 0
+		stmt: ^sqlite.Statement
+		sql := fmt.tprintf("SELECT used_slots FROM character_spell_slots WHERE character_id=%d AND slot_level=%d", char.id, slot_lvl)
+		sql_c := cstring(raw_data(sql))
+		if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+			defer sqlite.finalize(stmt)
+			if sqlite.step(stmt) == .Row {
+				used_slots = int(sqlite.column_int(stmt, 0))
+			}
 		}
-		slot_lvl := int(sqlite.column_int(stmt, 0))
-		max_v := int(sqlite.column_int(stmt, 1))
-		used_v := int(sqlite.column_int(stmt, 2))
-		fmt.printf("    Level %d: %d/%d\n", slot_lvl, max_v - used_v, max_v)
+		fmt.printf("    Level %d: %d/%d\n", slot_lvl, max_slots - used_slots, max_slots)
 	}
 }
 
