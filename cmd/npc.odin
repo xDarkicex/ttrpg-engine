@@ -905,15 +905,25 @@ print_npc_inventory_text :: proc(db: ^lib.Db, npc_id: int) {
 				status = " [A]"
 			}
 
-			details := ""
-			if len(dmg_dice) > 0 do details = fmt.tprintf("%s %s %s", details, dmg_dice, dmg_type)
-			if ac_bonus > 0 do details = fmt.tprintf("%s | AC+%d", details, ac_bonus)
-			if len(properties) > 0 do details = fmt.tprintf("%s | %s", details, properties)
-			if len(item_type) > 0 do details = fmt.tprintf("%s (%s)", details, item_type)
+			qty_part := ""
+			if qty > 1 {
+				qty_part = fmt.tprintf(" x%d", qty)
+			}
 
-			detail_part := ""
-			if len(details) > 0 do detail_part = fmt.tprintf(" | %s", details)
-			fmt.printf("    %s x%d%s%s (ID: %d)\n", name, qty, status, detail_part, item_id)
+			line := fmt.tprintf("    %s%s%s", name, qty_part, status)
+			if len(dmg_dice) > 0 {
+				line = fmt.tprintf("%s | %s %s", line, dmg_dice, dmg_type)
+			} else if ac_bonus > 0 {
+				line = fmt.tprintf("%s | +%d AC", line, ac_bonus)
+			}
+
+			if len(properties) > 0 {
+				line = fmt.tprintf("%s | %s (%s)", line, properties, item_type)
+			} else if len(item_type) > 0 {
+				line = fmt.tprintf("%s (%s)", line, item_type)
+			}
+
+			fmt.printf("%s (ID: %d)\n", line, item_id)
 		}
 		if !has_any do fmt.println("    Empty")
 	}
@@ -936,7 +946,7 @@ print_npc_tool_profs_json :: proc(db: ^lib.Db, npc_id: int) {
 		if !first do strings.write_string(&builder, ",")
 		first = false
 		name := column_text_safe(stmt, 0)
-		fmt.sbprintf(&builder, `{"name":"%s"}`, escape_json_string(name))
+		fmt.sbprintf(&builder, `{{"name":"%s"}}`, escape_json_string(name))
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))
@@ -980,7 +990,7 @@ print_npc_skills_json :: proc(db: ^lib.Db, npc_id: int) {
 		first = false
 		name := column_text_safe(stmt, 0)
 		mod := int(sqlite.column_int(stmt, 1))
-		fmt.sbprintf(&builder, `{"name":"%s","modifier":%d}`, escape_json_string(name), mod)
+		fmt.sbprintf(&builder, `{{"name":"%s","modifier":%d}}`, escape_json_string(name), mod)
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))

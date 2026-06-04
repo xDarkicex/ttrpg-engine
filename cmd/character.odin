@@ -537,15 +537,25 @@ print_character_inventory_text :: proc(db: ^lib.Db, char_id: int) {
 				status = " [A]"
 			}
 
-			details := ""
-			if len(dmg_dice) > 0 do details = fmt.tprintf("%s %s %s", details, dmg_dice, dmg_type)
-			if ac_bonus > 0 do details = fmt.tprintf("%s | AC+%d", details, ac_bonus)
-			if len(properties) > 0 do details = fmt.tprintf("%s | %s", details, properties)
-			if len(item_type) > 0 do details = fmt.tprintf("%s (%s)", details, item_type)
+			qty_part := ""
+			if qty > 1 {
+				qty_part = fmt.tprintf(" x%d", qty)
+			}
 
-			detail_part := ""
-			if len(details) > 0 do detail_part = fmt.tprintf(" | %s", details)
-			fmt.printf("    %s x%d%s%s (ID: %d)\n", name, qty, status, detail_part, item_id)
+			line := fmt.tprintf("    %s%s%s", name, qty_part, status)
+			if len(dmg_dice) > 0 {
+				line = fmt.tprintf("%s | %s %s", line, dmg_dice, dmg_type)
+			} else if ac_bonus > 0 {
+				line = fmt.tprintf("%s | +%d AC", line, ac_bonus)
+			}
+
+			if len(properties) > 0 {
+				line = fmt.tprintf("%s | %s (%s)", line, properties, item_type)
+			} else if len(item_type) > 0 {
+				line = fmt.tprintf("%s (%s)", line, item_type)
+			}
+
+			fmt.printf("%s (ID: %d)\n", line, item_id)
 		}
 		if !has_any do fmt.println("    Empty")
 	}
@@ -1547,13 +1557,20 @@ print_character_resources_text :: proc(db: ^lib.Db, char_id: int) {
 print_character_profs_json :: proc(db: ^lib.Db, char_id: int, prof_type: string) {
 	stmt: ^sqlite.Statement
 	table_name := ""
+	col_name := ""
 	switch prof_type {
-	case "weapon": table_name = "character_weapon_profs"
-	case "armor":  table_name = "character_armor_profs"
-	case "tool":   table_name = "character_tool_profs"
+	case "weapon":
+		table_name = "character_weapon_profs"
+		col_name = "weapon_name"
+	case "armor":
+		table_name = "character_armor_profs"
+		col_name = "armor_name"
+	case "tool":
+		table_name = "character_tool_profs"
+		col_name = "tool_name"
 	case: return
 	}
-	sql := fmt.tprintf("SELECT name FROM %s WHERE character_id=%d ORDER BY name", table_name, char_id)
+	sql := fmt.tprintf("SELECT %s FROM %s WHERE character_id=%d ORDER BY %s", col_name, table_name, char_id, col_name)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		fmt.print("[]")
@@ -1568,7 +1585,7 @@ print_character_profs_json :: proc(db: ^lib.Db, char_id: int, prof_type: string)
 		if !first do strings.write_string(&builder, ",")
 		first = false
 		name := column_text_safe(stmt, 0)
-		fmt.sbprintf(&builder, `{"name":"%s"}`, escape_json_string(name))
+		fmt.sbprintf(&builder, `{{"name":"%s"}}`, escape_json_string(name))
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))
@@ -1577,13 +1594,20 @@ print_character_profs_json :: proc(db: ^lib.Db, char_id: int, prof_type: string)
 print_character_profs_text :: proc(db: ^lib.Db, char_id: int, prof_type: string, label: string) {
 	stmt: ^sqlite.Statement
 	table_name := ""
+	col_name := ""
 	switch prof_type {
-	case "weapon": table_name = "character_weapon_profs"
-	case "armor":  table_name = "character_armor_profs"
-	case "tool":   table_name = "character_tool_profs"
+	case "weapon":
+		table_name = "character_weapon_profs"
+		col_name = "weapon_name"
+	case "armor":
+		table_name = "character_armor_profs"
+		col_name = "armor_name"
+	case "tool":
+		table_name = "character_tool_profs"
+		col_name = "tool_name"
 	case: return
 	}
-	sql := fmt.tprintf("SELECT name FROM %s WHERE character_id=%d ORDER BY name", table_name, char_id)
+	sql := fmt.tprintf("SELECT %s FROM %s WHERE character_id=%d ORDER BY %s", col_name, table_name, char_id, col_name)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		return
@@ -1620,7 +1644,7 @@ print_character_spell_slots_json :: proc(db: ^lib.Db, char_id: int) {
 		slot_lvl := int(sqlite.column_int(stmt, 0))
 		max_v := int(sqlite.column_int(stmt, 1))
 		used_v := int(sqlite.column_int(stmt, 2))
-		fmt.sbprintf(&builder, `{"slot_level":%d,"max_slots":%d,"used_slots":%d}`, slot_lvl, max_v, used_v)
+		fmt.sbprintf(&builder, `{{"slot_level":%d,"max_slots":%d,"used_slots":%d}}`, slot_lvl, max_v, used_v)
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))
@@ -1670,7 +1694,7 @@ print_conditions_json :: proc(db: ^lib.Db, target_type: string, target_id: int) 
 		dc := int(sqlite.column_int(stmt, 3))
 		ability := column_text_safe(stmt, 4)
 		applied := column_text_safe(stmt, 5)
-		fmt.sbprintf(&builder, `{"name":"%s","source":"%s","duration_rounds":%d,"save_dc":%d,"save_ability":"%s","applied_at":"%s"}`,
+		fmt.sbprintf(&builder, `{{"name":"%s","source":"%s","duration_rounds":%d,"save_dc":%d,"save_ability":"%s","applied_at":"%s"}}`,
 			escape_json_string(name), escape_json_string(source), dur, dc, escape_json_string(ability), escape_json_string(applied),
 		)
 	}
@@ -1701,8 +1725,8 @@ print_conditions_text :: proc(db: ^lib.Db, target_type: string, target_id: int) 
 
 		line := fmt.tprintf("    - %s", name)
 		if len(source) > 0 do line = fmt.tprintf("%s (from %s)", line, source)
-		if dur > 0 do line = fmt.tprintf("%s | %d rounds remaining", line, dur)
-		if dc > 0 do line = fmt.tprintf("%s | save DC %d %s", line, dc, ability)
+		if dur > 0 do line = fmt.tprintf("%s | %d rounds", line, dur)
+		if dc > 0 do line = fmt.tprintf("%s | save DC %d %s", line, dc, strings.to_upper(ability))
 		fmt.println(line)
 	}
 }
@@ -2586,10 +2610,17 @@ character_add_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	name := args[3]
 
 	table_name := ""
+	col_name := ""
 	switch prof_type {
-	case "weapon": table_name = "character_weapon_profs"
-	case "armor":  table_name = "character_armor_profs"
-	case "tool":   table_name = "character_tool_profs"
+	case "weapon":
+		table_name = "character_weapon_profs"
+		col_name = "weapon_name"
+	case "armor":
+		table_name = "character_armor_profs"
+		col_name = "armor_name"
+	case "tool":
+		table_name = "character_tool_profs"
+		col_name = "tool_name"
 	case:
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Prof type must be weapon, armor, or tool"}`)
@@ -2599,7 +2630,7 @@ character_add_prof :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 
-	sql := fmt.tprintf("INSERT OR REPLACE INTO %s (character_id, name) VALUES(%d, '%s')", table_name, id, escape_sql(name))
+	sql := fmt.tprintf("INSERT OR REPLACE INTO %s (character_id, %s) VALUES(%d, '%s')", table_name, col_name, id, escape_sql(name))
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Failed to add proficiency"}`)
@@ -2631,10 +2662,17 @@ character_remove_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	name := args[3]
 
 	table_name := ""
+	col_name := ""
 	switch prof_type {
-	case "weapon": table_name = "character_weapon_profs"
-	case "armor":  table_name = "character_armor_profs"
-	case "tool":   table_name = "character_tool_profs"
+	case "weapon":
+		table_name = "character_weapon_profs"
+		col_name = "weapon_name"
+	case "armor":
+		table_name = "character_armor_profs"
+		col_name = "armor_name"
+	case "tool":
+		table_name = "character_tool_profs"
+		col_name = "tool_name"
 	case:
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Prof type must be weapon, armor, or tool"}`)
@@ -2644,7 +2682,7 @@ character_remove_prof :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 
-	sql := fmt.tprintf("DELETE FROM %s WHERE character_id=%d AND name='%s'", table_name, id, escape_sql(name))
+	sql := fmt.tprintf("DELETE FROM %s WHERE character_id=%d AND %s='%s'", table_name, id, col_name, escape_sql(name))
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Failed to remove proficiency"}`)
@@ -2695,15 +2733,16 @@ character_set_spell_slot :: proc(db: ^lib.Db, args: []string) -> int {
 }
 
 condition_add :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 4 {
+	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent <entity> add-condition <id> <name> [source] [duration_rounds] [save_dc] [save_ability]"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent condition add <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent <entity> add-condition <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
+			fmt.eprintln("Usage: dnd-agent condition add <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
 		}
 		return 1
 	}
 	target_type := args[0]
+	if target_type == "char" do target_type = "character"
 	target_id := strconv.atoi(args[1])
 	name := args[2]
 	source := len(args) > 3 ? args[3] : ""
@@ -2742,6 +2781,7 @@ condition_remove :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	target_type := args[0]
+	if target_type == "char" do target_type = "character"
 	target_id := strconv.atoi(args[1])
 	name := args[2]
 
@@ -2773,6 +2813,7 @@ condition_list :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	target_type := args[0]
+	if target_type == "char" do target_type = "character"
 	target_id := strconv.atoi(args[1])
 
 	if db.is_json {
