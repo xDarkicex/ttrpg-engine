@@ -579,7 +579,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get":
 		return route_creature_core(db, sub, args)
-	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat", "set-darkvision":
+	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat", "set-darkvision", "set-type", "set-alignment", "set-environment", "set-speed-fly", "set-hover", "set-blindsight", "set-telepathy", "set-damage-immunities", "set-condition-immunities", "set-recharge", "set-bonus-actions", "set-lair-actions", "set-regional", "set-traits", "set-actions", "set-saving-throws", "set-skills-text", "set-languages-full":
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
@@ -620,6 +620,24 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-passive-perception":  return cmd.creature_set_passive_perception(db, args)
 	case "set-reactions":           return cmd.creature_set_reactions(db, args)
 	case "set-legendary":           return cmd.creature_set_legendary(db, args)
+	case "set-type":                return cmd.creature_set_type(db, args)
+	case "set-alignment":           return cmd.creature_set_alignment(db, args)
+	case "set-environment":         return cmd.creature_set_environment(db, args)
+	case "set-speed-fly":           return cmd.creature_set_speed_fly(db, args)
+	case "set-hover":               return cmd.creature_set_hover(db, args)
+	case "set-blindsight":           return cmd.creature_set_blindsight(db, args)
+	case "set-telepathy":           return cmd.creature_set_telepathy(db, args)
+	case "set-damage-immunities":   return cmd.creature_set_damage_immunities(db, args)
+	case "set-condition-immunities": return cmd.creature_set_condition_immunities(db, args)
+	case "set-recharge":            return cmd.creature_set_recharge(db, args)
+	case "set-bonus-actions":       return cmd.creature_set_bonus_actions(db, args)
+	case "set-lair-actions":        return cmd.creature_set_lair_actions(db, args)
+	case "set-regional":            return cmd.creature_set_regional(db, args)
+	case "set-traits":              return cmd.creature_set_traits(db, args)
+	case "set-actions":             return cmd.creature_set_actions(db, args)
+	case "set-saving-throws":       return cmd.creature_set_saving_throws(db, args)
+	case "set-skills-text":         return cmd.creature_set_skills_text(db, args)
+	case "set-languages-full":      return cmd.creature_set_languages_full(db, args)
 	case "set-combat":              return cmd.creature_set_combat(db, args)
 	case "set-darkvision":          return cmd.creature_set_darkvision(db, args)
 	}

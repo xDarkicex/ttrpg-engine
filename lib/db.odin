@@ -600,6 +600,43 @@ db_run_migrations_12 :: proc(db: ^Db, current_version: i32) -> Error {
 	return Error.None
 }
 
+db_run_migrations_13 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 13 {
+		// Legendary creature support: type, alignment, environment, speed_breakdown,
+		// senses (blindsight/tremorsense/truesight/telepathy), damage vs condition immunities,
+		// recharge, bonus actions, lair actions, regional effects, and saving throws display.
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN creature_type TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN alignment TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN environment TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN speed_fly INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN speed_hover INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN speed_burrow INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN speed_swim INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN speed_climb INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN blindsight INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN tremorsense INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN truesight INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN telepathy INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN damage_immunities TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN condition_immunities TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN recharge TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN bonus_actions TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN lair_actions TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN regional_effects TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN saving_throws_text TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN skills_text TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN traits TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN actions TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN languages_full TEXT DEFAULT '';")
+
+		set_version_err := set_db_version(db, 13)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
 db_init_schema :: proc(db: ^Db) -> Error {
 	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
 	if fk_err != Error.None do return fk_err
@@ -623,6 +660,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_12(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_13(db, i32(current_version))
 	if err != Error.None do return err
 
 	return Error.None
