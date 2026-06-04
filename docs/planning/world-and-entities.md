@@ -160,6 +160,19 @@ NPC's `location_id` points to the sub-location. The sub-location
 itself has `parent_id` pointing to the district. Walking up the
 parent chain gives the full district path.
 
+### 1.6 Relationship decay — schema add
+
+```sql
+-- Add last_interaction_at so the decay function has a timestamp to
+-- measure elapsed time from. Only persisted on actual interactions
+-- (no background cron).
+ALTER TABLE npc_relationships ADD COLUMN last_interaction_at TEXT DEFAULT '';
+-- Stores ISO date "1492-03-15" of last meaningful interaction (positive
+-- OR negative). The decay helper reads this and computes elapsed days.
+```
+
+No other schema changes for v15. Decay is purely query-time math.
+
 **Future option (defer to v16+):** Add `setpiece_id` to characters/npcs
 for "I am *at* the Anvil Bench, not just in the Blacksmith District".
 For now, `location_id` is sufficient.
@@ -248,41 +261,84 @@ also apply to creatures. Fix in v15 alongside the world model.
 
 ---
 
-## 4. Open questions for the contributor
+## 4. Resolved design questions
 
-1. **Should `locations.parent_id` be many levels deep (recursive tree)
-   or only one level (district → sub-location, no district-of-district)?**
-   Recommendation: recursive (a sub-location *can* itself have a
-   sub-location, e.g. "Castle" → "Castle Keep" → "Throne Room"). The
-   display walks the parent chain to print
-   `Castle > Keep > Throne Room`.
+The maintainer / contributor feedback loop on this doc converged on
+the following answers. Each is reflected in the implementation
+order in §5.
 
-2. **Should `relationship_status` be a per-character scalar, or
-   per-(character, location-type) like `(char, slum) = 0.3,
-   (char, castle) = 0.8`?**
-   Recommendation: scalar for v15. The per-(char, location) is a v16+
-   concern and adds combinatorial complexity.
+1. **`locations.parent_id` is recursive.** Walking a pointer chain
+   to resolve a location hierarchy
+   (`City → District → Castle → Throne Room`) is computationally
+   trivial in Odin and gives the DM maximum flexibility. The display
+   walks the parent chain and prints the breadcrumb.
 
-3. **Is `restricted_until = "open_hours"` the only schedule format?**
-   The `open_hours` field is plain text today
-   (e.g. `"06:00-22:00"`). Should it parse as a real schedule
-   with days, or is "we trust the DM" the right answer? Recommendation:
-   plain text, no parser. The display shows the raw text and the
-   check is a substring match.
+2. **`relationship_status` is a per-character scalar** in v15. The
+   per-(char, location) granularity is a v16+ concern and would
+   multiply write overhead without clear payoff.
 
-4. **Should `setpieces` require a chapter_event, or can a setpiece
-   just be flavor?**
-   Recommendation: `chapter_event` is optional. Empty = flavor.
-   Non-empty = "this location drives plot when the chapter
-   event triggers".
+3. **`open_hours` is plain text** (e.g. `"06:00-22:00"`). No parser.
+   The AI reads the string and the current in-game time to determine
+   if the shop is open. Trust the LLM; do not build a fantasy-calendar
+   parser.
 
-5. **For `houses`/`shops`, do we want a "loot table" reference
-   (table name) or a freeform `inventory` text?**
-   Recommendation: freeform `inventory` text for v15. Real loot
-   tables (id-based reference to a future `loot_tables` table) is
-   v16+.
+4. **`chapter_event` is optional.** Empty = flavor. Non-empty =
+   "instruction text for the AI DM." When the players enter a location
+   with a non-empty `chapter_event`, the system injects that text into
+   the AI's context window as a system instruction
+   (e.g. "The party has entered The Old Bell Tower. Trigger the
+   following event: Rings three times at midnight during Chapter 3.").
+   The AI narrates accordingly. No fired/unfired state machine in the
+   database.
 
----
+5. **`inventory` is a freeform text description** (e.g. "mid-tier
+   blacksmith goods, 2d4 healing potions, one rare magical
+   longsword"). When the players loot or shop, that string is passed
+   to the AI with a strict JSON schema requirement to return an array
+   of generated items. The AI handles the RNG and the stat generation.
+   No normalized `loot_tables` table in v15.
+
+### 4.1 Relationship decay algorithm (query-time, not stored)
+
+Negative relationships should cool off over in-game time. The maintainer
+proposed computing decay on query rather than via background updates.
+
+If `S_current` is the stored `friendship_level` (existing int, -10 to
++10), `S_base` is the neutral baseline (0), `t` is the elapsed in-game
+days since the last negative interaction, and `λ` is the decay constant
+(default 0.05 = ~14 day half-life):
+
+```
+S_calculated = S_base + (S_current - S_base) × e^(-λ × t)
+```
+
+The `S_current` is only persisted when an actual interaction occurs.
+This keeps the access check O(1) per query — one row lookup, one
+exponent, no matrix math. The `last_interaction_at` timestamp is
+stored on the `npc_relationships` row (added in v15 migration), not on
+the property being entered.
+
+For v15, this is implemented as a helper:
+
+```odin
+compute_relationship_with_decay :: proc(
+    db: ^lib.Db,
+    visitor_char_id: int,    -- 0 if visitor is NPC
+    visitor_npc_id: int,     -- 0 if visitor is character
+    owner_npc_id: int,
+    in_game_day: int,        -- current campaign day
+) -> float  -- returns -1.0..1.0
+```
+
+The result feeds the access-check bands from §2.3.
+
+### 4.2 Faction access math (deferred, v16+)
+
+The relationship math for v15 uses the per-pair `npc_relationships`
+row. Faction-based "same faction → auto-allowed, opposing faction →
+penalty" is documented as a v16 concern with no v15 schema change.
+The `factions` and `faction_standings` tables already exist and the
+maintainer can wire those into the access helper in v16.
 
 ## 5. Implementation order
 
