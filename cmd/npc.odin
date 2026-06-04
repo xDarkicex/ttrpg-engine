@@ -44,6 +44,12 @@ NpcStats :: struct {
 	languages: string,
 	concentrating_on: string,
 	combat: int,
+	darkvision: int,
+	bond: string,
+	flaw: string,
+	ideal: string,
+	personality_traits: string,
+	appearance: string,
 }
 
 npc_create :: proc(db: ^lib.Db, args: []string) -> int {
@@ -133,7 +139,7 @@ npc_list :: proc(db: ^lib.Db) -> int {
 fetch_npc_stats :: proc(db: ^lib.Db, id: int) -> (npc: NpcStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT n.id, n.name, n.description, n.current_hp, n.max_hp, n.dm_notes, n.campaign_id, n.gold, n.silver, n.copper, n.ac, n.status_effects, n.resistances, n.vulnerabilities, n.immunities, n.story_role, n.daily_role, n.backstory, n.faction_id, n.last_action, n.location_id, COALESCE(l.name, ''), n.str, n.dex, n.con, n.int_, n.wis, n.cha, n.cr, n.attack_bonus, n.damage_dice, n.damage_type, n.initiative, n.passive_perception, n.languages, n.concentrating_on, n.combat FROM npcs n LEFT JOIN locations l ON n.location_id = l.id WHERE n.id=%d",
+		"SELECT n.id, n.name, n.description, n.current_hp, n.max_hp, n.dm_notes, n.campaign_id, n.gold, n.silver, n.copper, n.ac, n.status_effects, n.resistances, n.vulnerabilities, n.immunities, n.story_role, n.daily_role, n.backstory, n.faction_id, n.last_action, n.location_id, COALESCE(l.name, ''), n.str, n.dex, n.con, n.int_, n.wis, n.cha, n.cr, n.attack_bonus, n.damage_dice, n.damage_type, n.initiative, n.passive_perception, n.languages, n.concentrating_on, n.combat, n.darkvision, n.bond, n.flaw, n.ideal, n.personality_traits, n.appearance FROM npcs n LEFT JOIN locations l ON n.location_id = l.id WHERE n.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -184,6 +190,12 @@ fetch_npc_stats :: proc(db: ^lib.Db, id: int) -> (npc: NpcStats, found: bool) {
 	npc.languages = fmt.tprintf("%s", sqlite.column_text(stmt, 34))
 	npc.concentrating_on = fmt.tprintf("%s", sqlite.column_text(stmt, 35))
 	npc.combat = int(sqlite.column_int(stmt, 36))
+	npc.darkvision = int(sqlite.column_int(stmt, 37))
+	npc.bond = fmt.tprintf("%s", sqlite.column_text(stmt, 38))
+	npc.flaw = fmt.tprintf("%s", sqlite.column_text(stmt, 39))
+	npc.ideal = fmt.tprintf("%s", sqlite.column_text(stmt, 40))
+	npc.personality_traits = fmt.tprintf("%s", sqlite.column_text(stmt, 41))
+	npc.appearance = fmt.tprintf("%s", sqlite.column_text(stmt, 42))
 
 	return npc, true
 }
@@ -212,16 +224,20 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"cr":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,`,
+			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"cr":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s",`,
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.dm_notes, npc.campaign_id,
 			npc.gold, npc.silver, npc.copper, npc.ac, npc.status_effects, npc.resistances, npc.vulnerabilities, npc.immunities,
 			npc.story_role, npc.daily_role, npc.backstory, npc.faction_id, escape_json_string(npc.last_action), npc.location_id, escape_json_string(npc.location_name),
 			npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha,
 			npc.cr, npc.attack_bonus, escape_json_string(npc.damage_dice), escape_json_string(npc.damage_type),
-			npc.initiative, npc.passive_perception, escape_json_string(npc.languages), escape_json_string(npc.concentrating_on), npc.combat,
+			npc.initiative, npc.passive_perception, escape_json_string(npc.languages), escape_json_string(npc.concentrating_on), npc.combat, npc.darkvision, escape_json_string(npc.bond), escape_json_string(npc.flaw), escape_json_string(npc.ideal), escape_json_string(npc.personality_traits), escape_json_string(npc.appearance),
 		)
 		fmt.print(`"abilities":`)
 		print_npc_abilities_json(db, npc.id)
+		fmt.print(`,"conditions":`)
+		print_conditions_json(db, "npc", npc.id)
+		fmt.print(`,"tool_profs":`)
+		print_npc_tool_profs_json(db, npc.id)
 		fmt.print(`,"skills":`)
 		print_npc_skills_json(db, npc.id)
 		fmt.print(`,"inventory":`)
@@ -233,8 +249,8 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 		)
 		fmt.printf("  Location: %s (ID: %d)\n", len(npc.location_name) > 0 ? npc.location_name : "None", npc.location_id)
 		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha)
-		fmt.printf("  Combat: CR:%d | Initiative: +%d | Passive Perception: %d | Attack: +%d (%s %s) | Combat: %s\n",
-			npc.cr, npc.initiative, npc.passive_perception, npc.attack_bonus, npc.damage_dice, npc.damage_type,
+		fmt.printf("  Combat: CR:%d | Initiative: +%d | Passive Perception: %d | Darkvision: %dft | Attack: +%d (%s %s) | Combat: %s\n",
+			npc.cr, npc.initiative, npc.passive_perception, npc.darkvision, npc.attack_bonus, npc.damage_dice, npc.damage_type,
 			npc.combat == 1 ? "YES" : "no",
 		)
 		fmt.printf("  Languages: %s\n", len(npc.languages) > 0 ? npc.languages : "None")
@@ -245,10 +261,17 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Story Role: %s\n", npc.story_role)
 		fmt.printf("  Daily Role: %s\n", npc.daily_role)
 		fmt.printf("  Backstory: %s\n", npc.backstory)
+		if len(npc.personality_traits) > 0 do fmt.printf("  Personality Traits: %s\n", npc.personality_traits)
+		if len(npc.ideal) > 0          do fmt.printf("  Ideal: %s\n", npc.ideal)
+		if len(npc.bond) > 0           do fmt.printf("  Bond: %s\n", npc.bond)
+		if len(npc.flaw) > 0           do fmt.printf("  Flaw: %s\n", npc.flaw)
+		if len(npc.appearance) > 0     do fmt.printf("  Appearance: %s\n", npc.appearance)
 		fmt.printf("  Status: %s\n", len(npc.status_effects) > 0 ? npc.status_effects : "None")
 		fmt.printf("  Resistances: %s\n", len(npc.resistances) > 0 ? npc.resistances : "None")
 		fmt.printf("  Last Action: %s\n", len(npc.last_action) > 0 ? npc.last_action : "None")
+		print_conditions_text(db, "npc", npc.id)
 		print_npc_abilities_text(db, npc.id)
+		print_npc_tool_profs_text(db, npc.id)
 		print_npc_skills_text(db, npc.id)
 		print_npc_inventory_text(db, npc.id)
 	}
@@ -827,7 +850,7 @@ print_npc_abilities_text :: proc(db: ^lib.Db, npc_id: int) {
 
 print_npc_inventory_json :: proc(db: ^lib.Db, npc_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.npc_id=%d", npc_id)
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id, i.damage_dice, i.damage_type, i.ac_bonus, i.properties, i.item_type FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.npc_id=%d", npc_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
 		defer sqlite.finalize(stmt)
@@ -854,7 +877,7 @@ print_npc_inventory_json :: proc(db: ^lib.Db, npc_id: int) {
 
 print_npc_inventory_text :: proc(db: ^lib.Db, npc_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.npc_id=%d", npc_id)
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id, i.damage_dice, i.damage_type, i.ac_bonus, i.properties, i.item_type FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.npc_id=%d", npc_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
 		defer sqlite.finalize(stmt)
@@ -862,11 +885,16 @@ print_npc_inventory_text :: proc(db: ^lib.Db, npc_id: int) {
 		has_any := false
 		for sqlite.step(stmt) == .Row {
 			has_any = true
-			name := sqlite.column_text(stmt, 0)
-			qty := sqlite.column_int(stmt, 1)
-			eq := sqlite.column_int(stmt, 2)
-			at := sqlite.column_int(stmt, 3)
-			item_id := sqlite.column_int(stmt, 4)
+			name := column_text_safe(stmt, 0)
+			qty := int(sqlite.column_int(stmt, 1))
+			eq := int(sqlite.column_int(stmt, 2))
+			at := int(sqlite.column_int(stmt, 3))
+			item_id := int(sqlite.column_int(stmt, 4))
+			dmg_dice := column_text_safe(stmt, 5)
+			dmg_type := column_text_safe(stmt, 6)
+			ac_bonus := int(sqlite.column_int(stmt, 7))
+			properties := column_text_safe(stmt, 8)
+			item_type := column_text_safe(stmt, 9)
 
 			status := ""
 			if eq == 1 && at == 1 {
@@ -876,9 +904,61 @@ print_npc_inventory_text :: proc(db: ^lib.Db, npc_id: int) {
 			} else if at == 1 {
 				status = " [A]"
 			}
-			fmt.printf("    %s x%d%s (ID: %d)\n", name, qty, status, item_id)
+
+			details := ""
+			if len(dmg_dice) > 0 do details = fmt.tprintf("%s %s %s", details, dmg_dice, dmg_type)
+			if ac_bonus > 0 do details = fmt.tprintf("%s | AC+%d", details, ac_bonus)
+			if len(properties) > 0 do details = fmt.tprintf("%s | %s", details, properties)
+			if len(item_type) > 0 do details = fmt.tprintf("%s (%s)", details, item_type)
+
+			detail_part := ""
+			if len(details) > 0 do detail_part = fmt.tprintf(" | %s", details)
+			fmt.printf("    %s x%d%s%s (ID: %d)\n", name, qty, status, detail_part, item_id)
 		}
 		if !has_any do fmt.println("    Empty")
+	}
+}
+
+print_npc_tool_profs_json :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT tool_name FROM npc_tool_profs WHERE npc_id=%d ORDER BY tool_name", npc_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_string(&builder, "[")
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_string(&builder, ",")
+		first = false
+		name := column_text_safe(stmt, 0)
+		fmt.sbprintf(&builder, `{"name":"%s"}`, escape_json_string(name))
+	}
+	strings.write_string(&builder, "]")
+	fmt.print(strings.to_string(builder))
+}
+
+print_npc_tool_profs_text :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT tool_name FROM npc_tool_profs WHERE npc_id=%d ORDER BY tool_name", npc_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	has_rows := false
+	for sqlite.step(stmt) == .Row {
+		if !has_rows {
+			fmt.println("  Tool Proficiencies:")
+			has_rows = true
+		}
+		name := column_text_safe(stmt, 0)
+		fmt.printf("    - %s\n", name)
 	}
 }
 
@@ -1291,5 +1371,79 @@ npc_remove_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	} else {
 		fmt.printf("Removed skill '%s' from NPC %d\n", skill_name, npc_id)
 	}
+	return 0
+}
+
+npc_set_darkvision :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-darkvision <id> <range_in_feet>"}`) } else { fmt.eprintln("Usage: dnd-agent npc set-darkvision <id> <range_in_feet>") }
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	rng := strconv.atoi(args[2])
+	sql := fmt.tprintf("UPDATE npcs SET darkvision=%d WHERE id=%d", rng, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set darkvision"}`) } else { fmt.eprintln("Failed to set darkvision") }
+		return 1
+	}
+	if db.is_json { fmt.printf(`{"success":true,"message":"Darkvision set","id":%d,"darkvision":%d}` + "\n", id, rng) } else { fmt.printf("Darkvision set to %dft for NPC %d\n", rng, id) }
+	return 0
+}
+
+npc_set_bond :: proc(db: ^lib.Db, args: []string) -> int { return npc_set_text_field(db, args, "bond", "Bond") }
+npc_set_flaw :: proc(db: ^lib.Db, args: []string) -> int { return npc_set_text_field(db, args, "flaw", "Flaw") }
+npc_set_ideal :: proc(db: ^lib.Db, args: []string) -> int { return npc_set_text_field(db, args, "ideal", "Ideal") }
+npc_set_personality_traits :: proc(db: ^lib.Db, args: []string) -> int { return npc_set_text_field(db, args, "personality_traits", "Personality Traits") }
+npc_set_appearance :: proc(db: ^lib.Db, args: []string) -> int { return npc_set_text_field(db, args, "appearance", "Appearance") }
+
+npc_set_text_field :: proc(db: ^lib.Db, args: []string, column: string, label: string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(fmt.tprintf(`{"success":false,"error":"Usage: dnd-agent npc set-%s <id> <text>"}`, column)) } else { fmt.eprintln(fmt.tprintf("Usage: dnd-agent npc set-%s <id> <text>", column)) }
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	text := args[2]
+	sql := fmt.tprintf("UPDATE npcs SET %s='%s' WHERE id=%d", column, escape_sql(text), id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(fmt.tprintf(`{"success":false,"error":"Failed to set %s"}`, column)) } else { fmt.eprintln(fmt.tprintf("Failed to set %s", column)) }
+		return 1
+	}
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"%s set","id":%d,"%s":"%s"}` + "\n", label, id, column, escape_json_string(text))
+	} else {
+		fmt.printf("%s set for NPC %d\n", label, id)
+	}
+	return 0
+}
+
+npc_add_tool_prof :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent npc add-tool-prof <npc_id> <tool_name>"}`) } else { fmt.eprintln("Usage: dnd-agent npc add-tool-prof <npc_id> <tool_name>") }
+		return 1
+	}
+	npc_id := strconv.atoi(args[1])
+	tool := args[2]
+	sql := fmt.tprintf("INSERT OR REPLACE INTO npc_tool_profs (npc_id, tool_name) VALUES(%d, '%s')", npc_id, escape_sql(tool))
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add tool prof"}`) } else { fmt.eprintln("Failed to add tool prof") }
+		return 1
+	}
+	if db.is_json { fmt.printf(`{"success":true,"message":"Tool prof added","npc_id":%d,"tool_name":"%s"}` + "\n", npc_id, escape_json_string(tool)) } else { fmt.printf("Added tool prof '%s' to NPC %d\n", tool, npc_id) }
+	return 0
+}
+
+npc_remove_tool_prof :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent npc remove-tool-prof <npc_id> <tool_name>"}`) } else { fmt.eprintln("Usage: dnd-agent npc remove-tool-prof <npc_id> <tool_name>") }
+		return 1
+	}
+	npc_id := strconv.atoi(args[1])
+	tool := args[2]
+	sql := fmt.tprintf("DELETE FROM npc_tool_profs WHERE npc_id=%d AND tool_name='%s'", npc_id, escape_sql(tool))
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to remove tool prof"}`) } else { fmt.eprintln("Failed to remove tool prof") }
+		return 1
+	}
+	if db.is_json { fmt.printf(`{"success":true,"message":"Tool prof removed","npc_id":%d,"tool_name":"%s"}` + "\n", npc_id, escape_json_string(tool)) } else { fmt.printf("Removed tool prof '%s' from NPC %d\n", tool, npc_id) }
 	return 0
 }

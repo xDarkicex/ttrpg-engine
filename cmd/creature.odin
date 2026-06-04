@@ -42,6 +42,7 @@ CreatureStats :: struct {
 	reactions: string,
 	legendary_actions: string,
 	combat: int,
+	darkvision: int,
 }
 
 creature_create :: proc(db: ^lib.Db, args: []string) -> int {
@@ -135,7 +136,7 @@ creature_list :: proc(db: ^lib.Db) -> int {
 fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, ''), c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.attack_bonus, c.damage_dice, c.damage_type, c.challenge_rating, c.initiative, c.passive_perception, c.reactions, c.legendary_actions, c.combat FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, ''), c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.attack_bonus, c.damage_dice, c.damage_type, c.challenge_rating, c.initiative, c.passive_perception, c.reactions, c.legendary_actions, c.combat, c.darkvision FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -184,6 +185,7 @@ fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: 
 	c.reactions = fmt.tprintf("%s", sqlite.column_text(stmt, 32))
 	c.legendary_actions = fmt.tprintf("%s", sqlite.column_text(stmt, 33))
 	c.combat = int(sqlite.column_int(stmt, 34))
+	c.darkvision = int(sqlite.column_int(stmt, 35))
 
 	return c, true
 }
@@ -217,13 +219,15 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 			c.campaign_id, c.location_id, c.location_name,
 		)
 		fmt.printf(
-			`"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","challenge_rating":%d,"initiative":%d,"passive_perception":%d,"reactions":"%s","legendary_actions":"%s","combat":%d,`,
+			`"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","challenge_rating":%d,"initiative":%d,"passive_perception":%d,"reactions":"%s","legendary_actions":"%s","combat":%d,"darkvision":%d,`,
 			c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum,
 			c.attack_bonus, escape_json_string(c.damage_dice), escape_json_string(c.damage_type),
-			c.challenge_rating, c.initiative, c.passive_perception, escape_json_string(c.reactions), escape_json_string(c.legendary_actions), c.combat,
+			c.challenge_rating, c.initiative, c.passive_perception, escape_json_string(c.reactions), escape_json_string(c.legendary_actions), c.combat, c.darkvision,
 		)
 		fmt.print(`"abilities":`)
 		print_creature_abilities_json(db, c.id)
+		fmt.print(`,"conditions":`)
+		print_conditions_json(db, "creature", c.id)
 		fmt.print(`,"loot":`)
 		print_creature_loot_json(db, c.id)
 		fmt.println("}")
@@ -231,8 +235,8 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("[%d] %s HP:%d/%d AC:%d Campaign:%d\n", c.id, c.name, c.current_hp, c.max_hp, c.ac, c.campaign_id)
 		fmt.printf("  Location: %s (ID: %d)\n", len(c.location_name) > 0 ? c.location_name : "None", c.location_id)
 		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", c.str, c.dex, c.con, c.int_, c.wis, c.cha)
-		fmt.printf("  Combat: CR:%d | Initiative: +%d | Passive Perception: %d | Attack: +%d (%s %s) | Combat: %s\n",
-			c.challenge_rating, c.initiative, c.passive_perception, c.attack_bonus, c.damage_dice, c.damage_type,
+		fmt.printf("  Combat: CR:%d | Initiative: +%d | Passive Perception: %d | Darkvision: %dft | Attack: +%d (%s %s) | Combat: %s\n",
+			c.challenge_rating, c.initiative, c.passive_perception, c.darkvision, c.attack_bonus, c.damage_dice, c.damage_type,
 			c.combat == 1 ? "YES" : "no",
 		)
 		if len(c.reactions) > 0 {
@@ -247,6 +251,7 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Resistances: %s\n", len(c.resistances) > 0 ? c.resistances : "None")
 		fmt.printf("  Story Role: %s\n", c.story_role)
 		fmt.printf("  Last Action: %s\n", len(c.last_action) > 0 ? c.last_action : "None")
+		print_conditions_text(db, "creature", c.id)
 		print_creature_abilities_text(db, c.id)
 		print_creature_loot_text(db, c.id)
 	}
@@ -577,7 +582,7 @@ print_creature_abilities_text :: proc(db: ^lib.Db, creature_id: int) {
 
 print_creature_loot_json :: proc(db: ^lib.Db, creature_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.creature_id=%d", creature_id)
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id, i.damage_dice, i.damage_type, i.ac_bonus, i.properties, i.item_type FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.creature_id=%d", creature_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
 		defer sqlite.finalize(stmt)
@@ -604,7 +609,7 @@ print_creature_loot_json :: proc(db: ^lib.Db, creature_id: int) {
 
 print_creature_loot_text :: proc(db: ^lib.Db, creature_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.creature_id=%d", creature_id)
+	sql := fmt.tprintf("SELECT i.name, inv.quantity, inv.equipped, inv.attuned, i.id, i.damage_dice, i.damage_type, i.ac_bonus, i.properties, i.item_type FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.creature_id=%d", creature_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
 		defer sqlite.finalize(stmt)
@@ -612,11 +617,16 @@ print_creature_loot_text :: proc(db: ^lib.Db, creature_id: int) {
 		has_any := false
 		for sqlite.step(stmt) == .Row {
 			has_any = true
-			name := sqlite.column_text(stmt, 0)
-			qty := sqlite.column_int(stmt, 1)
-			eq := sqlite.column_int(stmt, 2)
-			at := sqlite.column_int(stmt, 3)
-			item_id := sqlite.column_int(stmt, 4)
+			name := column_text_safe(stmt, 0)
+			qty := int(sqlite.column_int(stmt, 1))
+			eq := int(sqlite.column_int(stmt, 2))
+			at := int(sqlite.column_int(stmt, 3))
+			item_id := int(sqlite.column_int(stmt, 4))
+			dmg_dice := column_text_safe(stmt, 5)
+			dmg_type := column_text_safe(stmt, 6)
+			ac_bonus := int(sqlite.column_int(stmt, 7))
+			properties := column_text_safe(stmt, 8)
+			item_type := column_text_safe(stmt, 9)
 
 			status := ""
 			if eq == 1 && at == 1 {
@@ -626,7 +636,16 @@ print_creature_loot_text :: proc(db: ^lib.Db, creature_id: int) {
 			} else if at == 1 {
 				status = " [A]"
 			}
-			fmt.printf("    %s x%d%s (ID: %d)\n", name, qty, status, item_id)
+
+			details := ""
+			if len(dmg_dice) > 0 do details = fmt.tprintf("%s %s %s", details, dmg_dice, dmg_type)
+			if ac_bonus > 0 do details = fmt.tprintf("%s | AC+%d", details, ac_bonus)
+			if len(properties) > 0 do details = fmt.tprintf("%s | %s", details, properties)
+			if len(item_type) > 0 do details = fmt.tprintf("%s (%s)", details, item_type)
+
+			detail_part := ""
+			if len(details) > 0 do detail_part = fmt.tprintf(" | %s", details)
+			fmt.printf("    %s x%d%s%s (ID: %d)\n", name, qty, status, detail_part, item_id)
 		}
 		if !has_any do fmt.println("    Empty")
 	}
@@ -1050,5 +1069,21 @@ creature_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	} else {
 		fmt.printf("Combat %s for creature %d\n", state == 1 ? "started" : "ended", id)
 	}
+	return 0
+}
+
+creature_set_darkvision :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-darkvision <id> <range_in_feet>"}`) } else { fmt.eprintln("Usage: dnd-agent creature set-darkvision <id> <range_in_feet>") }
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	rng := strconv.atoi(args[2])
+	sql := fmt.tprintf("UPDATE creatures SET darkvision=%d WHERE id=%d", rng, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set darkvision"}`) } else { fmt.eprintln("Failed to set darkvision") }
+		return 1
+	}
+	if db.is_json { fmt.printf(`{"success":true,"message":"Darkvision set","id":%d,"darkvision":%d}` + "\n", id, rng) } else { fmt.printf("Darkvision set to %dft for creature %d\n", rng, id) }
 	return 0
 }

@@ -489,6 +489,52 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		if set_version_err != Error.None do return set_version_err
 	}
 
+	current_version = get_db_version(db)
+	if current_version < 7 {
+		// Senses: darkvision range (0 = none, common 60/120)
+		db_exec(db, "ALTER TABLE characters ADD COLUMN darkvision INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN darkvision INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN darkvision INTEGER DEFAULT 0;")
+
+		// Personality hooks (PHB)
+		db_exec(db, "ALTER TABLE characters ADD COLUMN bond TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN flaw TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN ideal TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN personality_traits TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN appearance TEXT DEFAULT '';")
+
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN bond TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN flaw TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN ideal TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN personality_traits TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN appearance TEXT DEFAULT '';")
+
+		// Conditions junction table (per-entity type+id; status effects with source/duration/save)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS conditions (
+			id INTEGER PRIMARY KEY,
+			target_type TEXT NOT NULL,
+			target_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			source TEXT DEFAULT '',
+			duration_rounds INTEGER DEFAULT 0,
+			save_dc INTEGER DEFAULT 0,
+			save_ability TEXT DEFAULT '',
+			applied_at TEXT DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(target_type, target_id, name)
+		);`)
+
+		// NPC tool proficiencies
+		db_exec(db, `CREATE TABLE IF NOT EXISTS npc_tool_profs (
+			id INTEGER PRIMARY KEY,
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE CASCADE,
+			tool_name TEXT NOT NULL,
+			UNIQUE(npc_id, tool_name)
+		);`)
+
+		set_version_err := set_db_version(db, 7)
+		if set_version_err != Error.None do return set_version_err
+	}
+
 	return Error.None
 }
 

@@ -6,7 +6,7 @@ This document details the SQLite database schema (`dnd-agent.db`) used by the D&
 
 ## Database Versioning
 The database schema utilizes SQLite's built-in `PRAGMA user_version` value to manage forward-only schema migrations.
-* **Current Version**: `6` (v1 base tables; v2 NPC ability scores; v3 creature campaign/location linkage; v4 creature stats/loot, NPC/creature feature junction tables; v5 character location/chapter; v6 combat stats, spellcasting, initiative, perception, languages, concentration, prof/skill/spell-slot junction tables).
+* **Current Version**: `7` (v1 base tables; v2 NPC ability scores; v3 creature campaign/location linkage; v4 creature stats/loot, NPC/creature feature junction tables; v5 character location/chapter; v6 combat stats, spellcasting, initiative, perception, languages, concentration, prof/skill/spell-slot junction tables; v7 darkvision, personality hooks (bond/flaw/ideal/traits/appearance), conditions junction table, NPC tool proficiencies).
 
 The canonical source of truth for the schema lives in `lib/db.odin` — `db_init_schema` constructs each version's `CREATE TABLE` / `ALTER TABLE` statements. This document is a reference derived from that code.
 
@@ -38,6 +38,10 @@ erDiagram
     features ||--o{ npc_features : "possessed_by"
     creatures ||--o{ creature_features : "has"
     features ||--o{ creature_features : "possessed_by"
+    characters ||--o{ conditions : "affected_by"
+    npcs ||--o{ conditions : "affected_by"
+    creatures ||--o{ conditions : "affected_by"
+    npcs ||--o{ npc_tool_profs : "proficient_in"
     campaigns ||--o{ locations : "contains"
     locations ||--o{ npcs : "contains"
     locations ||--o{ characters : "contains"
@@ -111,6 +115,12 @@ Tracks player characters, base stats, current saving throw proficiencies, combat
   * `concentrating_on`: `TEXT DEFAULT ''` (Active concentration spell name; blank = none) — *v6*
   * `combat`: `INTEGER DEFAULT 0` (Combat state flag: 0/1) — *v6*
   * `max_hit_dice`: `INTEGER DEFAULT 0` (Total hit dice pool; expended tracked separately) — *v6*
+  * `darkvision`: `INTEGER DEFAULT 0` (Darkvision range in feet; 0 = none, common 60/120) — *v7*
+  * `bond`: `TEXT DEFAULT ''` (PHB character bond) — *v7*
+  * `flaw`: `TEXT DEFAULT ''` (PHB character flaw) — *v7*
+  * `ideal`: `TEXT DEFAULT ''` (PHB character ideal) — *v7*
+  * `personality_traits`: `TEXT DEFAULT ''` (PHB character personality traits) — *v7*
+  * `appearance`: `TEXT DEFAULT ''` (Free-form physical description) — *v7*
 
 ---
 
@@ -176,7 +186,24 @@ Tracks max/used spell slots per level for each character. Pre-cast-table use; pe
 
 ---
 
-### 7. `companions`
+### 7. `conditions`
+Structured condition tracker replacing ad-hoc `status_effects` strings. Each row is one active condition on one entity (character, NPC, or creature). Use the top-level `dnd-agent condition` command — not a per-entity subcommand.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `target_type`: `TEXT NOT NULL` (One of `character`, `npc`, `creature` — no FK, polymorphic)
+  * `target_id`: `INTEGER NOT NULL`
+  * `name`: `TEXT NOT NULL` (e.g. `restrained`, `prone`, `frightened`)
+  * `source`: `TEXT DEFAULT ''` (Origin: `Web`, `Burning Hands`, etc.)
+  * `duration_rounds`: `INTEGER DEFAULT 0` (0 = indefinite, otherwise decrements on each round)
+  * `save_dc`: `INTEGER DEFAULT 0` (DC to end condition; 0 = no end-on-save)
+  * `save_ability`: `TEXT DEFAULT ''` (e.g. `STR`, `DEX`, `WIS`)
+  * `applied_at`: `TEXT DEFAULT CURRENT_TIMESTAMP`
+* **Constraints**: `UNIQUE(target_type, target_id, name)`
+* **Added in**: v7
+
+---
+
+### 8. `companions`
 Tracks character companions, pets, mounts, and familiars linked directly to a character.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -194,7 +221,7 @@ Tracks character companions, pets, mounts, and familiars linked directly to a ch
 
 ---
 
-### 8. `npcs`
+### 9. `npcs`
 Tracks non-player characters, daily/story roles, notes, currency, active location, campaign associations, and ability scores.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -223,10 +250,17 @@ Tracks non-player characters, daily/story roles, notes, currency, active locatio
   * `languages`: `TEXT DEFAULT ''` (Comma-separated) — *v6*
   * `concentrating_on`: `TEXT DEFAULT ''` (Active concentration spell; blank = none) — *v6*
   * `combat`: `INTEGER DEFAULT 0` (Combat state flag: 0/1) — *v6*
+  * `darkvision`: `INTEGER DEFAULT 0` (Darkvision range in feet) — *v7*
+  * `darkvision`: `INTEGER DEFAULT 0` (Darkvision range in feet) — *v7*
+  * `bond`: `TEXT DEFAULT ''` (NPC bond) — *v7*
+  * `flaw`: `TEXT DEFAULT ''` (NPC flaw) — *v7*
+  * `ideal`: `TEXT DEFAULT ''` (NPC ideal) — *v7*
+  * `personality_traits`: `TEXT DEFAULT ''` (NPC personality traits) — *v7*
+  * `appearance`: `TEXT DEFAULT ''` (NPC appearance) — *v7*
 
 ---
 
-### 9. `npc_skills`
+### 10. `npc_skills`
 NPCs use a flat skill+modifier store (no per-skill proficiency levels like characters). Each row is one skill for one NPC.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -238,7 +272,18 @@ NPCs use a flat skill+modifier store (no per-skill proficiency levels like chara
 
 ---
 
-### 10. `npc_relationships`
+### 11. `npc_tool_profs`
+Junction table for NPC tool proficiencies (e.g. `smith's tools`, `herbalism kit`). Creatures do not have tool profs.
+* **Columns**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `npc_id`: `INTEGER` (REFERENCES `npcs(id)` ON DELETE CASCADE)
+  * `tool_name`: `TEXT NOT NULL`
+* **Constraints**: `UNIQUE(npc_id, tool_name)`
+* **Added in**: v7
+
+---
+
+### 12. `npc_relationships`
 Enforces reputation/friendship matrices between two specific NPCs.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -251,7 +296,7 @@ Enforces reputation/friendship matrices between two specific NPCs.
 
 ---
 
-### 11. `factions` & `faction_standings`
+### 13. `factions` & `faction_standings`
 Defines factions and maps character standing reputations within those factions.
 * **`factions` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -267,7 +312,7 @@ Defines factions and maps character standing reputations within those factions.
 
 ---
 
-### 12. `items` & `inventory`
+### 14. `items` & `inventory`
 Stores item blueprints and records entities' holdings.
 * **`items` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -290,7 +335,7 @@ Stores item blueprints and records entities' holdings.
 
 ---
 
-### 13. `spells` & `character_spells`
+### 15. `spells` & `character_spells`
 Stores spell configurations and tracks spellbook links.
 * **`spells` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -306,7 +351,7 @@ Stores spell configurations and tracks spellbook links.
 
 ---
 
-### 14. `features` & `character_features`
+### 16. `features` & `character_features`
 Manages special abilities (feats, racial features, class features) and links them to characters.
 * **`features` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -320,7 +365,7 @@ Manages special abilities (feats, racial features, class features) and links the
 
 ---
 
-### 15. `creatures`
+### 17. `creatures`
 Tracks combat Presets, enemies, and monsters under the DM's management.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -340,10 +385,11 @@ Tracks combat Presets, enemies, and monsters under the DM's management.
   * `reactions`: `TEXT DEFAULT ''` (Free-form description of reaction abilities) — *v6*
   * `legendary_actions`: `TEXT DEFAULT ''` (Free-form description of legendary actions for boss-tier creatures) — *v6*
   * `combat`: `INTEGER DEFAULT 0` (Combat state flag: 0/1) — *v6*
+  * `darkvision`: `INTEGER DEFAULT 0` (Darkvision range in feet) — *v7*
 
 ---
 
-### 16. `class_specialties`
+### 18. `class_specialties`
 Configures level-unlocked class specialty information.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -356,7 +402,7 @@ Configures level-unlocked class specialty information.
 
 ---
 
-### 17. `campaigns` & `locations`
+### 19. `campaigns` & `locations`
 * **`campaigns` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
   * `name`: `TEXT NOT NULL`
@@ -374,7 +420,7 @@ Configures level-unlocked class specialty information.
 
 ---
 
-### 18. `story_actions` & `story_action_actors`
+### 20. `story_actions` & `story_action_actors`
 Tracks chronological logs of campaign plot steps and maps actors involved.
 * **`story_actions` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
@@ -395,7 +441,7 @@ Tracks chronological logs of campaign plot steps and maps actors involved.
 
 ---
 
-### 19. `npc_features` & `creature_features`
+### 21. `npc_features` & `creature_features`
 Junction tables linking NPCs and creatures to abilities/features.
 * **`npc_features` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)

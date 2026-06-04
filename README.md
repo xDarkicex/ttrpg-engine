@@ -56,15 +56,16 @@ odin build . -file -collection:ext=./vendor -out:dnd-agent
    - [Characters & Multiclassing](#1-characters--multiclassing)
    - [Vitals & Resting Setters](#2-vitals--resting-setters)
    - [Combat Stats & Spellcasting](#3-combat-stats--spellcasting)
-   - [Skills & Proficiencies](#4-skills--proficiencies)
-   - [Class Resources & Spell Slots](#5-class-resources--spell-slots)
-   - [Companions & Pets](#6-companions--pets)
-   - [NPCs & Relationships](#7-npcs--relationships)
-   - [Creatures & Monsters](#8-creatures--monsters)
-   - [Campaigns, Locations, & Story Tracking](#9-campaigns-locations--story-tracking)
-   - [Factions & Standings](#10-factions--standings)
-   - [Spells & Features](#11-spells--features)
-   - [Items & Inventory Management](#12-items--inventory-management)
+   - [Conditions & Personality](#4-conditions--personality)
+   - [Skills & Proficiencies](#5-skills--proficiencies)
+   - [Class Resources & Spell Slots](#6-class-resources--spell-slots)
+   - [Companions & Pets](#7-companions--pets)
+   - [NPCs & Relationships](#8-npcs--relationships)
+   - [Creatures & Monsters](#9-creatures--monsters)
+   - [Campaigns, Locations, & Story Tracking](#10-campaigns-locations--story-tracking)
+   - [Factions & Standings](#11-factions--standings)
+   - [Spells & Features](#12-spells--features)
+   - [Items & Inventory Management](#13-items--inventory-management)
 5. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
 6. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
@@ -241,10 +242,41 @@ Set D&D 5e combat math: proficiency bonus, initiative, spell save DC, spell atta
   ./dnd-agent character add-prof <id> <weapon|armor|tool> <name>
   ./dnd-agent character remove-prof <id> <weapon|armor|tool> <name>
   ```
+- **Set Darkvision (Range in Feet, 0 = None)**:
+  ```bash
+  ./dnd-agent character set-darkvision <id> <range>
+  ```
 
 ---
 
-### 4. Skills & Proficiencies
+### 4. Conditions & Personality
+Track D&D 5e conditions with source/duration/save metadata, and PHB personality hooks. Conditions are a top-level command (apply to character, NPC, or creature polymorphically).
+
+- **Apply a Condition**:
+  ```bash
+  ./dnd-agent condition add <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]
+  ```
+  *Example: `dnd-agent condition add character 1 restrained Web 10 13 STR` — restrained by Web, ends on STR save DC 13 or after 10 rounds.*
+- **List Active Conditions on an Entity**:
+  ```bash
+  ./dnd-agent condition list <character|npc|creature> <id>
+  ```
+- **Remove a Condition**:
+  ```bash
+  ./dnd-agent condition remove <character|npc|creature> <id> <name>
+  ```
+- **Set Personality Hooks (PHB)**:
+  ```bash
+  ./dnd-agent character set-bond <id> <text>
+  ./dnd-agent character set-flaw <id> <text>
+  ./dnd-agent character set-ideal <id> <text>
+  ./dnd-agent character set-personality-traits <id> <text>
+  ./dnd-agent character set-appearance <id> <text>
+  ```
+
+---
+
+### 5. Skills & Proficiencies
 Manage skill proficiencies. Modifiers are calculated dynamically based on 5e rules.
 
 - **Set Skill Proficiency Level**:
@@ -259,7 +291,7 @@ Manage skill proficiencies. Modifiers are calculated dynamically based on 5e rul
 
 ---
 
-### 5. Class Resources & Spell Slots
+### 6. Class Resources & Spell Slots
 Track custom class resource pools (Rage, Ki, Sorcery Points) and spell slots.
 
 - **Configure Resource Pool**:
@@ -287,7 +319,7 @@ Track custom class resource pools (Rage, Ki, Sorcery Points) and spell slots.
 
 ---
 
-### 6. Companions & Pets
+### 7. Companions & Pets
 Track character companions, mounts, pets, and familiars.
 
 - **Create Companion**:
@@ -314,7 +346,7 @@ Track character companions, mounts, pets, and familiars.
 
 ---
 
-### 7. NPCs & Relationships
+### 8. NPCs & Relationships
 Manage campaign NPCs, daily roles, location, and interpersonal relationships.
 
 - **Create NPC**:
@@ -381,10 +413,27 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ./dnd-agent npc set-skill <npc_id> <skill_name> <modifier>
   ./dnd-agent npc remove-skill <npc_id> <skill_name>
   ```
+- **Set NPC Darkvision (Range in Feet)**:
+  ```bash
+  ./dnd-agent npc set-darkvision <id> <range>
+  ```
+- **Set NPC Personality Hooks (Bond/Flaw/Ideal/Traits/Appearance)**:
+  ```bash
+  ./dnd-agent npc set-bond <id> <text>
+  ./dnd-agent npc set-flaw <id> <text>
+  ./dnd-agent npc set-ideal <id> <text>
+  ./dnd-agent npc set-personality-traits <id> <text>
+  ./dnd-agent npc set-appearance <id> <text>
+  ```
+- **Manage NPC Tool Proficiencies** (e.g. `smith's tools`, `herbalism kit`):
+  ```bash
+  ./dnd-agent npc add-tool-prof <npc_id> <tool_name>
+  ./dnd-agent npc remove-tool-prof <npc_id> <tool_name>
+  ```
 
 ---
 
-### 8. Creatures & Monsters
+### 9. Creatures & Monsters
 Manage active monsters, beasts, and campaign enemies. Supports ability scores, loot currencies, loot inventory tables, and custom traits.
 
 - **Create Creature Preset**:
@@ -454,6 +503,10 @@ Manage active monsters, beasts, and campaign enemies. Supports ability scores, l
   ```bash
   ./dnd-agent creature set-combat <id> <0|1>
   ```
+- **Set Creature Darkvision (Range in Feet)**:
+  ```bash
+  ./dnd-agent creature set-darkvision <id> <range>
+  ```
 - **Link Creature to Campaign Location**:
   ```bash
   ./dnd-agent creature set-location <creature_id> <location_id>
@@ -461,7 +514,7 @@ Manage active monsters, beasts, and campaign enemies. Supports ability scores, l
 
 ---
 
-### 9. Campaigns, Locations, & Story Tracking
+### 10. Campaigns, Locations, & Story Tracking
 Track the session number, current location, logged events, and generate a comprehensive campaign status report.
 
 - **Create Campaign**:
@@ -496,7 +549,7 @@ Track the session number, current location, logged events, and generate a compre
 
 ---
 
-### 10. Factions & Standings
+### 11. Factions & Standings
 Configure factions and standings metrics.
 
 - **Create Faction**:
@@ -518,7 +571,7 @@ Configure factions and standings metrics.
 
 ---
 
-### 11. Spells & Features
+### 12. Spells & Features
 Manage spell libraries, features, and character spellbooks.
 
 - **Spells Library**:
@@ -548,7 +601,7 @@ Manage spell libraries, features, and character spellbooks.
 
 ---
 
-### 12. Items & Inventory Management
+### 13. Items & Inventory Management
 Enforce items configurations and map item ownership, equipment, and attunement status.
 
 - **Create/Modify Item Blueprint**:

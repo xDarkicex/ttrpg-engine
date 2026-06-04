@@ -177,6 +177,15 @@ HELP_COMMANDS := []CommandHelp{
 		},
 	},
 	{
+		command = "condition",
+		description = "Manage active D&D 5e conditions (restrained, prone, etc.) on any entity.",
+		subcommands = []SubcommandHelp{
+			{"add", "<character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]", "Apply a condition to an entity. Source explains the origin (e.g. Web). Save fields are for effects that end on save."},
+			{"list", "<character|npc|creature> <id>", "List active conditions on an entity."},
+			{"remove", "<character|npc|creature> <id> <name>", "Remove a condition by name."},
+		},
+	},
+	{
 		command = "campaign",
 		description = "Track sessions, chapters, current active locations, story progress, and DM campaign logs.",
 		subcommands = []SubcommandHelp{
@@ -245,6 +254,8 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 	switch cmd_name {
 	case "character", "item", "inventory", "npc", "spell", "feature", "companion", "creature", "faction", "class-specialty":
 		return route_game_command(db, cmd_name, args)
+	case "condition":
+		return route_condition(db, args)
 	case "campaign", "init", "help":
 		return route_meta_command(db, cmd_name, args)
 	case:
@@ -343,7 +354,7 @@ route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_character_core(db, sub, args)
-	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot":
+	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance":
 		return route_character_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -408,6 +419,12 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 	case "add-prof":                return cmd.character_add_prof(db, args)
 	case "remove-prof":             return cmd.character_remove_prof(db, args)
 	case "set-spell-slot":          return cmd.character_set_spell_slot(db, args)
+	case "set-darkvision":          return cmd.character_set_darkvision(db, args)
+	case "set-bond":                return cmd.character_set_bond(db, args)
+	case "set-flaw":                return cmd.character_set_flaw(db, args)
+	case "set-ideal":               return cmd.character_set_ideal(db, args)
+	case "set-personality-traits":  return cmd.character_set_personality_traits(db, args)
+	case "set-appearance":          return cmd.character_set_appearance(db, args)
 	}
 	return 1
 }
@@ -554,7 +571,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get":
 		return route_creature_core(db, sub, args)
-	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat":
+	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat", "set-darkvision":
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
@@ -596,6 +613,7 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-reactions":           return cmd.creature_set_reactions(db, args)
 	case "set-legendary":           return cmd.creature_set_legendary(db, args)
 	case "set-combat":              return cmd.creature_set_combat(db, args)
+	case "set-darkvision":          return cmd.creature_set_darkvision(db, args)
 	}
 	return 1
 }
@@ -626,6 +644,30 @@ route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 }
 
+
+route_condition :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
+		}
+		return 1
+	}
+	switch args[0] {
+	case "add":    return cmd.condition_add(db, args[1:])
+	case "remove": return cmd.condition_remove(db, args[1:])
+	case "list":   return cmd.condition_list(db, args[1:])
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown condition subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown condition subcommand:", args[0])
+		}
+		return 1
+	}
+}
+
 route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
@@ -639,7 +681,7 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_npc_core(db, sub, args)
-	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities", "set-cr", "set-attack", "set-initiative", "set-combat", "set-languages", "set-passive-perception", "set-concentrating", "set-skill", "remove-skill":
+	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities", "set-cr", "set-attack", "set-initiative", "set-combat", "set-languages", "set-passive-perception", "set-concentrating", "set-skill", "remove-skill", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance", "add-tool-prof", "remove-tool-prof":
 		return route_npc_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -687,6 +729,14 @@ route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-concentrating":        return cmd.npc_set_concentrating(db, args)
 	case "set-skill":                return cmd.npc_set_skill(db, args)
 	case "remove-skill":             return cmd.npc_remove_skill(db, args)
+	case "set-darkvision":           return cmd.npc_set_darkvision(db, args)
+	case "set-bond":                 return cmd.npc_set_bond(db, args)
+	case "set-flaw":                 return cmd.npc_set_flaw(db, args)
+	case "set-ideal":                return cmd.npc_set_ideal(db, args)
+	case "set-personality-traits":   return cmd.npc_set_personality_traits(db, args)
+	case "set-appearance":           return cmd.npc_set_appearance(db, args)
+	case "add-tool-prof":            return cmd.npc_add_tool_prof(db, args)
+	case "remove-tool-prof":         return cmd.npc_remove_tool_prof(db, args)
 	}
 	return 1
 }
