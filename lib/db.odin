@@ -711,6 +711,20 @@ db_run_migrations_15 :: proc(db: ^Db, current_version: i32) -> Error {
 	return Error.None
 }
 
+db_run_migrations_16 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 16 {
+		// Relationship type: spouse, family, friend, rival, enemy, acquaintance, ally.
+		// Makes the friendship_level value meaningful by giving it a semantic label.
+		db_exec(db, "ALTER TABLE npc_relationships ADD COLUMN type TEXT DEFAULT '';")
+
+		set_version_err := set_db_version(db, 16)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
 db_init_schema :: proc(db: ^Db) -> Error {
 	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
 	if fk_err != Error.None do return fk_err
@@ -746,6 +760,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_15(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_16(db, i32(current_version))
 	if err != Error.None do return err
 
 	return Error.None

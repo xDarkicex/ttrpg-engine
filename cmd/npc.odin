@@ -247,12 +247,21 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("[%d] %s (%s) HP:%d/%d AC:%d Campaign:%d Faction:%d\n",
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.ac, npc.campaign_id, npc.faction_id,
 		)
-		fmt.printf("  Location: %s (ID: %d)\n", len(npc.location_name) > 0 ? npc.location_name : "None", npc.location_id)
+		if npc.location_id > 0 {
+			fmt.printf("  Location: %s (ID: %d)\n", npc.location_name, npc.location_id)
+		} else {
+			fmt.println("  Location: None")
+		}
 		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha)
-		fmt.printf("  Combat: CR:%d | Initiative: +%d | Passive Perception: %d | Darkvision: %dft | Attack: +%d (%s %s) | Combat: %s\n",
-			npc.cr, npc.initiative, npc.passive_perception, npc.darkvision, npc.attack_bonus, npc.damage_dice, npc.damage_type,
-			npc.combat == 1 ? "YES" : "no",
-		)
+		if len(npc.damage_dice) > 0 {
+			fmt.printf("  Combat: Initiative: +%d | Passive Perception: %d | Darkvision: %dft | Attack: +%d (%s %s)\n",
+				npc.initiative, npc.passive_perception, npc.darkvision, npc.attack_bonus, npc.damage_dice, npc.damage_type,
+			)
+		} else {
+			fmt.printf("  Combat: Initiative: +%d | Passive Perception: %d | Darkvision: %dft\n",
+				npc.initiative, npc.passive_perception, npc.darkvision,
+			)
+		}
 		fmt.printf("  Languages: %s\n", len(npc.languages) > 0 ? npc.languages : "None")
 		if len(npc.concentrating_on) > 0 {
 			fmt.printf("  Concentrating On: %s\n", npc.concentrating_on)
@@ -636,20 +645,21 @@ npc_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_relationship :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [notes]"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [notes]")
+			fmt.eprintln("Usage: dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]")
 		}
 		return 1
 	}
 	n1 := strconv.atoi(args[1])
 	n2 := strconv.atoi(args[2])
 	friend := strconv.atoi(args[3])
-	notes := len(args) >= 5 ? args[4] : ""
+	rel_type := len(args) >= 5 ? args[4] : ""
+	notes := len(args) >= 6 ? args[5] : ""
 
 	sql := fmt.tprintf(
-		"INSERT OR REPLACE INTO npc_relationships (npc_id_1,npc_id_2,friendship_level,notes) VALUES(%d,%d,%d,'%s')",
-		n1, n2, friend, escape_sql(notes),
+		"INSERT OR REPLACE INTO npc_relationships (npc_id_1,npc_id_2,friendship_level,type,notes) VALUES(%d,%d,%d,'%s','%s')",
+		n1, n2, friend, escape_sql(rel_type), escape_sql(notes),
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
@@ -661,9 +671,9 @@ npc_set_relationship :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"message":"Relationship updated between NPC %d and %d"}}\n`, n1, n2)
+		fmt.printf(`{{"success":true,"message":"Relationship updated","npc_id_1":%d,"npc_id_2":%d,"friendship_level":%d,"type":"%s"}}\n`, n1, n2, friend, escape_json_string(rel_type))
 	} else {
-		fmt.printf("Relationship updated between NPC %d and %d (friendship: %d)\n", n1, n2, friend)
+		fmt.printf("Relationship updated between NPC %d and %d (friendship: %d, type: %s)\n", n1, n2, friend, len(rel_type) > 0 ? rel_type : "unspecified")
 	}
 	return 0
 }
@@ -680,7 +690,7 @@ npc_list_relationships :: proc(db: ^lib.Db, args: []string) -> int {
 	id := strconv.atoi(args[1])
 
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT npc_id_2, friendship_level, notes FROM npc_relationships WHERE npc_id_1=%d ORDER BY friendship_level DESC", id)
+	sql := fmt.tprintf("SELECT npc_id_2, friendship_level, COALESCE(type, ''), notes FROM npc_relationships WHERE npc_id_1=%d ORDER BY friendship_level DESC", id)
 	sql_c := cstring(raw_data(sql))
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
@@ -700,10 +710,13 @@ npc_list_relationships :: proc(db: ^lib.Db, args: []string) -> int {
 		for sqlite.step(stmt) == .Row {
 			if !first do strings.write_byte(&builder, ',')
 			first = false
-			fmt.sbprintf(&builder, `{{"target_npc_id":{},"friendship_level":{},"notes":"{}"}}`,
+			rel_type := column_text_safe(stmt, 2)
+			notes := column_text_safe(stmt, 3)
+			fmt.sbprintf(&builder, `{{"target_npc_id":{},"friendship_level":{},"type":"{}","notes":"{}"}}`,
 				sqlite.column_int(stmt, 0),
 				sqlite.column_int(stmt, 1),
-				sqlite.column_text(stmt, 2),
+				rel_type,
+				notes,
 			)
 		}
 		strings.write_byte(&builder, ']')
@@ -711,10 +724,15 @@ npc_list_relationships :: proc(db: ^lib.Db, args: []string) -> int {
 	} else {
 		fmt.printf("Relationships for NPC %d:\n", id)
 		for sqlite.step(stmt) == .Row {
-			fmt.printf("  With NPC %d: friendship:%d (%s)\n",
+			rel_t := column_text_safe(stmt, 2)
+			nt := column_text_safe(stmt, 3)
+			type_prefix := ""
+			if len(rel_t) > 0 do type_prefix = fmt.tprintf("[%s] ", rel_t)
+			fmt.printf("  With NPC %d: %sfriendship:%d (%s)\n",
 				sqlite.column_int(stmt, 0),
+				type_prefix,
 				sqlite.column_int(stmt, 1),
-				sqlite.column_text(stmt, 2),
+				nt,
 			)
 		}
 	}
@@ -990,7 +1008,7 @@ print_npc_skills_json :: proc(db: ^lib.Db, npc_id: int) {
 		first = false
 		name := column_text_safe(stmt, 0)
 		mod := int(sqlite.column_int(stmt, 1))
-		fmt.sbprintf(&builder, `{{"name":"%s","modifier":%d}}`, escape_json_string(name), mod)
+		fmt.sbprintf(&builder, `{{"name":"%s","proficiency_rank":%d}}`, escape_json_string(name), mod)
 	}
 	strings.write_string(&builder, "]")
 	fmt.print(strings.to_string(builder))
@@ -1013,7 +1031,10 @@ print_npc_skills_text :: proc(db: ^lib.Db, npc_id: int) {
 		}
 		name := column_text_safe(stmt, 0)
 		mod := int(sqlite.column_int(stmt, 1))
-		fmt.printf("    - %s: %+d\n", name, mod)
+		rank_str := "None"
+		if mod == 1 do rank_str = "Proficient"
+		if mod == 2 do rank_str = "Expertise"
+		fmt.printf("    - %s: %s (+%d)\n", name, rank_str, mod)
 	}
 }
 
