@@ -2,6 +2,7 @@ package main
 
 import "core:fmt"
 import "core:os"
+import "core:strconv"
 import "core:strings"
 import lib "lib"
 import cmd "cmd"
@@ -260,6 +261,10 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_game_command(db, cmd_name, args)
 	case "condition":
 		return route_condition(db, args)
+	case "location", "house", "shop", "encounter", "setpiece":
+		return route_world(db, cmd_name, args)
+	case "can-enter":
+		return route_can_enter(db, args)
 	case "campaign", "init", "help":
 		return route_meta_command(db, cmd_name, args)
 	case:
@@ -710,6 +715,13 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 		return route_npc_core(db, sub, args)
 	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities", "set-cr", "set-attack", "set-initiative", "set-combat", "set-languages", "set-passive-perception", "set-concentrating", "set-skill", "remove-skill", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance", "add-tool-prof", "remove-tool-prof":
 		return route_npc_setters(db, sub, args)
+	case "help":
+		if db.is_json {
+			fmt.println(`{"success":true,"subcommands":["create","list","get","delete","damage","heal","set-details","set-stats","set-combat-meta","set-status","add-money","remove-money","set-action","set-relationship","list-relationships","set-location","add-ability","remove-ability","list-abilities","set-cr","set-attack","set-initiative","set-combat","set-languages","set-passive-perception","set-concentrating","set-skill","remove-skill","set-darkvision","set-bond","set-flaw","set-ideal","set-personality-traits","set-appearance","add-tool-prof","remove-tool-prof"]}`)
+		} else {
+			fmt.println("npc subcommands: create, list, get, delete, damage, heal, set-details, set-stats, set-combat-meta, set-status, add-money, remove-money, set-action, set-relationship, list-relationships, set-location, add-ability, remove-ability, list-abilities, set-cr, set-attack, set-initiative, set-combat, set-languages, set-passive-perception, set-concentrating, set-skill, remove-skill, set-darkvision, set-bond, set-flaw, set-ideal, set-personality-traits, set-appearance, add-tool-prof, remove-tool-prof")
+		}
+		return 0
 	case:
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Unknown npc subcommand"}`)
@@ -862,4 +874,80 @@ print_usage :: proc(is_json: bool = false) {
 	} else {
 		print_usage_text()
 	}
+}
+route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
+	switch cmd_name {
+	case "location":
+		switch args[0] {
+		case "set-parent":       return cmd.location_set_parent(db, args)
+		case "set-restricted":   return cmd.location_set_restricted(db, args)
+		case "breadcrumb":
+			id := strconv.atoi(args[1])
+			fmt.println(cmd.location_breadcrumb(db, id))
+			return 0
+		case:
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent location <set-parent|set-restricted|breadcrumb> ..."}`) }
+			else { fmt.eprintln("Usage: dnd-agent location <set-parent|set-restricted|breadcrumb> ...") }
+			return 1
+		}
+	case "house":
+		switch args[0] {
+		case "add":              return cmd.house_add(db, args)
+		case "list":             return cmd.house_list(db, args)
+		case "set-inventory":    return cmd.house_set_inventory(db, args)
+		case "set-restricted":   return cmd.house_set_restricted(db, args)
+		case:
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house <add|list|set-inventory|set-restricted> ..."}`) }
+			else { fmt.eprintln("Usage: dnd-agent house <add|list|set-inventory|set-restricted> ...") }
+			return 1
+		}
+	case "shop":
+		switch args[0] {
+		case "add":              return cmd.shop_add(db, args)
+		case "list":             return cmd.shop_list(db, args)
+		case "set-inventory":    return cmd.shop_set_inventory(db, args)
+		case:
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent shop <add|list|set-inventory> ..."}`) }
+			else { fmt.eprintln("Usage: dnd-agent shop <add|list|set-inventory> ...") }
+			return 1
+		}
+	case "encounter":
+		switch args[0] {
+		case "add":              return cmd.encounter_add(db, args)
+		case "list":             return cmd.encounter_list(db, args)
+		case:
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent encounter <add|list> ..."}`) }
+			else { fmt.eprintln("Usage: dnd-agent encounter <add|list> ...") }
+			return 1
+		}
+	case "setpiece":
+		switch args[0] {
+		case "add":              return cmd.setpiece_add(db, args)
+		case "list":             return cmd.setpiece_list(db, args)
+		case:
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent setpiece <add|list> ..."}`) }
+			else { fmt.eprintln("Usage: dnd-agent setpiece <add|list> ...") }
+			return 1
+		}
+	}
+	return 1
+}
+
+route_can_enter :: proc(db: ^lib.Db, args: []string) -> int {
+	// Usage: dnd-agent can-enter <property_kind> <property_id> [visitor_npc_id] [visitor_char_id] [in_game_day]
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]"}`) }
+		else { fmt.eprintln("Usage: dnd-agent can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]") }
+		return 1
+	}
+	property_kind := args[0]
+	property_id := strconv.atoi(args[1])
+	visitor_npc_id := len(args) > 2 ? strconv.atoi(args[2]) : 0
+	visitor_char_id := len(args) > 3 ? strconv.atoi(args[3]) : 0
+	in_game_day := len(args) > 4 ? strconv.atoi(args[4]) : 0
+
+	result := cmd.can_enter(db, visitor_npc_id, visitor_char_id, property_kind, property_id, in_game_day)
+	if db.is_json { fmt.printf(`{"success":true,"result":"%s"}` + "\n", result) }
+	else { fmt.printf("Access: %s\n", result) }
+	return 0
 }

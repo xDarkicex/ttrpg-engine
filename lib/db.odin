@@ -651,6 +651,66 @@ db_run_migrations_14 :: proc(db: ^Db, current_version: i32) -> Error {
 	return Error.None
 }
 
+db_run_migrations_15 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 15 {
+		// World model: locations can have sub-locations (recursive).
+		db_exec(db, "ALTER TABLE locations ADD COLUMN parent_id INTEGER REFERENCES locations(id) ON DELETE CASCADE;")
+		db_exec(db, "ALTER TABLE locations ADD COLUMN restricted INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE locations ADD COLUMN restricted_until TEXT DEFAULT '';")
+
+		// Sub-things inside a location. Cascade so deleting the location cleans them up.
+		db_exec(db, `CREATE TABLE IF NOT EXISTS houses (
+			id INTEGER PRIMARY KEY,
+			location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE SET NULL,
+			scale TEXT DEFAULT 'mid',
+			restricted INTEGER DEFAULT 0,
+			restricted_until TEXT DEFAULT '',
+			inventory TEXT DEFAULT '',
+			UNIQUE(location_id, name)
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS shops (
+			id INTEGER PRIMARY KEY,
+			location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE SET NULL,
+			scale TEXT DEFAULT 'mid',
+			open_hours TEXT DEFAULT '06:00-22:00',
+			restricted INTEGER DEFAULT 0,
+			inventory TEXT DEFAULT '',
+			UNIQUE(location_id, name)
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS encounters (
+			id INTEGER PRIMARY KEY,
+			location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+			type TEXT DEFAULT 'wander',
+			description TEXT DEFAULT '',
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE SET NULL
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS setpieces (
+			id INTEGER PRIMARY KEY,
+			location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			chapter_event TEXT DEFAULT '',
+			UNIQUE(location_id, name)
+		);`)
+
+		// Relationship decay timestamp. Stored as ISO date "1492-03-15" or empty.
+		// Decay is computed at query time, not via background updates.
+		db_exec(db, "ALTER TABLE npc_relationships ADD COLUMN last_interaction_at TEXT DEFAULT '';")
+
+		set_version_err := set_db_version(db, 15)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
 db_init_schema :: proc(db: ^Db) -> Error {
 	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
 	if fk_err != Error.None do return fk_err
@@ -682,6 +742,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_14(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_15(db, i32(current_version))
 	if err != Error.None do return err
 
 	return Error.None
