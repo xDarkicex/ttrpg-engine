@@ -71,6 +71,8 @@ CharacterStats :: struct {
 	ideal: string,
 	personality_traits: string,
 	appearance: string,
+	short_rests_available: int,
+	long_rests_available: int,
 }
 
 escape_sql :: proc(s: string) -> string {
@@ -280,7 +282,7 @@ fetch_character_class_summary :: proc(db: ^lib.Db, char_id: int) -> (class_summa
 fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.temp_hp, c.death_saves_success, c.death_saves_failure, c.exhaustion, c.hit_dice_expended, c.max_hit_dice, c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.save_prof_str, c.save_prof_dex, c.save_prof_con, c.save_prof_int, c.save_prof_wis, c.save_prof_cha, c.ac, c.race, c.speed, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.inspiration, c.alignment, c.size, c.xp, c.faction_id, c.campaign_id, c.last_action, c.party, c.backstory, c.owner, c.chapter_id, c.location_id, COALESCE(f.name, ''), COALESCE(l.name, ''), c.proficiency_bonus, c.spell_save_dc, c.spell_attack_bonus, c.initiative, c.passive_perception, c.languages, c.concentrating_on, c.combat, c.darkvision, c.bond, c.flaw, c.ideal, c.personality_traits, c.appearance FROM characters c LEFT JOIN factions f ON c.faction_id = f.id LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.temp_hp, c.death_saves_success, c.death_saves_failure, c.exhaustion, c.hit_dice_expended, c.max_hit_dice, c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.save_prof_str, c.save_prof_dex, c.save_prof_con, c.save_prof_int, c.save_prof_wis, c.save_prof_cha, c.ac, c.race, c.speed, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.inspiration, c.alignment, c.size, c.xp, c.faction_id, c.campaign_id, c.last_action, c.party, c.backstory, c.owner, c.chapter_id, c.location_id, COALESCE(f.name, ''), COALESCE(l.name, ''), c.proficiency_bonus, c.spell_save_dc, c.spell_attack_bonus, c.initiative, c.passive_perception, c.languages, c.concentrating_on, c.combat, c.darkvision, c.bond, c.flaw, c.ideal, c.personality_traits, c.appearance, c.short_rests_available, c.long_rests_available FROM characters c LEFT JOIN factions f ON c.faction_id = f.id LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -356,6 +358,8 @@ fetch_character_stats :: proc(db: ^lib.Db, id: int) -> (char: CharacterStats, fo
 	char.ideal = fmt.tprintf("%s", sqlite.column_text(stmt, 59))
 	char.personality_traits = fmt.tprintf("%s", sqlite.column_text(stmt, 60))
 	char.appearance = fmt.tprintf("%s", sqlite.column_text(stmt, 61))
+	char.short_rests_available = int(sqlite.column_int(stmt, 62))
+	char.long_rests_available = int(sqlite.column_int(stmt, 63))
 
 	char.class, char.level = fetch_character_class_summary(db, id)
 
@@ -642,14 +646,19 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"max_hit_dice":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,"last_action":"%s","party":"%s","backstory":"%s","owner":"%s","chapter_id":"%s","location_id":%d,"location_name":"%s","proficiency_bonus":%d,"spell_save_dc":%d,"spell_attack_bonus":%d,"initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s",`,
+			`"id":%d,"name":"%s","class":"%s","level":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"death_saves_success":%d,"death_saves_failure":%d,"exhaustion":%d,"hit_dice_expended":%d,"max_hit_dice":%d,"ac":%d,"race":"%s","speed":%d,"stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"save_proficiencies":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","gold":%d,"silver":%d,"copper":%d,"platinum":%d,"electrum":%d,"inspiration":%d,"alignment":"%s","size":"%s","xp":%d,"faction_id":%d,"faction_name":"%s","campaign_id":%d,`,
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.death_saves_success, char.death_saves_failure, char.exhaustion, char.hit_dice_expended, char.max_hit_dice, char.ac, char.race, char.speed,
 			char.str, char.dex, char.con, char.int_, char.wis, char.cha,
 			char.save_prof_str, char.save_prof_dex, char.save_prof_con, char.save_prof_int, char.save_prof_wis, char.save_prof_cha,
 			char.status_effects, char.resistances, char.vulnerabilities, char.immunities,
-			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, escape_json_string(char.faction_name), char.campaign_id, escape_json_string(char.last_action), escape_json_string(char.party), escape_json_string(char.backstory),
+			char.gold, char.silver, char.copper, char.platinum, char.electrum, char.inspiration, char.alignment, char.size, char.xp, char.faction_id, escape_json_string(char.faction_name), char.campaign_id,
+		)
+		fmt.printf(
+			`"last_action":"%s","party":"%s","backstory":"%s","owner":"%s","chapter_id":"%s","location_id":%d,"location_name":"%s","proficiency_bonus":%d,"spell_save_dc":%d,"spell_attack_bonus":%d,"initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s","short_rests_available":%d,"long_rests_available":%d,`,
+			escape_json_string(char.last_action), escape_json_string(char.party), escape_json_string(char.backstory),
 			escape_json_string(char.owner), escape_json_string(char.chapter_id), char.location_id, escape_json_string(char.location_name),
 			char.proficiency_bonus, char.spell_save_dc, char.spell_attack_bonus, char.initiative, char.passive_perception, escape_json_string(char.languages), escape_json_string(char.concentrating_on), char.combat, char.darkvision, escape_json_string(char.bond), escape_json_string(char.flaw), escape_json_string(char.ideal), escape_json_string(char.personality_traits), escape_json_string(char.appearance),
+			char.short_rests_available, char.long_rests_available,
 		)
 		fmt.print(`"skills":`)
 		print_character_skills_json(db, char)
@@ -685,8 +694,9 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 			char.id, char.name, char.class, char.level, char.current_hp, char.max_hp, char.temp_hp, char.ac, char.race, char.speed,
 			char.xp, faction_str,
 		)
-		fmt.printf("  Identity: Owner: %s | Alignment: %s | Size: %s | Inspiration: %d | Exhaustion: %d | Spent Hit Dice: %d\n",
+		fmt.printf("  Identity: Owner: %s | Alignment: %s | Size: %s | Inspiration: %d | Exhaustion: %d | Spent Hit Dice: %d | Rests: %d Short / %d Long\n",
 			char.owner, char.alignment, char.size, char.inspiration, char.exhaustion, char.hit_dice_expended,
+			char.short_rests_available, char.long_rests_available,
 		)
 		loc_str := "None"
 		if char.location_id > 0 {
@@ -1980,6 +1990,37 @@ character_set_inspiration :: proc(db: ^lib.Db, args: []string) -> int {
 	return 0
 }
 
+character_set_rests :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-rests <id> <short_rests> <long_rests>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent character set-rests <id> <short_rests> <long_rests>")
+		}
+		return 1
+	}
+	id := strconv.atoi(args[1])
+	shorts := strconv.atoi(args[2])
+	longs := strconv.atoi(args[3])
+
+	sql := fmt.tprintf("UPDATE characters SET short_rests_available=%d, long_rests_available=%d WHERE id=%d", shorts, longs, id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to set rests"}`)
+		} else {
+			fmt.eprintln("Failed to set rests")
+		}
+		return 1
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Rests set","id":%d,"short_rests_available":%d,"long_rests_available":%d}}\n`, id, shorts, longs)
+	} else {
+		fmt.printf("Set rests for character %d to %d Short / %d Long\n", id, shorts, longs)
+	}
+	return 0
+}
+
 character_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
@@ -2202,9 +2243,60 @@ character_reset_resources :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) >= 3 {
 		cond := args[2]
 		if cond == "long_rest" {
+			stmt_chk: ^sqlite.Statement
+			sql_chk := fmt.tprintf("SELECT long_rests_available FROM characters WHERE id=%d", char_id)
+			sql_chk_c := cstring(raw_data(sql_chk))
+			long_avail := 1
+			if sqlite.prepare(db.ptr, sql_chk_c, i32(len(sql_chk)), &stmt_chk, nil) == .Ok {
+				defer sqlite.finalize(stmt_chk)
+				if sqlite.step(stmt_chk) == .Row {
+					long_avail = int(sqlite.column_int(stmt_chk, 0))
+				}
+			}
+			if long_avail <= 0 {
+				if !db.is_json {
+					fmt.println("Warning: You do not have any available long rests left for today. Resting anyway.")
+				}
+			}
+
 			sql = fmt.tprintf("UPDATE character_resources SET current_amount=max_amount WHERE character_id=%d AND reset_condition IN ('long_rest', 'short_rest')", char_id)
+			
+			// Reset spell slots
+			sql_slots := fmt.tprintf("UPDATE character_spell_slots SET used_slots=0 WHERE character_id=%d", char_id)
+			lib.db_exec(db, sql_slots)
+			// Reset HP to max
+			sql_hp := fmt.tprintf("UPDATE characters SET current_hp=max_hp WHERE id=%d", char_id)
+			lib.db_exec(db, sql_hp)
+			// Regain Hit Dice
+			sql_hd := fmt.tprintf("UPDATE characters SET hit_dice_expended = MAX(0, hit_dice_expended - MAX(1, max_hit_dice / 2)) WHERE id=%d", char_id)
+			lib.db_exec(db, sql_hd)
+			// Decrease exhaustion
+			sql_ex := fmt.tprintf("UPDATE characters SET exhaustion = MAX(0, exhaustion - 1) WHERE id=%d", char_id)
+			lib.db_exec(db, sql_ex)
+			// Reset available short and long rests
+			sql_rests := fmt.tprintf("UPDATE characters SET short_rests_available=2, long_rests_available=1 WHERE id=%d", char_id)
+			lib.db_exec(db, sql_rests)
 		} else if cond == "short_rest" {
+			stmt_chk: ^sqlite.Statement
+			sql_chk := fmt.tprintf("SELECT short_rests_available FROM characters WHERE id=%d", char_id)
+			sql_chk_c := cstring(raw_data(sql_chk))
+			short_avail := 2
+			if sqlite.prepare(db.ptr, sql_chk_c, i32(len(sql_chk)), &stmt_chk, nil) == .Ok {
+				defer sqlite.finalize(stmt_chk)
+				if sqlite.step(stmt_chk) == .Row {
+					short_avail = int(sqlite.column_int(stmt_chk, 0))
+				}
+			}
+			if short_avail <= 0 {
+				if !db.is_json {
+					fmt.println("Warning: You do not have any available short rests left for today. Resting anyway.")
+				}
+			}
+
 			sql = fmt.tprintf("UPDATE character_resources SET current_amount=max_amount WHERE character_id=%d AND reset_condition='short_rest'", char_id)
+			// Decrement available short rests
+			sql_rests := fmt.tprintf("UPDATE characters SET short_rests_available = MAX(0, short_rests_available - 1) WHERE id=%d", char_id)
+			lib.db_exec(db, sql_rests)
 		} else {
 			sql = fmt.tprintf("UPDATE character_resources SET current_amount=max_amount WHERE character_id=%d AND reset_condition='%s'", char_id, escape_sql(cond))
 		}

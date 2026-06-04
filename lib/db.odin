@@ -535,6 +535,15 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		if set_version_err != Error.None do return set_version_err
 	}
 
+	current_version = get_db_version(db)
+	if current_version < 8 {
+		db_exec(db, "ALTER TABLE characters ADD COLUMN short_rests_available INTEGER DEFAULT 2;")
+		db_exec(db, "ALTER TABLE characters ADD COLUMN long_rests_available INTEGER DEFAULT 1;")
+
+		set_version_err := set_db_version(db, 8)
+		if set_version_err != Error.None do return set_version_err
+	}
+
 	return Error.None
 }
 

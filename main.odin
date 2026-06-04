@@ -47,6 +47,7 @@ HELP_COMMANDS := []CommandHelp{
 			{"set-exhaustion", "<id> <level>", "Set exhaustion level (0 to 6)."},
 			{"set-hit-dice", "<id> <expended>", "Set expended hit dice count."},
 			{"set-inspiration", "<id> <0/1>", "Set DM-awarded inspiration (0 or 1)."},
+			{"set-rests", "<id> <short_rests> <long_rests>", "Set available short and long rests."},
 			{"set-backstory", "<id> <backstory>", "Set character backstory."},
 			{"set-location", "<id> <location_id>", "Link character to a campaign location."},
 			{"set-chapter", "<id> <chapter_id>", "Set character active campaign chapter."},
@@ -354,7 +355,7 @@ route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_character_core(db, sub, args)
-	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance":
+	case "set-stats", "set-save-prof", "set-details", "set-combat-meta", "set-status", "set-action", "add-class", "list-classes", "add-xp", "add-money", "remove-money", "set-party", "set-campaign", "set-temp-hp", "set-death-saves", "set-exhaustion", "set-hit-dice", "set-inspiration", "set-rests", "set-backstory", "set-location", "set-chapter", "set-owner", "set-skill", "list-skills", "set-resource", "use-resource", "reset-resources", "list-resources", "set-proficiency", "set-spellcasting", "set-initiative", "set-passive-perception", "set-languages", "set-max-hit-dice", "set-combat", "set-concentrating", "add-prof", "remove-prof", "set-spell-slot", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance":
 		return route_character_setters(db, sub, args)
 	case:
 		if db.is_json {
@@ -398,6 +399,7 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 	case "set-exhaustion":  return cmd.character_set_exhaustion(db, args)
 	case "set-hit-dice":    return cmd.character_set_hit_dice(db, args)
 	case "set-inspiration": return cmd.character_set_inspiration(db, args)
+	case "set-rests":       return cmd.character_set_rests(db, args)
 	case "set-backstory":   return cmd.character_set_backstory(db, args)
 	case "set-location":    return cmd.character_set_location(db, args)
 	case "set-chapter":     return cmd.character_set_chapter(db, args)
