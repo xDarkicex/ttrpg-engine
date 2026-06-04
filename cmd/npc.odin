@@ -200,6 +200,12 @@ fetch_npc_stats :: proc(db: ^lib.Db, id: int) -> (npc: NpcStats, found: bool) {
 	return npc, true
 }
 
+
+faction_id_json_str :: proc(fid: int) -> string {
+	if fid <= 0 do return "null"
+	return fmt.tprintf("%d", fid)
+}
+
 npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
@@ -224,10 +230,10 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if db.is_json {
 		fmt.print("{")
 		fmt.printf(
-			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%d,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"cr":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s",`,
+			`"id":%d,"name":"%s","description":"%s","current_hp":%d,"max_hp":%d,"dm_notes":"%s","campaign_id":%d,"gold":%d,"silver":%d,"copper":%d,"ac":%d,"status_effects":"%s","resistances":"%s","vulnerabilities":"%s","immunities":"%s","story_role":"%s","daily_role":"%s","backstory":"%s","faction_id":%s,"last_action":"%s","location_id":%d,"location_name":"%s","stats":{{"str":%d,"dex":%d,"con":%d,"int":%d,"wis":%d,"cha":%d}},"cr":%d,"attack_bonus":%d,"damage_dice":"%s","damage_type":"%s","initiative":%d,"passive_perception":%d,"languages":"%s","concentrating_on":"%s","combat":%d,"darkvision":%d,"bond":"%s","flaw":"%s","ideal":"%s","personality_traits":"%s","appearance":"%s",`,
 			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.dm_notes, npc.campaign_id,
 			npc.gold, npc.silver, npc.copper, npc.ac, npc.status_effects, npc.resistances, npc.vulnerabilities, npc.immunities,
-			npc.story_role, npc.daily_role, npc.backstory, npc.faction_id, escape_json_string(npc.last_action), npc.location_id, escape_json_string(npc.location_name),
+			npc.story_role, npc.daily_role, npc.backstory, faction_id_json_str(npc.faction_id), escape_json_string(npc.last_action), npc.location_id, escape_json_string(npc.location_name),
 			npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha,
 			npc.cr, npc.attack_bonus, escape_json_string(npc.damage_dice), escape_json_string(npc.damage_type),
 			npc.initiative, npc.passive_perception, escape_json_string(npc.languages), escape_json_string(npc.concentrating_on), npc.combat, npc.darkvision, escape_json_string(npc.bond), escape_json_string(npc.flaw), escape_json_string(npc.ideal), escape_json_string(npc.personality_traits), escape_json_string(npc.appearance),
@@ -244,8 +250,10 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 		print_npc_inventory_json(db, npc.id)
 		fmt.println("}")
 	} else {
-		fmt.printf("[%d] %s (%s) HP:%d/%d AC:%d Campaign:%d Faction:%d\n",
-			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.ac, npc.campaign_id, npc.faction_id,
+		camp_str := npc.campaign_id > 0 ? fmt.tprintf("%d", npc.campaign_id) : "None"
+		faction_str := npc.faction_id > 0 ? fmt.tprintf("%d", npc.faction_id) : "None"
+		fmt.printf("[%d] %s (%s) HP:%d/%d AC:%d Campaign:%s Faction:%s\n",
+			npc.id, npc.name, npc.description, npc.current_hp, npc.max_hp, npc.ac, camp_str, faction_str,
 		)
 		if npc.location_id > 0 {
 			fmt.printf("  Location: %s (ID: %d)\n", npc.location_name, npc.location_id)
@@ -253,13 +261,33 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 			fmt.println("  Location: None")
 		}
 		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", npc.str, npc.dex, npc.con, npc.int_, npc.wis, npc.cha)
+		// Derived stats: initiative = DEX mod, passive_perception = 10 + WIS mod + perception prof
+		dex_mod := (npc.dex - 10) / 2
+		wis_mod := (npc.wis - 10) / 2
+		init_val := npc.initiative
+		if init_val == 0 do init_val = dex_mod  // unstored: default from DEX
+		pp_val := npc.passive_perception
+		if pp_val == 10 {  // unstored: default 10 + WIS mod
+			pp_val = 10 + wis_mod
+			// Check if NPC is proficient in perception
+			sk_stmt: ^sqlite.Statement
+			sk_sql := fmt.tprintf("SELECT modifier FROM npc_skills WHERE npc_id=%d AND LOWER(skill_name)='perception'", npc.id)
+			sk_c := cstring(raw_data(sk_sql))
+			if sqlite.prepare(db.ptr, sk_c, i32(len(sk_sql)), &sk_stmt, nil) == .Ok {
+				if sqlite.step(sk_stmt) == .Row {
+					sk_mod := int(sqlite.column_int(sk_stmt, 0))
+					if sk_mod > wis_mod do pp_val += (sk_mod - wis_mod)
+				}
+				sqlite.finalize(sk_stmt)
+			}
+		}
 		if len(npc.damage_dice) > 0 {
 			fmt.printf("  Combat: Initiative: +%d | Passive Perception: %d | Darkvision: %dft | Attack: +%d (%s %s)\n",
-				npc.initiative, npc.passive_perception, npc.darkvision, npc.attack_bonus, npc.damage_dice, npc.damage_type,
+				init_val, pp_val, npc.darkvision, npc.attack_bonus, npc.damage_dice, npc.damage_type,
 			)
 		} else {
 			fmt.printf("  Combat: Initiative: +%d | Passive Perception: %d | Darkvision: %dft\n",
-				npc.initiative, npc.passive_perception, npc.darkvision,
+				init_val, pp_val, npc.darkvision,
 			)
 		}
 		fmt.printf("  Languages: %s\n", len(npc.languages) > 0 ? npc.languages : "None")
