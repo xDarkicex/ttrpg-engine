@@ -579,7 +579,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get":
 		return route_creature_core(db, sub, args)
-	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat", "set-darkvision", "set-type", "set-alignment", "set-environment", "set-speed-fly", "set-hover", "set-blindsight", "set-telepathy", "set-damage-immunities", "set-condition-immunities", "set-recharge", "set-bonus-actions", "set-lair-actions", "set-regional", "set-traits", "set-actions", "set-saving-throws", "set-skills-text", "set-languages-full":
+	case "set-status", "set-combat-meta", "set-action", "set-location", "damage", "heal", "set-stats", "add-money", "remove-money", "add-ability", "remove-ability", "list-abilities", "set-attack", "set-cr", "set-initiative", "set-passive-perception", "set-reactions", "set-legendary", "set-combat", "set-darkvision", "set-type", "set-alignment", "set-environment", "set-speed-fly", "set-hover", "set-speed", "set-blindsight", "set-telepathy", "set-damage-immunities", "set-condition-immunities", "set-recharge", "set-bonus-actions", "set-lair-actions", "set-regional", "set-traits", "set-actions", "set-saving-throws", "set-skills-text", "set-languages-full":
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
@@ -625,6 +625,7 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-environment":         return cmd.creature_set_environment(db, args)
 	case "set-speed-fly":           return cmd.creature_set_speed_fly(db, args)
 	case "set-hover":               return cmd.creature_set_hover(db, args)
+	case "set-speed":               return cmd.creature_set_speed(db, args)
 	case "set-blindsight":           return cmd.creature_set_blindsight(db, args)
 	case "set-telepathy":           return cmd.creature_set_telepathy(db, args)
 	case "set-damage-immunities":   return cmd.creature_set_damage_immunities(db, args)

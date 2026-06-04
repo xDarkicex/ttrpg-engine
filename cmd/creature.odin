@@ -51,6 +51,7 @@ CreatureStats :: struct {
 	speed_burrow: int,
 	speed_swim: int,
 	speed_climb: int,
+	speed: int,
 	blindsight: int,
 	tremorsense: int,
 	truesight: int,
@@ -159,7 +160,7 @@ creature_list :: proc(db: ^lib.Db) -> int {
 fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: bool) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
-		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, ''), c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.attack_bonus, c.damage_dice, c.damage_type, c.challenge_rating, c.initiative, c.passive_perception, c.reactions, c.legendary_actions, c.combat, c.darkvision, c.creature_type, c.alignment, c.environment, c.speed_fly, c.speed_hover, c.speed_burrow, c.speed_swim, c.speed_climb, c.blindsight, c.tremorsense, c.truesight, c.telepathy, c.damage_immunities, c.condition_immunities, c.recharge, c.bonus_actions, c.lair_actions, c.regional_effects, c.saving_throws_text, c.skills_text, c.traits, c.actions, c.languages_full FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
+		"SELECT c.id, c.name, c.current_hp, c.max_hp, c.ac, c.status_effects, c.resistances, c.vulnerabilities, c.immunities, c.attacks, c.story_role, c.last_action, c.campaign_id, c.location_id, COALESCE(l.name, ''), c.str, c.dex, c.con, c.int_, c.wis, c.cha, c.gold, c.silver, c.copper, c.platinum, c.electrum, c.attack_bonus, c.damage_dice, c.damage_type, c.challenge_rating, c.initiative, c.passive_perception, c.reactions, c.legendary_actions, c.combat, c.darkvision, c.creature_type, c.alignment, c.environment, c.speed_fly, c.speed_hover, c.speed_burrow, c.speed_swim, c.speed_climb, c.blindsight, c.tremorsense, c.truesight, c.telepathy, c.damage_immunities, c.condition_immunities, c.recharge, c.bonus_actions, c.lair_actions, c.regional_effects, c.saving_throws_text, c.skills_text, c.traits, c.actions, c.languages_full, c.speed FROM creatures c LEFT JOIN locations l ON c.location_id = l.id WHERE c.id=%d",
 		id,
 	)
 	sql_c := cstring(raw_data(sql))
@@ -232,6 +233,7 @@ fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: 
 	c.traits = fmt.tprintf("%s", sqlite.column_text(stmt, 56))
 	c.actions = fmt.tprintf("%s", sqlite.column_text(stmt, 57))
 	c.languages_full = fmt.tprintf("%s", sqlite.column_text(stmt, 58))
+	c.speed = int(sqlite.column_int(stmt, 59))
 
 	return c, true
 }
@@ -303,25 +305,36 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 		)
 
 		// Speed (with breakdown)
-		speed_str := fmt.tprintf("%d ft", 30)  // base 30 is just a placeholder; real value is current_hp=max_hp-style fallback
-		// Use the speed field — but creatures don't have a `speed` column, so rely on the data the AI set.
-		// For now, derive from max_hp-based heuristic? No. Print what we know.
+		speed_str := fmt.tprintf("%d ft", c.speed)  // walk speed from v14 column
 		_ = speed_str
 		speed_parts := make([dynamic]string, context.temp_allocator)
-		// We need a base speed; the user's creature data didn't include it, so use a heuristic:
-		// default walk speed is 30. Real speed is "speed" but we don't have a column.
-		// Skip for now; the speed breakdown is in the creature's lore data.
 		if c.speed_fly > 0 {
 			hover_str := c.speed_hover == 1 ? " (hover)" : ""
 			append(&speed_parts, fmt.tprintf("fly %d ft%s", c.speed_fly, hover_str))
 		}
+		if c.speed_swim > 0 {
+			append(&speed_parts, fmt.tprintf("swim %d ft", c.speed_swim))
+		}
+		if c.speed_burrow > 0 {
+			append(&speed_parts, fmt.tprintf("burrow %d ft", c.speed_burrow))
+		}
+		if c.speed_climb > 0 {
+			append(&speed_parts, fmt.tprintf("climb %d ft", c.speed_climb))
+		}
 		if len(speed_parts) > 0 {
-			fmt.printf("  Speed: 30 ft, %s\n", strings.join(speed_parts[:], ", ", context.temp_allocator))
+			fmt.printf("  Speed: %d ft, %s\n", c.speed, strings.join(speed_parts[:], ", ", context.temp_allocator))
 		} else {
-			fmt.printf("  Speed: 30 ft\n")
+			fmt.printf("  Speed: %d ft\n", c.speed)
 		}
 
-		fmt.printf("  Stats: STR:%d DEX:%d CON:%d INT:%d WIS:%d CHA:%d\n", c.str, c.dex, c.con, c.int_, c.wis, c.cha)
+		fmt.printf("  Stats: STR:%d(+%d) DEX:%d(+%d) CON:%d(+%d) INT:%d(+%d) WIS:%d(+%d) CHA:%d(+%d)\n",
+			c.str, (c.str - 10) / 2,
+			c.dex, (c.dex - 10) / 2,
+			c.con, (c.con - 10) / 2,
+			c.int_, (c.int_ - 10) / 2,
+			c.wis, (c.wis - 10) / 2,
+			c.cha, (c.cha - 10) / 2,
+		)
 
 		if len(c.saving_throws_text) > 0 {
 			fmt.printf("  Saving Throws: %s\n", c.saving_throws_text)
@@ -1356,5 +1369,15 @@ creature_set_telepathy :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("UPDATE creatures SET telepathy=%d WHERE id=%d", v, id)
 	if lib.db_exec(db, sql) != lib.Error.None { fmt.eprintln("Failed to set telepathy"); return 1 }
 	if db.is_json { fmt.printf(`{"success":true,"message":"Telepathy set","id":%d,"telepathy":%d}` + "\n", id, v) } else { fmt.printf("Telepathy set to %dft for creature %d\n", v, id) }
+	return 0
+}
+
+creature_set_speed :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 { fmt.eprintln("Usage: dnd-agent creature set-speed <id> <ft>"); return 1 }
+	id := strconv.atoi(args[1])
+	v := strconv.atoi(args[2])
+	sql := fmt.tprintf("UPDATE creatures SET speed=%d WHERE id=%d", v, id)
+	if lib.db_exec(db, sql) != lib.Error.None { fmt.eprintln("Failed to set speed"); return 1 }
+	if db.is_json { fmt.printf(`{"success":true,"message":"Speed set","id":%d,"speed":%d}` + "\n", id, v) } else { fmt.printf("Speed set to %dft for creature %d\n", v, id) }
 	return 0
 }

@@ -637,6 +637,20 @@ db_run_migrations_13 :: proc(db: ^Db, current_version: i32) -> Error {
 	return Error.None
 }
 
+db_run_migrations_14 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 14 {
+		// Walk speed (base ground speed) for creatures. Default 30, but Vhalzareth-style
+		// huge creatures are 40, etc. Fly/swim/burrow/climb are already in v13.
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN speed INTEGER DEFAULT 30;")
+
+		set_version_err := set_db_version(db, 14)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
 db_init_schema :: proc(db: ^Db) -> Error {
 	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
 	if fk_err != Error.None do return fk_err
@@ -664,6 +678,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_13(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_14(db, i32(current_version))
 	if err != Error.None do return err
 
 	return Error.None
