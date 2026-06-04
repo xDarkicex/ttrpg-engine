@@ -2384,6 +2384,20 @@ print_character_resources_json :: proc(db: ^lib.Db, char_id: int) {
 	fmt.print(strings.to_string(builder))
 }
 
+
+
+// Normalize a stored reset_condition string ("long_rest", "short_rest", "until_rest", "permanent")
+// to a human-readable label ("Long Rest", "Short Rest", etc.) for display.
+normalize_reset_condition :: proc(cond: string) -> string {
+	switch strings.to_lower(cond, context.temp_allocator) {
+	case "long_rest":     return "Long Rest"
+	case "short_rest":    return "Short Rest"
+	case "until_rest":    return "Until Next Rest"
+	case "permanent":     return "Permanent"
+	case "":              return "Long Rest"
+	}
+	return cond
+}
 print_character_resources_text :: proc(db: ^lib.Db, char_id: int) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf("SELECT resource_name, max_amount, current_amount, reset_condition FROM character_resources WHERE character_id=%d ORDER BY resource_name", char_id)
@@ -2404,7 +2418,7 @@ print_character_resources_text :: proc(db: ^lib.Db, char_id: int) {
 		curr_val := int(sqlite.column_int(stmt, 2))
 		reset_cond := column_text_safe(stmt, 3)
 
-		fmt.printf("    - %s: %d/%d (Reset: %s)\n", name, curr_val, max_val, reset_cond)
+		fmt.printf("    - %s: %d/%d (Reset: %s)\n", name, curr_val, max_val, normalize_reset_condition(reset_cond))
 	}
 }
 
@@ -3244,7 +3258,7 @@ character_set_resource :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf(`"success":true,"message":"Resource set","character_id":%d,"resource_name":"%s","max_amount":%d,"current_amount":%d,"reset_condition":"%s"`, char_id, escape_json_string(resource_name), max_val, curr_val, escape_json_string(reset_condition))
 		fmt.println("}")
 	} else {
-		fmt.printf("Resource %s set to %d/%d (Reset: %s) for character %d\n", resource_name, curr_val, max_val, reset_condition, char_id)
+		fmt.printf("Resource %s set to %d/%d (Reset: %s) for character %d\n", resource_name, curr_val, max_val, normalize_reset_condition(reset_condition), char_id)
 	}
 	return 0
 }
