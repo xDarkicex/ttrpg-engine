@@ -305,6 +305,58 @@ MULTICLASS_SPELL_SLOTS := [21][10]int{
 	{0, 4, 3, 3, 3, 3, 2, 2, 1, 1},
 }
 
+// Per-class single-class spell slot table (PHB 5e).
+// Index [class_level][slot_level]. Used to validate prepared spells of a specific class.
+// Per multiclass PHB rules, you prepare spells per-class as if single-classed; combined caster
+// level only governs how many slots you have total, not what each class can prepare.
+// 5e Warlock is special (pact magic) and not handled here — Warlock spells should use the
+// Warlock-specific slot count from invocations, not this table.
+SINGLE_CLASS_SPELL_SLOTS := [22][10]int{
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 2, 0, 0, 0, 0, 0, 0, 0, 0},  // 1
+	{0, 3, 0, 0, 0, 0, 0, 0, 0, 0},  // 2
+	{0, 4, 2, 0, 0, 0, 0, 0, 0, 0},  // 3
+	{0, 4, 3, 0, 0, 0, 0, 0, 0, 0},  // 4
+	{0, 4, 3, 2, 0, 0, 0, 0, 0, 0},  // 5
+	{0, 4, 3, 3, 0, 0, 0, 0, 0, 0},  // 6
+	{0, 4, 3, 3, 1, 0, 0, 0, 0, 0},  // 7
+	{0, 4, 3, 3, 2, 0, 0, 0, 0, 0},  // 8
+	{0, 4, 3, 3, 3, 1, 0, 0, 0, 0},  // 9
+	{0, 4, 3, 3, 3, 2, 0, 0, 0, 0},  // 10
+	{0, 4, 3, 3, 3, 2, 1, 0, 0, 0},  // 11
+	{0, 4, 3, 3, 3, 2, 1, 0, 0, 0},  // 12
+	{0, 4, 3, 3, 3, 2, 1, 1, 0, 0},  // 13
+	{0, 4, 3, 3, 3, 2, 1, 1, 0, 0},  // 14
+	{0, 4, 3, 3, 3, 2, 1, 1, 1, 0},  // 15
+	{0, 4, 3, 3, 3, 2, 1, 1, 1, 0},  // 16
+	{0, 4, 3, 3, 3, 2, 1, 1, 1, 1},  // 17
+	{0, 4, 3, 3, 3, 3, 1, 1, 1, 1},  // 18
+	{0, 4, 3, 3, 3, 3, 2, 1, 1, 1},  // 19
+	{0, 4, 3, 3, 3, 3, 2, 2, 1, 1},  // 20
+	{0, 4, 3, 3, 3, 3, 2, 2, 2, 1},  // 21 (epic)
+}
+
+// Returns the max slot level (1-9) a character has for a specific class at their current level in that class.
+// Returns 0 if the class has no spell slots or the level is out of range.
+get_class_max_slot_level :: proc(db: ^lib.Db, char_id: int, class_name: string) -> int {
+	cls := strings.to_lower(class_name, context.temp_allocator)
+	// Only full/half casters use the standard slot table; non-casters get 0.
+	can_cast := cls == "bard" || cls == "cleric" || cls == "druid" || cls == "sorcerer" || cls == "wizard" ||
+	            cls == "paladin" || cls == "ranger" || cls == "artificer"
+	if !can_cast do return 0
+
+	lvl := get_class_level(db, char_id, class_name)
+	if lvl <= 0 || lvl >= len(SINGLE_CLASS_SPELL_SLOTS) do return 0
+
+	max_lvl := 0
+	for slot_lvl := 9; slot_lvl >= 1; slot_lvl -= 1 {
+		if SINGLE_CLASS_SPELL_SLOTS[lvl][slot_lvl] > 0 {
+			return slot_lvl
+		}
+	}
+	return 0
+}
+
 get_skill_modifier :: proc(db: ^lib.Db, char: CharacterStats, skill_name: string) -> int {
 	ability_score := get_skill_ability(char, skill_name)
 	ability_mod := get_ability_modifier(ability_score)
@@ -476,7 +528,8 @@ calculate_character_ac :: proc(db: ^lib.Db, char: CharacterStats) -> int {
 
 get_class_level :: proc(db: ^lib.Db, char_id: int, target_class: string) -> int {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT level FROM character_classes WHERE character_id=%d AND class_name='%s'", char_id, escape_sql(target_class))
+	// Class names are case-insensitive in user data; use LOWER() so "Cleric" / "cleric" / "CLERIC" all match.
+	sql := fmt.tprintf("SELECT level FROM character_classes WHERE character_id=%d AND LOWER(class_name)=LOWER('%s')", char_id, escape_sql(target_class))
 	sql_c := cstring(raw_data(sql))
 	
 	level := 0
@@ -2551,20 +2604,11 @@ print_character_spells_json :: proc(db: ^lib.Db, char_id: int) {
 }
 
 print_character_spells_text :: proc(db: ^lib.Db, char_id: int) {
-	// Lookup the highest configured spell slot level for this character.
-	// A prepared spell above this level is mechanically impossible (multiclass PHB rule).
-	max_slot_level := 0
-	{
-		stmt: ^sqlite.Statement
-		q := fmt.tprintf("SELECT COALESCE(MAX(slot_level), 0) FROM character_spell_slots WHERE character_id=%d AND max_slots > 0", char_id)
-		q_c := cstring(raw_data(q))
-		if sqlite.prepare(db.ptr, q_c, i32(len(q)), &stmt, nil) == .Ok {
-			defer sqlite.finalize(stmt)
-			if sqlite.step(stmt) == .Row {
-				max_slot_level = int(sqlite.column_int(stmt, 0))
-			}
-		}
-	}
+	// Per PHB multiclass spell preparation rule: you prepare spells per-class
+	// as if you were single-classed in that class. Combined caster level only
+	// governs how many slots you have total, not which spells each class can
+	// prepare. So we check each prepared spell against the spell's class only.
+	// Per-class max slot level is queried inline below via get_class_max_slot_level.
 
 	stmt: ^sqlite.Statement
 	// Wizard spells are split into wizard_prepared / wizard_spellbook groups at query level.
@@ -2602,6 +2646,7 @@ print_character_spells_text :: proc(db: ^lib.Db, char_id: int) {
 		name := column_text_safe(stmt, 1)
 		level := int(sqlite.column_int(stmt, 2))
 		prep := int(sqlite.column_int(stmt, 3)) == 1
+		class_name := column_text_safe(stmt, 4)
 		display_group := column_text_safe(stmt, 5)
 		source := column_text_safe(stmt, 6)
 
@@ -2624,13 +2669,19 @@ print_character_spells_text :: proc(db: ^lib.Db, char_id: int) {
 		source_tag := ""
 		if len(source) > 0 do source_tag = fmt.tprintf(" [%s]", source)
 
-		// Tag prepared spells that exceed the character's highest configured spell slot.
-		// Per 5e multiclass PHB rules, a character can prepare at most spells up to their
-		// highest available slot level (or 1st for cantrips). Anything beyond is mechanically
-		// impossible — flag it so the DM/AI can correct.
+		// Tag prepared spells that exceed the character's spell slots for THIS class.
+		// Per 5e multiclass PHB rules, you prepare spells per-class as if you were
+		// single-classed in that class. So Cleric 1 cannot prepare 2nd-level Cleric
+		// spells even when 2nd-level slots are available from another class.
+		// Use class_name (the actual class) not display_group (the section heading).
 		over_slot_tag := ""
-		if prep && level > max_slot_level && level > 0 {
-			over_slot_tag = " [OVER SLOT - exceeds max configured level]"
+		if prep && level > 0 && len(class_name) > 0 {
+			class_max := get_class_max_slot_level(db, char_id, class_name)
+			if level > class_max && class_max > 0 {
+				over_slot_tag = fmt.tprintf(" [OVER SLOT - %s max is %d]", class_name, class_max)
+			} else if level > class_max && class_max == 0 {
+				over_slot_tag = " [INVALID CLASS]"
+			}
 		}
 
 		fmt.printf("      - %s (Level %d)%s%s%s\n", name, level, prep_tag, source_tag, over_slot_tag)
