@@ -231,3 +231,33 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 	return 0
 }
+
+
+spell_forget :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell forget <char_id> <spell_id>"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent spell forget <char_id> <spell_id>")
+		}
+		return 1
+	}
+	char_id := strconv.atoi(args[1])
+	spell_id := strconv.atoi(args[2])
+
+	sql := fmt.tprintf("DELETE FROM character_spells WHERE character_id=%d AND spell_id=%d", char_id, spell_id)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Failed to forget spell"}`)
+		} else {
+			fmt.eprintln("Failed to forget spell")
+		}
+		return 1
+	}
+	if db.is_json {
+		fmt.printf(`{"success":true,"message":"Spell forgotten","character_id":%d,"spell_id":%d}` + "\n", char_id, spell_id)
+	} else {
+		fmt.printf("Character %d forgot spell %d\n", char_id, spell_id)
+	}
+	return 0
+}

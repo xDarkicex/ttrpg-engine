@@ -156,7 +156,8 @@ HELP_COMMANDS := []CommandHelp{
 		subcommands = []SubcommandHelp{
 			{"upsert", "<name> <level> <school> <casting_time> <range> <components> <duration> <description>", "Define or update a spell."},
 			{"list", "", "List all spells in the spell library."},
-			{"learn", "<char_id> <spell_id> [prepared (0/1)]", "Make a character learn a spell."},
+			{"learn", "<char_id> <spell_id> [prepared (0/1)] [class_name] [source]", "Make a character learn a spell."},
+			{"forget", "<char_id> <spell_id>", "Remove a spell entirely from a character."},
 			{"prepare", "<char_id> <spell_id> <0/1>", "Prepare or unprepare a spell for a character."},
 			{"list-character", "<char_id>", "List spellbook and preparation state for a character."},
 		},
@@ -500,6 +501,7 @@ route_spell :: proc(db: ^lib.Db, args: []string) -> int {
 	case "upsert":         return cmd.spell_upsert(db, args)
 	case "list":           return cmd.spell_list(db)
 	case "learn":          return cmd.spell_learn(db, args)
+	case "forget":         return cmd.spell_forget(db, args)
 	case "prepare":        return cmd.spell_prepare(db, args)
 	case "list-character": return cmd.spell_list_character(db, args)
 	case:
