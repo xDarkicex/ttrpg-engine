@@ -746,6 +746,66 @@ print_json_standings_by_id :: proc(db: ^lib.Db, campaign_id: int) {
 	fmt.print(strings.to_string(builder))
 }
 
+print_json_npc_relationships :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT r.npc_id_1, n1.name, r.npc_id_2, n2.name, r.friendship_level, r.type, r.notes, r.last_interaction_at FROM npc_relationships r JOIN npcs n1 ON r.npc_id_1 = n1.id JOIN npcs n2 ON r.npc_id_2 = n2.id WHERE n1.campaign_id = %d ORDER BY r.friendship_level DESC",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_byte(&builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(&builder, ',')
+		first = false
+		fmt.sbprintf(&builder, `{{"npc_id_1":{},"npc_name_1":"{}","npc_id_2":{},"npc_name_2":"{}","friendship_level":{},"type":"{}","notes":"{}","last_interaction_at":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			sqlite.column_int(stmt, 2),
+			escape_json_string(column_text_safe(stmt, 3)),
+			sqlite.column_int(stmt, 4),
+			column_text_safe(stmt, 5),
+			escape_json_string(column_text_safe(stmt, 6)),
+			column_text_safe(stmt, 7),
+		)
+	}
+	strings.write_byte(&builder, ']')
+	fmt.print(strings.to_string(builder))
+}
+
+print_json_factions :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql_str := "SELECT id, name, description FROM factions ORDER BY id"
+	sql_c := cstring(raw_data(sql_str))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_byte(&builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(&builder, ',')
+		first = false
+		fmt.sbprintf(&builder, `{{"id":{},"name":"{}","description":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+		)
+	}
+	strings.write_byte(&builder, ']')
+	fmt.print(strings.to_string(builder))
+}
+
 print_json_actions_by_id :: proc(db: ^lib.Db, campaign_id: int) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
@@ -804,6 +864,7 @@ print_text_story_state :: proc(db: ^lib.Db, campaign_id: int) {
 	print_text_journal_entries(db, campaign_id, 10)
 	print_text_quests(db, campaign_id)
 	print_text_locations_tree(db, campaign_id)
+	print_text_npc_relationships(db, campaign_id)
 	print_text_story_state_standings(db, campaign_id)
 	print_text_story_state_actions(db, campaign_id)
 }
@@ -913,6 +974,10 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 		print_json_quests_for_state(db, campaign_id)
 		fmt.print(`,"locations_tree":`)
 		print_json_locations_tree(db, campaign_id)
+		fmt.print(`,"factions":`)
+		print_json_factions(db, campaign_id)
+		fmt.print(`,"npc_relationships":`)
+		print_json_npc_relationships(db, campaign_id)
 		fmt.print(`,"faction_standings":`)
 		print_json_standings_by_id(db, campaign_id)
 		fmt.print(`,"story_actions":`)
@@ -1540,6 +1605,36 @@ print_json_creatures_at :: proc(builder: ^strings.Builder, db: ^lib.Db, location
 		)
 	}
 	strings.write_byte(builder, ']')
+}
+
+print_text_npc_relationships :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT r.npc_id_1, n1.name, r.npc_id_2, n2.name, r.friendship_level, r.type, r.notes FROM npc_relationships r JOIN npcs n1 ON r.npc_id_1 = n1.id JOIN npcs n2 ON r.npc_id_2 = n2.id WHERE n1.campaign_id = %d ORDER BY r.friendship_level DESC",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	fmt.println("--------------------------------------------------------------------------------")
+	fmt.println("NPC RELATIONSHIPS")
+	fmt.println("--------------------------------------------------------------------------------")
+	has_any := false
+	for sqlite.step(stmt) == .Row {
+		has_any = true
+		name1 := column_text_safe(stmt, 1)
+		name2 := column_text_safe(stmt, 3)
+		level := sqlite.column_int(stmt, 4)
+		rel_type := column_text_safe(stmt, 5)
+		notes := column_text_safe(stmt, 6)
+		fmt.printf("  %s (#%d) --[%s, %+d]--> %s (#%d)\n", name1, sqlite.column_int(stmt, 0), rel_type, level, name2, sqlite.column_int(stmt, 2))
+		if len(notes) > 0 {
+			fmt.printf("    %s\n", notes)
+		}
+	}
+	if !has_any do fmt.println("  No relationships defined.")
+	fmt.println()
 }
 
 // Text-mode helpers for location tree display.
