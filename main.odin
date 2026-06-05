@@ -190,6 +190,19 @@ HELP_COMMANDS := []CommandHelp{
 			{"remove", "<character|npc|creature> <id> <name>", "Remove a condition by name."},
 		},
 	},
+		{
+			command = "quest",
+			description = "Manage campaign quests with objectives and actor tracking.",
+			subcommands = []SubcommandHelp{
+				{"add", "<campaign_id> <name> [description] [quest_giver_npc_id] [reward] [chapter]", "Create a new quest."},
+				{"add-objective", "<quest_id> <description> [sort_order]", "Add a step to a quest."},
+				{"complete-objective", "<objective_id>", "Mark an objective as complete."},
+				{"set-status", "<quest_id> <active|completed|failed|abandoned>", "Update quest status."},
+				{"add-actor", "<quest_id> <char|npc> <actor_id> [role]", "Link a character or NPC to a quest."},
+				{"list", "<campaign_id> [status]", "List quests for a campaign."},
+				{"get", "<quest_id>", "Show full quest details with objectives and actors."},
+			},
+		},
 	{
 		command = "campaign",
 		description = "Track sessions, chapters, current active locations, story progress, and DM campaign logs.",
@@ -206,7 +219,11 @@ HELP_COMMANDS := []CommandHelp{
 			{"add-action", "<campaign_id> <description> [location_id] [faction_id] [standing_impact] [story_progression] [status]", "Log a plot/story action impacting factions/story state."},
 			{"link-actor", "<action_id> <char|npc> <actor_id>", "Link character/NPC to a logged campaign action."},
 			{"list-actions", "<campaign_id> [location_id]", "List story actions in campaign."},
-			{"get-story-state", "<campaign_id>", "Show detailed chronological story log, plot standing, and active location data."},
+			{"get-story-state", "<campaign_id>", "Show full campaign context packet: locations tree, journal, quests, standings, story log."},
+				{"add-journal-entry", "<campaign_id> <entry_type> <description> [location_id] [session_num]", "Add a timestamped journal entry for session recaps."},
+				{"list-journal", "<campaign_id> [limit]", "List recent journal entries for a campaign."},
+				{"set-dm-notes", "<campaign_id> <text>", "Set private DM notes for a campaign."},
+				{"set-time", "<campaign_id> <in_game_day> <time_of_day> <season>", "Set in-game calendar state."},
 		},
 	},
 	{
@@ -265,6 +282,8 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_world(db, cmd_name, args)
 	case "can-enter":
 		return route_can_enter(db, args)
+	case "quest":
+		return route_quest(db, args)
 	case "campaign", "init", "help":
 		return route_meta_command(db, cmd_name, args)
 	case:
@@ -328,6 +347,34 @@ route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
 			fmt.println(`{"success":false,"error":"Unknown class-specialty subcommand"}`)
 		} else {
 			fmt.eprintln("Unknown class-specialty subcommand:", sub)
+		}
+		return 1
+	}
+}
+
+route_quest :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent quest <subcommand> [args]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent quest <subcommand> [args]")
+		}
+		return 1
+	}
+	sub := args[0]
+	switch sub {
+	case "add":                return cmd.quest_add(db, args)
+	case "add-objective":     return cmd.quest_add_objective(db, args)
+	case "complete-objective": return cmd.quest_complete_objective(db, args)
+	case "set-status":        return cmd.quest_set_status(db, args)
+	case "add-actor":         return cmd.quest_add_actor(db, args)
+	case "list":              return cmd.quest_list(db, args)
+	case "get":               return cmd.quest_get(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown quest subcommand"}`)
+		} else {
+			fmt.eprintln("Unknown quest subcommand:", sub)
 		}
 		return 1
 	}
@@ -793,7 +840,7 @@ route_campaign :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "set-chapter", "next-session":
 		return route_campaign_core(db, sub, args)
-	case "add-location", "set-location", "list-locations", "add-action", "link-actor", "list-actions", "get-story-state":
+	case "add-location", "set-location", "list-locations", "add-action", "link-actor", "list-actions", "get-story-state", "add-journal-entry", "list-journal", "set-dm-notes", "set-time":
 		return route_campaign_story(db, sub, args)
 	case:
 		if db.is_json {
@@ -819,13 +866,17 @@ route_campaign_core :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 
 route_campaign_story :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	switch sub {
-	case "add-location":    return cmd.campaign_add_location(db, args)
-	case "set-location":    return cmd.campaign_set_location(db, args)
-	case "list-locations":  return cmd.campaign_list_locations(db, args)
-	case "add-action":      return cmd.campaign_add_action(db, args)
-	case "link-actor":      return cmd.campaign_link_actor(db, args)
-	case "list-actions":    return cmd.campaign_list_actions(db, args)
-	case "get-story-state": return cmd.campaign_get_story_state(db, args)
+	case "add-location":       return cmd.campaign_add_location(db, args)
+	case "set-location":       return cmd.campaign_set_location(db, args)
+	case "list-locations":     return cmd.campaign_list_locations(db, args)
+	case "add-action":         return cmd.campaign_add_action(db, args)
+	case "link-actor":         return cmd.campaign_link_actor(db, args)
+	case "list-actions":       return cmd.campaign_list_actions(db, args)
+	case "get-story-state":    return cmd.campaign_get_story_state(db, args)
+	case "add-journal-entry":  return cmd.campaign_add_journal_entry(db, args)
+	case "list-journal":       return cmd.campaign_list_journal(db, args)
+	case "set-dm-notes":       return cmd.campaign_set_dm_notes(db, args)
+	case "set-time":           return cmd.campaign_set_time(db, args)
 	}
 	return 1
 }

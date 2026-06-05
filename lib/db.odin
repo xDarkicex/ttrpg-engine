@@ -753,6 +753,60 @@ db_run_migrations_17 :: proc(db: ^Db, current_version: i32) -> Error {
 	return Error.None
 }
 
+db_run_migrations_18 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 18 {
+		db_exec(db, `CREATE TABLE IF NOT EXISTS campaign_journal (
+			id INTEGER PRIMARY KEY,
+			campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+			session_num INTEGER DEFAULT 0,
+			entry_type TEXT DEFAULT 'narrative',
+			description TEXT NOT NULL,
+			location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP
+		);`)
+
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN dm_notes TEXT DEFAULT '';")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN in_game_day INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN in_game_time TEXT DEFAULT 'morning';")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN current_season TEXT DEFAULT 'spring';")
+
+		db_exec(db, `CREATE TABLE IF NOT EXISTS quests (
+			id INTEGER PRIMARY KEY,
+			campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			quest_giver_npc_id INTEGER REFERENCES npcs(id) ON DELETE SET NULL,
+			status TEXT DEFAULT 'active',
+			reward_description TEXT DEFAULT '',
+			chapter TEXT DEFAULT '',
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP
+		);`)
+
+		db_exec(db, `CREATE TABLE IF NOT EXISTS quest_objectives (
+			id INTEGER PRIMARY KEY,
+			quest_id INTEGER REFERENCES quests(id) ON DELETE CASCADE,
+			description TEXT NOT NULL,
+			status TEXT DEFAULT 'incomplete',
+			sort_order INTEGER DEFAULT 0
+		);`)
+
+		db_exec(db, `CREATE TABLE IF NOT EXISTS quest_actors (
+			id INTEGER PRIMARY KEY,
+			quest_id INTEGER REFERENCES quests(id) ON DELETE CASCADE,
+			actor_type TEXT NOT NULL,
+			actor_id INTEGER NOT NULL,
+			role TEXT DEFAULT 'participant',
+			UNIQUE(quest_id, actor_type, actor_id)
+		);`)
+
+		set_version_err := set_db_version(db, 18)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
 db_init_schema :: proc(db: ^Db) -> Error {
 	fk_err := db_exec(db, "PRAGMA foreign_keys = ON;")
 	if fk_err != Error.None do return fk_err
@@ -796,6 +850,10 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_17(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_18(db, i32(current_version))
 	if err != Error.None do return err
 
 	return Error.None

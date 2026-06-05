@@ -674,7 +674,7 @@ campaign_list_actions :: proc(db: ^lib.Db, args: []string) -> int {
 
 print_json_campaign_details :: proc(db: ^lib.Db, campaign_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT id, name, chapter, session_num FROM campaigns WHERE id=%d", campaign_id)
+	sql := fmt.tprintf("SELECT id, name, chapter, session_num, dm_notes, in_game_day, in_game_time, current_season FROM campaigns WHERE id=%d", campaign_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		fmt.print("null")
@@ -684,11 +684,15 @@ print_json_campaign_details :: proc(db: ^lib.Db, campaign_id: int) {
 
 	if sqlite.step(stmt) == .Row {
 		fmt.print("{")
-		fmt.printf("\"id\":%d,\"name\":\"%s\",\"chapter\":\"%s\",\"session_num\":%d",
+		fmt.printf("\"id\":%d,\"name\":\"%s\",\"chapter\":\"%s\",\"session_num\":%d,\"dm_notes\":\"%s\",\"in_game_day\":%d,\"in_game_time\":\"%s\",\"current_season\":\"%s\"",
 			sqlite.column_int(stmt, 0),
 			escape_json_string(column_text_safe(stmt, 1)),
 			column_text_safe(stmt, 2),
 			sqlite.column_int(stmt, 3),
+			escape_json_string(column_text_safe(stmt, 4)),
+			sqlite.column_int(stmt, 5),
+			column_text_safe(stmt, 6),
+			column_text_safe(stmt, 7),
 		)
 		fmt.print("}")
 	} else {
@@ -759,7 +763,7 @@ print_json_actions_by_id :: proc(db: ^lib.Db, campaign_id: int) {
 
 print_text_story_state :: proc(db: ^lib.Db, campaign_id: int) {
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT c.name, c.chapter, c.session_num, (SELECT name FROM locations WHERE campaign_id=c.id AND is_current=1 LIMIT 1) FROM campaigns c WHERE c.id=%d", campaign_id)
+	sql := fmt.tprintf("SELECT c.name, c.chapter, c.session_num, c.dm_notes, c.in_game_day, c.in_game_time, c.current_season, (SELECT name FROM locations WHERE campaign_id=c.id AND is_current=1 LIMIT 1) FROM campaigns c WHERE c.id=%d", campaign_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		fmt.eprintln("Failed to prepare campaign details query")
@@ -775,31 +779,74 @@ print_text_story_state :: proc(db: ^lib.Db, campaign_id: int) {
 	camp_name := sqlite.column_text(stmt, 0)
 	chapter := sqlite.column_text(stmt, 1)
 	session_num := sqlite.column_int(stmt, 2)
-	curr_loc := sqlite.column_text(stmt, 3)
+	dm_notes := sqlite.column_text(stmt, 3)
+	in_game_day := sqlite.column_int(stmt, 4)
+	in_game_time := sqlite.column_text(stmt, 5)
+	current_season := sqlite.column_text(stmt, 6)
+	curr_loc := sqlite.column_text(stmt, 7)
 	curr_loc_str := curr_loc != nil ? string(curr_loc) : "None"
+	dm_notes_str := dm_notes != nil ? string(dm_notes) : ""
 
 	fmt.println("================================================================================")
 	fmt.printf("CAMPAIGN REPORT: %s (ID: %d)\n", camp_name, campaign_id)
 	fmt.println("================================================================================")
-	fmt.printf("Chapter: %s | Session: %d\n", chapter, session_num)
+	fmt.printf("Chapter: %s | Session: %d | Day: %d | %s, %s\n", chapter, session_num, in_game_day, in_game_time, current_season)
 	fmt.printf("Current Active Location: %s\n\n", curr_loc_str)
 
-	print_text_story_state_locations(db, campaign_id)
+	if len(dm_notes_str) > 0 {
+		fmt.println("--------------------------------------------------------------------------------")
+		fmt.println("DM NOTES")
+		fmt.println("--------------------------------------------------------------------------------")
+		fmt.println(dm_notes_str)
+		fmt.println()
+	}
+
+	print_text_journal_entries(db, campaign_id, 10)
+	print_text_quests(db, campaign_id)
+	print_text_locations_tree(db, campaign_id)
 	print_text_story_state_standings(db, campaign_id)
 	print_text_story_state_actions(db, campaign_id)
 }
 
-print_text_story_state_locations :: proc(db: ^lib.Db, campaign_id: int) {
+print_text_locations_tree :: proc(db: ^lib.Db, campaign_id: int) {
 	fmt.println("--------------------------------------------------------------------------------")
-	fmt.println("LOCATIONS LIST")
+	fmt.println("LOCATIONS")
 	fmt.println("--------------------------------------------------------------------------------")
 	stmt: ^sqlite.Statement
-	sql := fmt.tprintf("SELECT id, name, description, chapter, is_current FROM locations WHERE campaign_id=%d ORDER BY id", campaign_id)
+	sql := fmt.tprintf("SELECT id, name, description, chapter, is_current, COALESCE(parent_id,0), restricted, restricted_until FROM locations WHERE campaign_id=%d ORDER BY id", campaign_id)
 	sql_c := cstring(raw_data(sql))
-	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
-		defer sqlite.finalize(stmt)
-		print_text_locations_stmt(stmt)
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.println("  No locations.")
+		fmt.println()
+		return
 	}
+	defer sqlite.finalize(stmt)
+
+	has_any := false
+	for sqlite.step(stmt) == .Row {
+		has_any = true
+		loc_id := int(sqlite.column_int(stmt, 0))
+		name := column_text_safe(stmt, 1)
+		desc := column_text_safe(stmt, 2)
+		chapter := column_text_safe(stmt, 3)
+		is_curr := sqlite.column_int(stmt, 4) != 0
+		restricted := sqlite.column_int(stmt, 6) != 0
+
+		active_str := is_curr ? "[ACTIVE] " : "         "
+		restr_str := restricted ? " (restricted)" : ""
+		fmt.printf("  %s[%d] %s%s: %s (Chapter: %s)\n", active_str, loc_id, name, restr_str, desc, chapter)
+
+		print_text_sub_locations(db, loc_id, "    ")
+		print_text_houses(db, loc_id, "    ")
+		print_text_shops(db, loc_id, "    ")
+		print_text_encounters(db, loc_id, "    ")
+		print_text_setpieces(db, loc_id, "    ")
+		print_text_npcs_at(db, loc_id, "    ")
+		print_text_characters_at(db, loc_id, "    ")
+		print_text_creatures_at(db, loc_id, "    ")
+		fmt.println()
+	}
+	if !has_any do fmt.println("  No locations.")
 	fmt.println()
 }
 
@@ -860,8 +907,12 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.print(`{"success":true`)
 		fmt.print(`,"campaign":`)
 		print_json_campaign_details(db, campaign_id)
-		fmt.print(`,"locations":`)
-		print_json_locations_by_id(db, campaign_id)
+		fmt.print(`,"journal":`)
+		print_json_journal_for_state(db, campaign_id)
+		fmt.print(`,"quests":`)
+		print_json_quests_for_state(db, campaign_id)
+		fmt.print(`,"locations_tree":`)
+		print_json_locations_tree(db, campaign_id)
 		fmt.print(`,"faction_standings":`)
 		print_json_standings_by_id(db, campaign_id)
 		fmt.print(`,"story_actions":`)
@@ -871,4 +922,727 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 		print_text_story_state(db, campaign_id)
 	}
 	return 0
+}
+
+// v18: campaign journal entries for AI session continuity.
+// The AI stores recaps as free-text entries; get-story-state loads the last N
+// to reconstruct game state from a cold load.
+
+campaign_add_journal_entry :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		return print_error(db, "Usage: dnd-agent campaign add-journal-entry <campaign_id> <entry_type> <description> [location_id] [session_num]")
+	}
+
+	campaign_id := strconv.atoi(args[1])
+	entry_type := args[2]
+	description := args[3]
+	location_sql := parse_opt_id(args, 4)
+	session_num := parse_opt_int(args, 5, 0)
+
+	sql := fmt.tprintf(
+		"INSERT INTO campaign_journal (campaign_id, entry_type, description, location_id, session_num) VALUES (%d, '%s', '%s', %s, %d)",
+		campaign_id, escape_sql(entry_type), escape_sql(description), location_sql, session_num,
+	)
+
+	if lib.db_exec(db, sql) != .None {
+		return print_error(db, "Failed to add journal entry")
+	}
+
+	entry_id := get_last_insert_id(db)
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Journal entry added","entry_id":{}}}`+"\n", entry_id)
+	} else {
+		fmt.printf("Journal entry #%d added (type: %s)\n", entry_id, entry_type)
+	}
+	return 0
+}
+
+campaign_list_journal :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 2 {
+		return print_error(db, "Usage: dnd-agent campaign list-journal <campaign_id> [limit]")
+	}
+
+	campaign_id := strconv.atoi(args[1])
+	limit := parse_opt_int(args, 2, 10)
+
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT j.id, j.session_num, j.entry_type, j.description, j.location_id, l.name, j.created_at FROM campaign_journal j LEFT JOIN locations l ON j.location_id = l.id WHERE j.campaign_id = %d ORDER BY j.id DESC LIMIT %d",
+		campaign_id, limit,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return print_error(db, "Failed to list journal entries")
+	}
+	defer sqlite.finalize(stmt)
+
+	if db.is_json {
+		builder := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&builder, '[')
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do strings.write_byte(&builder, ',')
+			first = false
+			loc_id := sqlite.column_int(stmt, 4)
+			loc_name := loc_id > 0 ? fmt.tprintf(`"%s"`, escape_json_string(column_text_safe(stmt, 5))) : "null"
+			loc_id_str := loc_id > 0 ? fmt.tprintf("%d", loc_id) : "null"
+			strings.write_string(&builder, "{")
+			fmt.sbprintf(&builder, `"id":%d,"session_num":%d,"entry_type":"%s","description":"%s","location_id":%s,"location_name":%s,"created_at":"%s"`,
+				sqlite.column_int(stmt, 0),
+				sqlite.column_int(stmt, 1),
+				column_text_safe(stmt, 2),
+				escape_json_string(column_text_safe(stmt, 3)),
+				loc_id_str,
+				loc_name,
+				column_text_safe(stmt, 6),
+			)
+			strings.write_string(&builder, "}")
+		}
+		strings.write_byte(&builder, ']')
+		fmt.println(strings.to_string(builder))
+	} else {
+		for sqlite.step(stmt) == .Row {
+			entry_type := column_text_safe(stmt, 2)
+			loc_name := column_text_safe(stmt, 5)
+			created := column_text_safe(stmt, 6)
+			fmt.printf("  [#%d] [%s] S%d \u2014 %s\n", sqlite.column_int(stmt, 0), entry_type, sqlite.column_int(stmt, 1), column_text_safe(stmt, 3))
+			if len(loc_name) > 0 {
+				fmt.printf("    Location: %s | %s\n", loc_name, created)
+			} else {
+				fmt.printf("    %s\n", created)
+			}
+		}
+	}
+	return 0
+}
+
+campaign_set_dm_notes :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		return print_error(db, "Usage: dnd-agent campaign set-dm-notes <campaign_id> <text>")
+	}
+
+	campaign_id := strconv.atoi(args[1])
+	notes := args[2]
+	sql := fmt.tprintf("UPDATE campaigns SET dm_notes='%s' WHERE id=%d", escape_sql(notes), campaign_id)
+
+	if lib.db_exec(db, sql) != .None {
+		return print_error(db, "Failed to set DM notes")
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"DM notes updated","campaign_id":{}}}`+"\n", campaign_id)
+	} else {
+		fmt.printf("DM notes updated for campaign %d\n", campaign_id)
+	}
+	return 0
+}
+
+campaign_set_time :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 5 {
+		return print_error(db, "Usage: dnd-agent campaign set-time <campaign_id> <in_game_day> <time_of_day> <season>")
+	}
+
+	campaign_id := strconv.atoi(args[1])
+	day := strconv.atoi(args[2])
+	time_of_day := args[3]
+	season := args[4]
+
+	sql := fmt.tprintf(
+		"UPDATE campaigns SET in_game_day=%d, in_game_time='%s', current_season='%s' WHERE id=%d",
+		day, escape_sql(time_of_day), escape_sql(season), campaign_id,
+	)
+
+	if lib.db_exec(db, sql) != .None {
+		return print_error(db, "Failed to set time")
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Time updated","campaign_id":{},"in_game_day":{},"in_game_time":"{}","current_season":"{}"}}`+"\n", campaign_id, day, time_of_day, season)
+	} else {
+		fmt.printf("Campaign %d time: Day %d, %s, %s\n", campaign_id, day, time_of_day, season)
+	}
+	return 0
+}
+
+// v18: journal entries for get-story-state context packet.
+
+print_json_journal_for_state :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT id, session_num, entry_type, description, location_id, created_at FROM campaign_journal WHERE campaign_id=%d ORDER BY id DESC LIMIT 10",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_byte(&builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(&builder, ',')
+		first = false
+		loc_id := sqlite.column_int(stmt, 4)
+		loc_id_str := loc_id > 0 ? fmt.tprintf("%d", loc_id) : "null"
+		fmt.sbprintf(&builder, `{{"id":{},"session_num":{},"entry_type":"{}","description":"{}","location_id":{},"created_at":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			sqlite.column_int(stmt, 1),
+			column_text_safe(stmt, 2),
+			escape_json_string(column_text_safe(stmt, 3)),
+			loc_id_str,
+			column_text_safe(stmt, 5),
+		)
+	}
+	strings.write_byte(&builder, ']')
+	fmt.print(strings.to_string(builder))
+}
+
+print_text_journal_entries :: proc(db: ^lib.Db, campaign_id: int, limit: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT id, session_num, entry_type, description FROM campaign_journal WHERE campaign_id=%d ORDER BY id DESC LIMIT %d",
+		campaign_id, limit,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	fmt.println("--------------------------------------------------------------------------------")
+	fmt.println("JOURNAL (last entries)")
+	fmt.println("--------------------------------------------------------------------------------")
+	has_any := false
+	for sqlite.step(stmt) == .Row {
+		has_any = true
+		fmt.printf("  [#%d] [%s] S%d \u2014 %s\n",
+			sqlite.column_int(stmt, 0),
+			column_text_safe(stmt, 2),
+			sqlite.column_int(stmt, 1),
+			column_text_safe(stmt, 3),
+		)
+	}
+	if !has_any do fmt.println("  No entries yet.")
+	fmt.println()
+}
+
+// v18: quest display for get-story-state.
+
+print_json_quests_for_state :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT q.id, q.name, q.description, q.quest_giver_npc_id, n.name, q.status, q.reward_description, q.chapter, q.created_at FROM quests q LEFT JOIN npcs n ON q.quest_giver_npc_id = n.id WHERE q.campaign_id=%d ORDER BY q.id",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_byte(&builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(&builder, ',')
+		first = false
+		q_id := int(sqlite.column_int(stmt, 0))
+		giver_id := int(sqlite.column_int(stmt, 3))
+		giver_id_str := giver_id > 0 ? fmt.tprintf("%d", giver_id) : "null"
+		giver_name := column_text_safe(stmt, 4)
+		giver_name_str := len(giver_name) > 0 ? fmt.tprintf(`"%s"`, escape_json_string(giver_name)) : "null"
+
+		strings.write_string(&builder, "{")
+		fmt.sbprintf(&builder, `"id":%d,"name":"%s","description":"%s","quest_giver_npc_id":%s,"quest_giver_name":%s,"status":"%s","reward_description":"%s","chapter":"%s","created_at":"%s"`,
+			q_id,
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+			giver_id_str,
+			giver_name_str,
+			column_text_safe(stmt, 5),
+			escape_json_string(column_text_safe(stmt, 6)),
+			column_text_safe(stmt, 7),
+			column_text_safe(stmt, 8),
+		)
+		strings.write_string(&builder, `,"objectives":`)
+		print_json_quest_objectives(&builder, db, q_id)
+		strings.write_string(&builder, `,"actors":`)
+		print_json_quest_actors(&builder, db, q_id)
+		strings.write_string(&builder, "}")
+	}
+	strings.write_byte(&builder, ']')
+	fmt.print(strings.to_string(builder))
+}
+
+print_json_quest_objectives :: proc(builder: ^strings.Builder, db: ^lib.Db, quest_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, description, status, sort_order FROM quest_objectives WHERE quest_id=%d ORDER BY sort_order, id", quest_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"description":"{}","status":"{}","sort_order":{}}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			column_text_safe(stmt, 2),
+			sqlite.column_int(stmt, 3),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_quest_actors :: proc(builder: ^strings.Builder, db: ^lib.Db, quest_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT actor_type, actor_id, role FROM quest_actors WHERE quest_id=%d ORDER BY actor_type, actor_id", quest_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		actor_type := column_text_safe(stmt, 0)
+		actor_id := int(sqlite.column_int(stmt, 1))
+		actor_name := get_actor_name(db, actor_type, actor_id)
+		fmt.sbprintf(builder, `{{"actor_type":"{}","actor_id":{},"actor_name":"{}","role":"{}"}}`,
+			actor_type,
+			actor_id,
+			escape_json_string(actor_name),
+			column_text_safe(stmt, 2),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_text_quests :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT q.id, q.name, q.description, q.quest_giver_npc_id, n.name, q.status, q.reward_description, q.chapter FROM quests q LEFT JOIN npcs n ON q.quest_giver_npc_id = n.id WHERE q.campaign_id=%d ORDER BY q.id",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	fmt.println("--------------------------------------------------------------------------------")
+	fmt.println("QUESTS")
+	fmt.println("--------------------------------------------------------------------------------")
+	has_any := false
+	for sqlite.step(stmt) == .Row {
+		has_any = true
+		q_id := int(sqlite.column_int(stmt, 0))
+		fmt.printf("  [#%d] [%s] %s\n", q_id, column_text_safe(stmt, 5), column_text_safe(stmt, 1))
+		fmt.printf("    %s\n", column_text_safe(stmt, 2))
+		giver_id := int(sqlite.column_int(stmt, 3))
+		if giver_id > 0 {
+			fmt.printf("    Quest giver: %s (#%d)\n", column_text_safe(stmt, 4), giver_id)
+		}
+		ch := column_text_safe(stmt, 7)
+		reward := column_text_safe(stmt, 6)
+		if len(ch) > 0 || len(reward) > 0 {
+			fmt.printf("    Chapter: %s | Reward: %s\n", ch, reward)
+		}
+
+		obj_stmt: ^sqlite.Statement
+		obj_sql := fmt.tprintf("SELECT description, status FROM quest_objectives WHERE quest_id=%d ORDER BY sort_order, id", q_id)
+		obj_c := cstring(raw_data(obj_sql))
+		if sqlite.prepare(db.ptr, obj_c, i32(len(obj_sql)), &obj_stmt, nil) == .Ok {
+			for sqlite.step(obj_stmt) == .Row {
+				done := column_text_safe(obj_stmt, 1) == "complete" ? "x" : " "
+				fmt.printf("    [%s] %s\n", done, column_text_safe(obj_stmt, 0))
+			}
+			sqlite.finalize(obj_stmt)
+		}
+		fmt.println()
+	}
+	if !has_any do fmt.println("  No quests.\n")
+}
+
+// v18: location tree for get-story-state. Each location node includes
+// sub-locations, houses, shops, encounters, setpieces, and all entities present.
+
+print_json_locations_tree :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, description, chapter, is_current, COALESCE(parent_id,0), restricted, restricted_until FROM locations WHERE campaign_id=%d ORDER BY id", campaign_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_byte(&builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(&builder, ',')
+		first = false
+		loc_id := int(sqlite.column_int(stmt, 0))
+		parent_id := int(sqlite.column_int(stmt, 5))
+		parent_str := parent_id > 0 ? fmt.tprintf("%d", parent_id) : "null"
+		is_curr := sqlite.column_int(stmt, 4) != 0 ? "true" : "false"
+
+		strings.write_string(&builder, "{")
+		fmt.sbprintf(&builder, `"id":%d,"name":"%s","description":"%s","chapter":"%s","is_current":%s,"parent_id":%s,"restricted":%d,"restricted_until":"%s"`,
+			loc_id,
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+			column_text_safe(stmt, 3),
+			is_curr,
+			parent_str,
+			sqlite.column_int(stmt, 6),
+			escape_json_string(column_text_safe(stmt, 7)),
+		)
+		strings.write_string(&builder, `,"sub_locations":`)
+		print_json_sub_locations(&builder, db, loc_id)
+		strings.write_string(&builder, `,"houses":`)
+		print_json_houses(&builder, db, loc_id)
+		strings.write_string(&builder, `,"shops":`)
+		print_json_shops(&builder, db, loc_id)
+		strings.write_string(&builder, `,"encounters":`)
+		print_json_encounters(&builder, db, loc_id)
+		strings.write_string(&builder, `,"setpieces":`)
+		print_json_setpieces(&builder, db, loc_id)
+		strings.write_string(&builder, `,"npcs_present":`)
+		print_json_npcs_at(&builder, db, loc_id)
+		strings.write_string(&builder, `,"characters_present":`)
+		print_json_characters_at(&builder, db, loc_id)
+		strings.write_string(&builder, `,"creatures_present":`)
+		print_json_creatures_at(&builder, db, loc_id)
+		strings.write_string(&builder, "}")
+	}
+	strings.write_byte(&builder, ']')
+	fmt.print(strings.to_string(builder))
+}
+
+print_json_sub_locations :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name FROM locations WHERE parent_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_houses :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, description, npc_id, scale, restricted, restricted_until, inventory FROM houses WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}","description":"{}","npc_id":{},"scale":"{}","restricted":{},"restricted_until":"{}","inventory":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+			sqlite.column_int(stmt, 3),
+			column_text_safe(stmt, 4),
+			sqlite.column_int(stmt, 5),
+			escape_json_string(column_text_safe(stmt, 6)),
+			escape_json_string(column_text_safe(stmt, 7)),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_shops :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, description, npc_id, scale, open_hours, restricted, inventory FROM shops WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}","description":"{}","npc_id":{},"scale":"{}","open_hours":"{}","restricted":{},"inventory":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+			sqlite.column_int(stmt, 3),
+			column_text_safe(stmt, 4),
+			column_text_safe(stmt, 5),
+			sqlite.column_int(stmt, 6),
+			escape_json_string(column_text_safe(stmt, 7)),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_encounters :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, type, description, npc_id FROM encounters WHERE location_id=%d ORDER BY id", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"type":"{}","description":"{}","npc_id":{}}}`,
+			sqlite.column_int(stmt, 0),
+			column_text_safe(stmt, 1),
+			escape_json_string(column_text_safe(stmt, 2)),
+			sqlite.column_int(stmt, 3),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_setpieces :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, description, chapter_event FROM setpieces WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}","description":"{}","chapter_event":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+			escape_json_string(column_text_safe(stmt, 3)),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_npcs_at :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, description, current_hp, max_hp, story_role, daily_role FROM npcs WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}","description":"{}","current_hp":{},"max_hp":{},"story_role":"{}","daily_role":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			escape_json_string(column_text_safe(stmt, 2)),
+			sqlite.column_int(stmt, 3),
+			sqlite.column_int(stmt, 4),
+			column_text_safe(stmt, 5),
+			column_text_safe(stmt, 6),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_characters_at :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, current_hp, max_hp, owner, party FROM characters WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}","current_hp":{},"max_hp":{},"owner":"{}","party":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			sqlite.column_int(stmt, 2),
+			sqlite.column_int(stmt, 3),
+			column_text_safe(stmt, 4),
+			column_text_safe(stmt, 5),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+print_json_creatures_at :: proc(builder: ^strings.Builder, db: ^lib.Db, location_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, current_hp, max_hp, story_role FROM creatures WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		strings.write_string(builder, "[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	strings.write_byte(builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(builder, ',')
+		first = false
+		fmt.sbprintf(builder, `{{"id":{},"name":"{}","current_hp":{},"max_hp":{},"story_role":"{}"}}`,
+			sqlite.column_int(stmt, 0),
+			escape_json_string(column_text_safe(stmt, 1)),
+			sqlite.column_int(stmt, 2),
+			sqlite.column_int(stmt, 3),
+			column_text_safe(stmt, 4),
+		)
+	}
+	strings.write_byte(builder, ']')
+}
+
+// Text-mode helpers for location tree display.
+
+print_text_sub_locations :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name FROM locations WHERE parent_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		fmt.printf("%sSub-location: [%d] %s\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1))
+	}
+}
+
+print_text_houses :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, scale, restricted FROM houses WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		restr := sqlite.column_int(stmt, 3) != 0 ? " (restricted)" : ""
+		fmt.printf("%sHouse: [%d] %s (scale: %s)%s\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), column_text_safe(stmt, 2), restr)
+	}
+}
+
+print_text_shops :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, scale, open_hours FROM shops WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		fmt.printf("%sShop: [%d] %s (scale: %s, hours: %s)\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), column_text_safe(stmt, 2), column_text_safe(stmt, 3))
+	}
+}
+
+print_text_encounters :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, type, description FROM encounters WHERE location_id=%d ORDER BY id", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		fmt.printf("%sEncounter: [%d] (%s) %s\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), column_text_safe(stmt, 2))
+	}
+}
+
+print_text_setpieces :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, description, chapter_event FROM setpieces WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		event := column_text_safe(stmt, 3)
+		event_str := len(event) > 0 ? fmt.tprintf(" [Event: %s]", event) : ""
+		fmt.printf("%sSetpiece: [%d] %s%s\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), event_str)
+	}
+}
+
+print_text_npcs_at :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, story_role FROM npcs WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		role := column_text_safe(stmt, 2)
+		role_str := len(role) > 0 ? fmt.tprintf(" (%s)", role) : ""
+		fmt.printf("%sNPC: [%d] %s%s\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), role_str)
+	}
+}
+
+print_text_characters_at :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, party FROM characters WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		party := column_text_safe(stmt, 2)
+		party_str := len(party) > 0 ? fmt.tprintf(" (party: %s)", party) : ""
+		fmt.printf("%sCharacter: [%d] %s%s\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), party_str)
+	}
+}
+
+print_text_creatures_at :: proc(db: ^lib.Db, location_id: int, indent: string) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, current_hp, max_hp FROM creatures WHERE location_id=%d ORDER BY name", location_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok { return }
+	defer sqlite.finalize(stmt)
+
+	for sqlite.step(stmt) == .Row {
+		fmt.printf("%sCreature: [%d] %s (%d/%d hp)\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), sqlite.column_int(stmt, 2), sqlite.column_int(stmt, 3))
+	}
 }

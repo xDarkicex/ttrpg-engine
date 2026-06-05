@@ -1,19 +1,25 @@
 # dnd-agent
 
-> D&D campaign management CLI — track characters, NPCs, items, spells, factions, and campaign storylines from your terminal.
+> The terminal-native D&D world engine. Build your campaign as a living database — towns, shops, NPCs, quests, session journals, faction politics — then query it from the command line or feed it to an AI Dungeon Master.
 
 [![Odin](https://img.shields.io/badge/Odin-dev--2026--05-blue?logo=odin&logoColor=white)](https://odin-lang.org)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Linux](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-blue?logo=linux&logoColor=white)](https://github.com/xDarkicex/dnd-agent/actions)
 [![Build](https://github.com/xDarkicex/dnd-agent/actions/workflows/release.yml/badge.svg)](https://github.com/xDarkicex/dnd-agent/actions/workflows/release.yml)
 
-## Why dnd-agent?
+## The World Engine
 
-- **Script-friendly** — `--json` output for piping into AI agent pipelines, bots, or automation.
-- **Rich 5e tracking** — multiclass characters, spell slots, companions, factions, story log.
-- **Zero-config** — automatic SQLite schema migrations on first run.
-- **Fast** — arena-based memory, O(1) DB lookups, zero heap allocations after startup.
-- **Deep inventory** — items, equipment, attuned status across characters, NPCs, and creatures.
+dnd-agent models your tabletop world as a **relational database** — every tavern, blacksmith, quest giver, and goblin camp is a row you can query, update, and connect. It was built for DMs who run long-form campaigns with deep continuity, and for AI agents that need a canonical source of truth about the game state.
+
+**The world model.** You create a campaign. Inside it, you build locations — towns, districts, dungeons. Locations nest into sub-locations (`Ashwick > Blacksmith District > The Anvil & Flame`). Each location holds houses (with residents and inventory), shops (with opening hours and proprietors), wandering encounters, and story-driving setpieces. NPCs, characters, and creatures all have a location — the CLI tells you exactly who is where right now.
+
+**The memory system.** A stateless AI agent only knows what you tell it. dnd-agent solves this with three systems working together: a **campaign journal** (timestamped session recaps the AI writes and reads back), a **quest tracker** (step-by-step objectives with linked actors, so the AI remembers what the party is supposed to be doing), and an **in-game calendar** (day, time of day, season) so the AI can say "it's autumn evening on day 42." One command — `campaign get-story-state` — returns the complete context packet the AI needs to reconstruct the game from a cold start.
+
+**The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have faction standings that shift with story actions. Houses have residents. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
+
+**Built for AI pipelines.** Every command emits `--json` output for piping into LLM agents, Discord bots, or automation scripts. The schema is designed so an AI can call `get-story-state`, receive the full world snapshot (locations tree with all entities present, active quests, recent journal entries, faction standings, story log), and immediately begin DMing with full context. No warm-up, no context-stuffing — one query, everything it needs.
+
+**Fast by design.** O(1) database lookups. Arena-based memory with zero heap allocations after startup. Automatic SQLite schema migrations — drop the binary into a campaign folder and run. No config files, no daemons, no network calls. Just a 2.6 MB binary and a `.db` file you can commit to git alongside your session notes.
 
 ## Install
 
@@ -49,10 +55,11 @@ odin build . -file -collection:ext=./vendor -out:dnd-agent
 ---
 
 ## Table of Contents
-1. [Installation & Build](#installation--build)
-2. [Database Schema](#database-schema)
-3. [Global Output Flags](#global-output-flags)
-4. [CLI Command Reference](#cli-command-reference)
+1. [The World Engine](#the-world-engine)
+2. [Installation & Build](#installation--build)
+3. [Database Schema](#database-schema)
+4. [Global Output Flags](#global-output-flags)
+5. [CLI Command Reference](#cli-command-reference)
    - [Characters & Multiclassing](#1-characters--multiclassing)
    - [Vitals & Resting Setters](#2-vitals--resting-setters)
    - [Combat Stats & Spellcasting](#3-combat-stats--spellcasting)
@@ -62,13 +69,14 @@ odin build . -file -collection:ext=./vendor -out:dnd-agent
    - [Companions & Pets](#7-companions--pets)
    - [NPCs & Relationships](#8-npcs--relationships)
    - [Creatures & Monsters](#9-creatures--monsters)
-   - [Campaigns, Locations, & Story Tracking](#10-campaigns-locations--story-tracking)
-   - [World & Locations](#11-world--locations)
-   - [Factions & Standings](#12-factions--standings)
-   - [Spells & Features](#13-spells--features)
-   - [Items & Inventory Management](#14-items--inventory-management)
-5. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
-6. [Example Walkthrough Scenario](#example-walkthrough-scenario)
+   - [Campaigns, Story Tracking & Session Continuity](#10-campaigns-story-tracking--session-continuity)
+   - [Quest Tracking](#11-quest-tracking)
+   - [World & Locations](#12-world--locations)
+   - [Factions & Standings](#13-factions--standings)
+   - [Spells & Features](#14-spells--features)
+   - [Items & Inventory Management](#15-items--inventory-management)
+6. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
+7. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
 ---
 
@@ -517,13 +525,31 @@ Manage active monsters, beasts, and campaign enemies. Supports ability scores, l
 
 ---
 
-### 10. Campaigns, Locations, & Story Tracking
-Track the session number, current location, logged events, and generate a comprehensive campaign status report.
+### 10. Campaigns, Story Tracking & Session Continuity
+Manage the campaign world, track sessions, log story events, write session recaps, and generate the AI context packet.
 
 - **Create Campaign**:
   ```bash
   ./dnd-agent campaign create <name>
   ```
+- **Set Campaign Chapter**:
+  ```bash
+  ./dnd-agent campaign set-chapter <id> <chapter>
+  ```
+- **Advance Session Number**:
+  ```bash
+  ./dnd-agent campaign next-session <campaign_id>
+  ```
+- **Set In-Game Calendar**:
+  ```bash
+  ./dnd-agent campaign set-time <campaign_id> <in_game_day> <time_of_day> <season>
+  ```
+  *Example: `dnd-agent campaign set-time 1 42 evening autumn` — it is day 42, evening, in autumn.*
+- **Set Private DM Notes**:
+  ```bash
+  ./dnd-agent campaign set-dm-notes <campaign_id> <text>
+  ```
+  *Hidden notes visible in the story state report; never shown to players.*
 - **Add Location to Campaign**:
   ```bash
   ./dnd-agent campaign add-location <campaign_id> <name> <description> [chapter]
@@ -540,19 +566,60 @@ Track the session number, current location, logged events, and generate a compre
   ```bash
   ./dnd-agent campaign link-actor <action_id> <char|npc> <actor_id>
   ```
-- **Advance Session**:
+- **Add Journal Entry (Session Recap)**:
   ```bash
-  ./dnd-agent campaign next-session <campaign_id>
+  ./dnd-agent campaign add-journal-entry <campaign_id> <entry_type> <description> [location_id] [session_num]
   ```
-- **Get Complete Story State & Report**:
+  *Entry types: `narrative`, `combat`, `decision`, `npc_interaction`, `quest_update`, `dm_note`. The AI writes these to remember what happened; get-story-state loads the last 10 for session continuity.*
+- **List Journal Entries**:
+  ```bash
+  ./dnd-agent campaign list-journal <campaign_id> [limit]
+  ```
+- **Get Complete Story State (AI Context Packet)**:
   ```bash
   ./dnd-agent campaign get-story-state <campaign_id> [--json]
   ```
-  *Prints a report including session details, current location, location list, characters' standings with factions, and a chronological campaign story log.*
+  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), faction standings, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
 
 ---
 
-### 11. World & Locations
+### 11. Quest Tracking
+Track campaign quests with step-by-step objectives and linked actors. Quests appear in the `get-story-state` context packet so the AI knows what the party is supposed to be doing.
+
+- **Create Quest**:
+  ```bash
+  ./dnd-agent quest add <campaign_id> <name> [description] [quest_giver_npc_id] [reward] [chapter]
+  ```
+- **Add Objective (Step)**:
+  ```bash
+  ./dnd-agent quest add-objective <quest_id> <description> [sort_order]
+  ```
+- **Complete an Objective**:
+  ```bash
+  ./dnd-agent quest complete-objective <objective_id>
+  ```
+- **Update Quest Status**:
+  ```bash
+  ./dnd-agent quest set-status <quest_id> <active|completed|failed|abandoned>
+  ```
+- **Link Actor to Quest**:
+  ```bash
+  ./dnd-agent quest add-actor <quest_id> <char|npc> <actor_id> [role]
+  ```
+  *Roles: `leader`, `participant`, `target`, `observer`.*
+- **List Quests for a Campaign**:
+  ```bash
+  ./dnd-agent quest list <campaign_id> [status]
+  ```
+- **Get Full Quest Details**:
+  ```bash
+  ./dnd-agent quest get <quest_id> [--json]
+  ```
+  *Returns quest metadata, all objectives with completion status, and all linked actors with names.*
+
+---
+
+### 12. World & Locations
 Manage the campaign world: locations, sub-locations via `parent_id`, houses, shops, encounters, and setpieces. All commands are O(1) per query.
 
 - **Set a Sub-location Parent (Recursive)**:
@@ -604,7 +671,7 @@ Manage the campaign world: locations, sub-locations via `parent_id`, houses, sho
 
 ---
 
-### 12. Factions & Standings
+### 13. Factions & Standings
 Configure factions and standings metrics.
 
 - **Create Faction**:
@@ -626,7 +693,7 @@ Configure factions and standings metrics.
 
 ---
 
-### 13. Spells & Features
+### 14. Spells & Features
 Manage spell libraries, features, and character spellbooks.
 
 - **Spells Library**:
@@ -657,7 +724,7 @@ Manage spell libraries, features, and character spellbooks.
 
 ---
 
-### 14. Items & Inventory Management
+### 15. Items & Inventory Management
 Enforce items configurations and map item ownership, equipment, and attunement status.
 
 - **Create/Modify Item Blueprint**:
