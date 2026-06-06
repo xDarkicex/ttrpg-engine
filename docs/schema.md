@@ -26,7 +26,8 @@ erDiagram
     characters ||--o{ companions : "has"
     characters ||--o{ character_spells : "knows"
     characters ||--o{ character_features : "has"
-    characters ||--o{ faction_standings : "has"
+    characters ||--o{ faction_standings : "reputation"
+    campaigns ||--o{ party_faction_standings : "party reputation"
     characters ||--o{ inventory : "holds"
     npcs ||--o{ inventory : "holds"
     npcs ||--o{ npc_skills : "has"
@@ -54,7 +55,8 @@ erDiagram
     locations ||--o{ npcs : "contains"
     locations ||--o{ characters : "contains"
     locations ||--o{ creatures : "contains"
-    factions ||--o{ faction_standings : "reputation"
+    factions ||--o{ faction_standings : "character reputation"
+    factions ||--o{ party_faction_standings : "party reputation"
     npcs ||--o{ npc_relationships : "relationship"
     campaigns ||--o{ story_actions : "logs"
     locations ||--o{ story_actions : "logs"
@@ -307,19 +309,33 @@ Enforces reputation/friendship matrices between two specific NPCs.
 
 ---
 
-### 13. `factions` & `faction_standings`
-Defines factions and maps character standing reputations within those factions.
+### 13. `factions`, `faction_standings` & `party_faction_standings`
+Defines factions and two tiers of reputation: per-character and party-wide.
 * **`factions` Table**:
   * `id`: `INTEGER` (PRIMARY KEY)
   * `name`: `TEXT NOT NULL UNIQUE`
   * `description`: `TEXT DEFAULT ''`
-* **`faction_standings` Table**:
+* **`faction_standings` Table** — per-character reputation (personal relationships/history):
   * `id`: `INTEGER` (PRIMARY KEY)
   * `faction_id`: `INTEGER` (REFERENCES `factions(id)` ON DELETE CASCADE)
   * `character_id`: `INTEGER` (REFERENCES `characters(id)` ON DELETE CASCADE)
   * `standing`: `INTEGER DEFAULT 0`
   * `notes`: `TEXT DEFAULT ''`
   * **Constraints**: `UNIQUE(faction_id, character_id)`
+* **`party_faction_standings` Table** — institutional party-wide reputation (distinct from character rep):
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `faction_id`: `INTEGER` (REFERENCES `factions(id)` ON DELETE CASCADE)
+  * `campaign_id`: `INTEGER` (REFERENCES `campaigns(id)` ON DELETE CASCADE)
+  * `standing`: `INTEGER DEFAULT 0`
+  * `notes`: `TEXT DEFAULT ''`
+  * **Constraints**: `UNIQUE(faction_id, campaign_id)`
+
+  Character reputation tracks personal relationships. Party reputation is the institutional
+  standing attached to the adventuring group — a faction can like one PC and dislike another,
+  but still mark the party as hostile because "the party killed our surveyor." Both appear in
+  `campaign get-story-state`. Use `faction effective-standing` for a computed display value
+  (party standing + average character standing). The computed value is display-only; canonical
+  state lives in these two tables.
 
 ---
 

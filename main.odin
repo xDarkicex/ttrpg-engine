@@ -105,6 +105,9 @@ HELP_COMMANDS := []CommandHelp{
 			{"join", "<char|npc> <id> <faction_id>", "Make a character or NPC join a faction."},
 			{"set-standing", "<character_id> <faction_id> <standing> [notes]", "Set standing reputation (integer) and notes with a faction."},
 			{"get-standing", "<character_id> [faction_id]", "Retrieve faction standings for a character (all or filtered by faction ID)."},
+				{"set-party-standing", "<campaign_id> <faction_id> <standing> [notes]", "Set party-wide institutional standing with a faction."},
+				{"get-party-standing", "<campaign_id> [faction_id]", "Retrieve party faction standings for a campaign."},
+				{"effective-standing", "<campaign_id> <faction_id>", "Computed effective standing (party + avg character). Non-canonical display."},
 		},
 	},
 	{
@@ -712,7 +715,10 @@ route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 	case "list":   return cmd.faction_list(db)
 	case "join":   return cmd.faction_join(db, args)
 	case "set-standing": return cmd.faction_set_standing(db, args)
-	case "get-standing": return cmd.faction_get_standing(db, args)
+	case "get-standing":        return cmd.faction_get_standing(db, args)
+		case "set-party-standing":  return cmd.faction_set_party_standing(db, args)
+		case "get-party-standing":  return cmd.faction_get_party_standing(db, args)
+		case "effective-standing":  return cmd.faction_effective_standing(db, args)
 	case:
 		if db.is_json {
 			fmt.println(`{"success":false,"error":"Unknown faction subcommand"}`)

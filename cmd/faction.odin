@@ -228,3 +228,143 @@ faction_get_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	print_faction_standings(stmt, db.is_json)
 	return 0
 }
+
+print_party_faction_standings :: proc(stmt: ^sqlite.Statement, is_json: bool) {
+	if is_json {
+		builder := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&builder, '[')
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do strings.write_byte(&builder, ',')
+			first = false
+			fmt.sbprintf(&builder, `{{"campaign_id":{},"faction_id":{},"faction_name":"{}","standing":{},"notes":"{}"}}`,
+				sqlite.column_int(stmt, 0),
+				sqlite.column_int(stmt, 1),
+				sqlite.column_text(stmt, 2),
+				sqlite.column_int(stmt, 3),
+				sqlite.column_text(stmt, 4),
+			)
+		}
+		strings.write_byte(&builder, ']')
+		fmt.println(strings.to_string(builder))
+	} else {
+		for sqlite.step(stmt) == .Row {
+			fmt.printf("  Campaign %d — %s (ID: %d): standing %+d (%s)\n",
+				sqlite.column_int(stmt, 0),
+				sqlite.column_text(stmt, 2),
+				sqlite.column_int(stmt, 1),
+				sqlite.column_int(stmt, 3),
+				sqlite.column_text(stmt, 4),
+			)
+		}
+	}
+}
+
+faction_set_party_standing :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		return print_error(db, "Usage: dnd-agent faction set-party-standing <campaign_id> <faction_id> <standing> [notes]")
+	}
+	campaign_id := strconv.atoi(args[1])
+	faction_id := strconv.atoi(args[2])
+	standing := strconv.atoi(args[3])
+	notes := len(args) >= 5 ? args[4] : ""
+
+	sql := fmt.tprintf(
+		"INSERT OR REPLACE INTO party_faction_standings (campaign_id,faction_id,standing,notes) VALUES(%d,%d,%d,'%s')",
+		campaign_id, faction_id, standing, escape_sql(notes),
+	)
+
+	if lib.db_exec(db, sql) != lib.Error.None {
+		return print_error(db, "Failed to set party faction standing")
+	}
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"message":"Party standing set for campaign %d in faction %d","campaign_id":%d,"faction_id":%d,"standing":%d}}` + "\n", campaign_id, faction_id, campaign_id, faction_id, standing)
+	} else {
+		fmt.printf("Party standing set for campaign %d in faction %d to %+d\n", campaign_id, faction_id, standing)
+	}
+	return 0
+}
+
+faction_get_party_standing :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 2 {
+		return print_error(db, "Usage: dnd-agent faction get-party-standing <campaign_id> [faction_id]")
+	}
+	campaign_id := strconv.atoi(args[1])
+	faction_id := 0
+	if len(args) >= 3 do faction_id = strconv.atoi(args[2])
+
+	stmt: ^sqlite.Statement
+	sql := ""
+	if faction_id > 0 {
+		sql = fmt.tprintf("SELECT ps.campaign_id, ps.faction_id, f.name, ps.standing, ps.notes FROM party_faction_standings ps JOIN factions f ON ps.faction_id=f.id WHERE ps.campaign_id=%d AND ps.faction_id=%d", campaign_id, faction_id)
+	} else {
+		sql = fmt.tprintf("SELECT ps.campaign_id, ps.faction_id, f.name, ps.standing, ps.notes FROM party_faction_standings ps JOIN factions f ON ps.faction_id=f.id WHERE ps.campaign_id=%d", campaign_id)
+	}
+
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return print_error(db, "Failed to get party standings")
+	}
+	defer sqlite.finalize(stmt)
+
+	if !db.is_json {
+		fmt.printf("Party faction standings for campaign %d:\n", campaign_id)
+	}
+	print_party_faction_standings(stmt, db.is_json)
+	return 0
+}
+
+faction_effective_standing :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		return print_error(db, "Usage: dnd-agent faction effective-standing <campaign_id> <faction_id>")
+	}
+	campaign_id := strconv.atoi(args[1])
+	faction_id := strconv.atoi(args[2])
+
+	party_standing := 0
+	party_notes := ""
+	stmt: ^sqlite.Statement
+	party_sql := fmt.tprintf("SELECT standing, notes FROM party_faction_standings WHERE campaign_id=%d AND faction_id=%d", campaign_id, faction_id)
+	party_c := cstring(raw_data(party_sql))
+	if sqlite.prepare(db.ptr, party_c, i32(len(party_sql)), &stmt, nil) == .Ok {
+		if sqlite.step(stmt) == .Row {
+			party_standing = int(sqlite.column_int(stmt, 0))
+			party_notes = strings.clone(column_text_safe(stmt, 1), context.temp_allocator)
+		}
+		sqlite.finalize(stmt)
+	}
+
+	char_count := 0
+	char_sum := 0
+	char_sql := fmt.tprintf("SELECT fs.standing FROM faction_standings fs JOIN characters c ON fs.character_id=c.id WHERE c.campaign_id=%d AND fs.faction_id=%d", campaign_id, faction_id)
+	char_c := cstring(raw_data(char_sql))
+	if sqlite.prepare(db.ptr, char_c, i32(len(char_sql)), &stmt, nil) == .Ok {
+		for sqlite.step(stmt) == .Row {
+			char_count += 1
+			char_sum += int(sqlite.column_int(stmt, 0))
+		}
+		sqlite.finalize(stmt)
+	}
+
+	char_avg: f64 = 0.0
+	if char_count > 0 do char_avg = f64(char_sum) / f64(char_count)
+	effective := int(char_avg) + party_standing
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"faction_id":%d,"party_standing":%d,"party_notes":"%s","character_count":%d,"character_average":%.1f,"effective_standing":%d}}` + "\n",
+			faction_id, party_standing, escape_json_string(party_notes), char_count, char_avg, effective)
+	} else {
+		fmt.printf("Effective faction %d standing for campaign %d:\n", faction_id, campaign_id)
+		fmt.printf("  Party standing:    %+d", party_standing)
+		if len(party_notes) > 0 do fmt.printf(" (%s)", party_notes)
+		fmt.println()
+		if char_count > 0 {
+			fmt.printf("  Avg character rep: %.1f (over %d characters)\n", char_avg, char_count)
+		} else {
+			fmt.println("  Avg character rep: n/a (no character standings)")
+		}
+		fmt.printf("  Effective:         %+d  [canonical state is party standing; avg is display-only]\n", effective)
+	}
+	return 0
+}

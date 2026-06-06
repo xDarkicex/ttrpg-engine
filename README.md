@@ -15,7 +15,7 @@ dnd-agent models your tabletop world as a **relational database** — every tave
 
 **The memory system.** A stateless AI agent only knows what you tell it. dnd-agent solves this with three systems working together: a **campaign journal** (timestamped session recaps the AI writes and reads back), a **quest tracker** (step-by-step objectives with linked actors, so the AI remembers what the party is supposed to be doing), and an **in-game calendar** (day, time of day, season) so the AI can say "it's autumn evening on day 42." One command — `campaign get-story-state` — returns the complete context packet the AI needs to reconstruct the game from a cold start.
 
-**The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have faction standings that shift with story actions. Houses have residents. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
+**The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have personal faction standings, and campaigns track party-wide institutional faction reputation — a faction can hate one PC but still mark the party as hostile for the group's actions. Houses have residents. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
 
 **Built for AI pipelines.** Every command emits `--json` output for piping into LLM agents, Discord bots, or automation scripts. The schema is designed so an AI can call `get-story-state`, receive the full world snapshot (locations tree with all entities present, active quests, recent journal entries, faction standings, story log), and immediately begin DMing with full context. No warm-up, no context-stuffing — one query, everything it needs.
 
@@ -579,7 +579,7 @@ Manage the campaign world, track sessions, log story events, write session recap
   ```bash
   ./dnd-agent campaign get-story-state <campaign_id> [--json]
   ```
-  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), faction standings, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
+  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), factions, NPC relationships, character faction standings, party faction standings, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
 
 ---
 
@@ -686,9 +686,21 @@ Configure factions and standings metrics.
   ```bash
   ./dnd-agent faction set-standing <character_id> <faction_id> <standing> [notes]
   ```
-- **Get Standings**:
+- **Get Character Standings**:
   ```bash
   ./dnd-agent faction get-standing <character_id> [faction_id]
+  ```
+- **Set Party Standing** (institutional party-wide reputation):
+  ```bash
+  ./dnd-agent faction set-party-standing <campaign_id> <faction_id> <standing> [notes]
+  ```
+- **Get Party Standings**:
+  ```bash
+  ./dnd-agent faction get-party-standing <campaign_id> [faction_id]
+  ```
+- **Effective Standing** (computed, non-canonical display):
+  ```bash
+  ./dnd-agent faction effective-standing <campaign_id> <faction_id>
   ```
 
 ---

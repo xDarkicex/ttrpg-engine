@@ -290,6 +290,14 @@ db_run_migrations_1_4 :: proc(db: ^Db, current_version: i32) -> Error {
 			notes TEXT DEFAULT '',
 			UNIQUE(faction_id, character_id)
 		);
+		CREATE TABLE IF NOT EXISTS party_faction_standings (
+			id INTEGER PRIMARY KEY,
+			faction_id INTEGER REFERENCES factions(id) ON DELETE CASCADE,
+			campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+			standing INTEGER DEFAULT 0,
+			notes TEXT DEFAULT '',
+			UNIQUE(faction_id, campaign_id)
+		);
 		CREATE TABLE IF NOT EXISTS story_actions (
 			id INTEGER PRIMARY KEY,
 			campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,

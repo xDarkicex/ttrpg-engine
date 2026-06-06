@@ -746,6 +746,39 @@ print_json_standings_by_id :: proc(db: ^lib.Db, campaign_id: int) {
 	fmt.print(strings.to_string(builder))
 }
 
+print_json_party_standings :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT ps.campaign_id, ps.faction_id, f.name, ps.standing, ps.notes FROM party_faction_standings ps JOIN factions f ON ps.faction_id = f.id WHERE ps.campaign_id = %d ORDER BY f.name",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		fmt.print("[]")
+		return
+	}
+	defer sqlite.finalize(stmt)
+
+	builder := strings.builder_make(context.temp_allocator)
+	strings.write_byte(&builder, '[')
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do strings.write_byte(&builder, ',')
+		first = false
+		strings.write_string(&builder, "{")
+		fmt.sbprintf(&builder, "\"campaign_id\":%d,\"faction_id\":%d,\"faction_name\":\"%s\",\"standing\":%d,\"notes\":\"%s\"",
+			sqlite.column_int(stmt, 0),
+			sqlite.column_int(stmt, 1),
+			escape_json_string(column_text_safe(stmt, 2)),
+			sqlite.column_int(stmt, 3),
+			escape_json_string(column_text_safe(stmt, 4)),
+		)
+		strings.write_string(&builder, "}")
+	}
+	strings.write_byte(&builder, ']')
+	fmt.print(strings.to_string(builder))
+}
+
 print_json_npc_relationships :: proc(db: ^lib.Db, campaign_id: int) {
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
@@ -866,6 +899,7 @@ print_text_story_state :: proc(db: ^lib.Db, campaign_id: int) {
 	print_text_locations_tree(db, campaign_id)
 	print_text_npc_relationships(db, campaign_id)
 	print_text_story_state_standings(db, campaign_id)
+		print_text_party_standings(db, campaign_id)
 	print_text_story_state_actions(db, campaign_id)
 }
 
@@ -913,7 +947,7 @@ print_text_locations_tree :: proc(db: ^lib.Db, campaign_id: int) {
 
 print_text_story_state_standings :: proc(db: ^lib.Db, campaign_id: int) {
 	fmt.println("--------------------------------------------------------------------------------")
-	fmt.println("FACTION STANDINGS")
+	fmt.println("CHARACTER FACTION STANDINGS")
 	fmt.println("--------------------------------------------------------------------------------")
 	stmt: ^sqlite.Statement
 	sql := fmt.tprintf(
@@ -937,6 +971,31 @@ print_text_story_state_standings :: proc(db: ^lib.Db, campaign_id: int) {
 			}
 			fmt.printf("    - %s: standing %+d (%s)\n", fac_name, standing, notes)
 		}
+	}
+	fmt.println()
+}
+
+print_text_party_standings :: proc(db: ^lib.Db, campaign_id: int) {
+	fmt.println("--------------------------------------------------------------------------------")
+	fmt.println("PARTY FACTION STANDINGS")
+	fmt.println("--------------------------------------------------------------------------------")
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT ps.campaign_id, ps.faction_id, f.name, ps.standing, ps.notes FROM party_faction_standings ps JOIN factions f ON ps.faction_id = f.id WHERE ps.campaign_id = %d ORDER BY f.name",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			fac_name := sqlite.column_text(stmt, 2)
+			standing := sqlite.column_int(stmt, 3)
+			notes := sqlite.column_text(stmt, 4)
+			fmt.printf("  %s: party standing %+d (%s)\n", fac_name, standing, notes)
+		}
+		if !has_any do fmt.println("  No party faction standings defined.")
 	}
 	fmt.println()
 }
@@ -978,8 +1037,10 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 		print_json_factions(db, campaign_id)
 		fmt.print(`,"npc_relationships":`)
 		print_json_npc_relationships(db, campaign_id)
-		fmt.print(`,"faction_standings":`)
+		fmt.print(`,"character_faction_standings":`)
 		print_json_standings_by_id(db, campaign_id)
+		fmt.print(`,"party_faction_standings":`)
+		print_json_party_standings(db, campaign_id)
 		fmt.print(`,"story_actions":`)
 		print_json_actions_by_id(db, campaign_id)
 		fmt.println(`}`)
