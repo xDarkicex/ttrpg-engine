@@ -194,7 +194,15 @@ HELP_COMMANDS := []CommandHelp{
 		},
 	},
 		{
-			command = "quest",
+			command = "rest",
+			description = "Take a short or long rest to recover HP, hit dice, spell slots, and resources.",
+			subcommands = []SubcommandHelp{
+				{"short", "<character_id> <hit_dice_count>", "Short rest: spend hit dice to heal, reset short-rest resources."},
+				{"long", "<character_id>", "Long rest: full heal, recover half hit dice, reset all resources and spell slots."},
+			},
+		},
+			{
+				command = "quest",
 			description = "Manage campaign quests with objectives and actor tracking.",
 			subcommands = []SubcommandHelp{
 				{"add", "<campaign_id> <name> [description] [quest_giver_npc_id] [reward] [chapter]", "Create a new quest."},
@@ -281,6 +289,8 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_game_command(db, cmd_name, args)
 	case "condition":
 		return route_condition(db, args)
+		case "rest":
+			return route_rest(db, args)
 	case "location", "house", "shop", "encounter", "setpiece":
 		return route_world(db, cmd_name, args)
 	case "can-enter":
@@ -748,6 +758,28 @@ route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 			fmt.println(`{"success":false,"error":"Unknown condition subcommand"}`)
 		} else {
 			fmt.eprintln("Unknown condition subcommand:", args[0])
+		}
+		return 1
+	}
+}
+
+route_rest :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent rest <short|long> <character_id> [hit_dice_count]"}`)
+		} else {
+			fmt.eprintln("Usage: dnd-agent rest <short|long> <character_id> [hit_dice_count]")
+		}
+		return 1
+	}
+	switch args[0] {
+	case "short": return cmd.rest_short(db, args)
+	case "long":  return cmd.rest_long(db, args)
+	case:
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Unknown rest subcommand. Use 'short' or 'long'."}`)
+		} else {
+			fmt.eprintln("Unknown rest subcommand. Use 'short' or 'long'.")
 		}
 		return 1
 	}
