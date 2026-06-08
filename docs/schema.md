@@ -61,6 +61,9 @@ erDiagram
     campaigns ||--o{ story_actions : "logs"
     locations ||--o{ story_actions : "logs"
     story_actions ||--o{ story_action_actors : "actor"
+    campaigns ||--o{ combat_encounters : "has"
+    locations ||--o{ combat_encounters : "locale"
+    combat_encounters ||--o{ combat_participants : "participants"
 ```
 
 ---
@@ -560,3 +563,36 @@ Existing table, now with sub-location support and restricted access.
   * `parent_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE CASCADE — recursive sub-location chain) — *v15*
   * `restricted`: `INTEGER DEFAULT 0` (Access restriction flag) — *v15*
   * `restricted_until`: `TEXT DEFAULT ''` (e.g. `24/7`, `open_hours`, `1492-03-15`) — *v15*
+
+### 28. `combat_encounters` & `combat_participants` (v19)
+
+Full D&D 5e combat tracking integrated into the engine. Encounters are owned by a campaign, optionally at a location, and track round/turn state. Participants are characters, NPCs, or creatures with initiative-based turn order.
+
+* **`combat_encounters` Table**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `campaign_id`: `INTEGER` (REFERENCES `campaigns(id)` ON DELETE CASCADE)
+  * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
+  * `round`: `INTEGER DEFAULT 1` — current combat round
+  * `turn_index`: `INTEGER DEFAULT 0` — index into sorted participants for current turn
+  * `status`: `TEXT DEFAULT 'active'` — active, paused, or ended
+  * `created_at`: `TEXT DEFAULT CURRENT_TIMESTAMP`
+
+* **`combat_participants` Table**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `encounter_id`: `INTEGER` (REFERENCES `combat_encounters(id)` ON DELETE CASCADE)
+  * `actor_type`: `TEXT NOT NULL` — 'character', 'npc', or 'creature'
+  * `actor_id`: `INTEGER NOT NULL`
+  * `initiative_roll`: `INTEGER NOT NULL` — rolled d20 value
+  * `initiative_mod`: `INTEGER DEFAULT 0` — DEX mod for tie-breaking
+  * `sort_order`: `INTEGER DEFAULT 0` — computed after lock-in, 0-indexed
+  * `is_active`: `INTEGER DEFAULT 1` — set to 0 when dead, unconscious, or fled
+  * `position`: `TEXT DEFAULT 'melee'` — melee, ranged, cover, hidden, fleeing
+  * `reaction_used`: `INTEGER DEFAULT 0` — reset at start of each round
+  * `action_used`: `INTEGER DEFAULT 0` — reset at start of actor's turn
+  * `bonus_action_used`: `INTEGER DEFAULT 0` — reset at start of actor's turn
+  * `readied_action`: `TEXT DEFAULT ''` — action + trigger text
+  * **Constraints**: `UNIQUE(encounter_id, actor_type, actor_id)`
+
+The combat system auto-computes attack modifiers (proficiency + ability mod for characters, stored `attack_bonus` for NPCs/creatures), applies damage resistance/vulnerability/immunity from the actor's stat block, tracks death saves, concentration, and conditions. Both `get-story-state` JSON and text output include the full combat snapshot when an active encounter exists.
+
+**v19 column additions**: `temp_hp` on NPCs and creatures, `concentrating_on` on creatures — these are universal combat mechanics needed by all participant types.

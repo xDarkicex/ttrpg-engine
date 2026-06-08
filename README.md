@@ -15,6 +15,8 @@ dnd-agent models your tabletop world as a **relational database** — every tave
 
 **The memory system.** A stateless AI agent only knows what you tell it. dnd-agent solves this with three systems working together: a **campaign journal** (timestamped session recaps the AI writes and reads back), a **quest tracker** (step-by-step objectives with linked actors, so the AI remembers what the party is supposed to be doing), and an **in-game calendar** (day, time of day, season) so the AI can say "it's autumn evening on day 42." One command — `campaign get-story-state` — returns the complete context packet the AI needs to reconstruct the game from a cold start.
 
+**The combat engine.** Turn-based D&D 5e combat lives inside the database. `combat start`, `combat join`, `combat init` set up the encounter. `combat attack` resolves attack rolls against AC, `combat damage` applies damage with automatic resistance/vulnerability/immunity. `combat save` handles saving throws with proficiency bonuses. `combat next` advances turns, resets reactions each round. Death saves, concentration, conditions, reactions, and ready actions are all tracked. The combat snapshot appears in `get-story-state` — the AI always knows who's up, what HP everyone has, and what conditions are active.
+
 **The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have personal faction standings, and campaigns track party-wide institutional faction reputation — a faction can hate one PC but still mark the party as hostile for the group's actions. Houses have residents. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
 
 **Built for AI pipelines.** Every command emits `--json` output for piping into LLM agents, Discord bots, or automation scripts. The schema is designed so an AI can call `get-story-state`, receive the full world snapshot (locations tree with all entities present, active quests, recent journal entries, faction standings, story log), and immediately begin DMing with full context. No warm-up, no context-stuffing — one query, everything it needs.
@@ -316,7 +318,18 @@ Track custom class resource pools (Rage, Ki, Sorcery Points) and spell slots.
   ```bash
   ./dnd-agent character list-resources <char_id>
   ```
-- **Perform Rest (Resets resources based on condition)**:
+- **Short Rest (Spend hit dice to heal)**:
+  ```bash
+  ./dnd-agent rest short <character_id> <hit_dice_count>
+  ```
+  *Heals hit_dice_count × (avg_hit_die + CON_mod). Resets short-rest resources, decrements available short rests, clears rest-duration conditions. Hit die size determined by character class (d6→4, d8→5, d10→6, d12→7 average).*
+- **Long Rest (Full recovery)**:
+  ```bash
+  ./dnd-agent rest long <character_id>
+  ```
+  *Full HP heal, clears temp HP, recovers half expended hit dice, reduces exhaustion by 1, resets all spell slots and resources, resets available rests to 2/1, clears short/long/until_rest conditions.*
+
+- **Manual Resource Reset (for fine-grained control)**:
   ```bash
   ./dnd-agent character reset-resources <char_id> [reset_condition]
   ```
@@ -579,7 +592,7 @@ Manage the campaign world, track sessions, log story events, write session recap
   ```bash
   ./dnd-agent campaign get-story-state <campaign_id> [--json]
   ```
-  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), factions, NPC relationships, character faction standings, party faction standings, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
+  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), factions, NPC relationships, character faction standings, party faction standings, active combat encounter with turn order/HP/conditions, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
 
 ---
 
@@ -762,6 +775,79 @@ Enforce items configurations and map item ownership, equipment, and attunement s
 
 ---
 
+---
+
+### 16. Combat Engine
+
+Full D&D 5e turn-based combat tracking with attack resolution, damage application, saving throws, initiative, conditions, death saves, and reactions.
+
+- **Start Combat**:
+  ```bash
+  ./dnd-agent combat start <campaign_id> <location_id>
+  ```
+- **Add Participants**:
+  ```bash
+  ./dnd-agent combat join <encounter_id> <char|npc|creature> <id> <initiative_roll> [initiative_mod] [position]
+  ./dnd-agent combat join-all <encounter_id>
+  ```
+- **Lock Turn Order**:
+  ```bash
+  ./dnd-agent combat init <encounter_id>
+  ```
+- **Advance Turn**:
+  ```bash
+  ./dnd-agent combat next <encounter_id>
+  ```
+- **Resolve Attack (roll vs AC)**:
+  ```bash
+  ./dnd-agent combat attack <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <attack_roll> [ability] [adv|disadv]
+  ```
+  *Auto-computes attack modifier (proficiency + ability mod for characters, attack_bonus for NPCs/creatures). Includes cover bonus from target position.*
+- **Apply Damage**:
+  ```bash
+  ./dnd-agent combat damage <encounter_id> <target_type> <target_id> <amount> <type> [source]
+  ```
+  *Auto-applies resistance (half), vulnerability (double), immunity (zero). Depletes temp HP first. Tracks concentration break DC, handles death at 0 HP.*
+- **Saving Throw**:
+  ```bash
+  ./dnd-agent combat save <encounter_id> <actor_type> <actor_id> <ability> <save_roll> [dc] [adv|disadv]
+  ```
+  *Applies ability mod + save proficiency (characters only) + cover bonus.*
+- **Move/Position**:
+  ```bash
+  ./dnd-agent combat move <encounter_id> <actor_type> <actor_id> <position>
+  ```
+  *Positions: melee, ranged, cover, hidden, fleeing. Warns about opportunity attacks when leaving melee.*
+- **Death Saving Throw**:
+  ```bash
+  ./dnd-agent combat death-save <character_id> <roll>
+  ```
+  *Nat 20: regains 1 HP. Nat 1: 2 failures. 3 successes: stabilized. 3 failures: dead.*
+- **Use Reaction**:
+  ```bash
+  ./dnd-agent combat react <encounter_id> <actor_type> <actor_id> <reaction_type> [target_type] [target_id]
+  ```
+- **Ready Action**:
+  ```bash
+  ./dnd-agent combat ready <encounter_id> <actor_type> <actor_id> "<action>" <trigger>
+  ```
+- **Apply Condition**:
+  ```bash
+  ./dnd-agent combat condition <encounter_id> <target_type> <target_id> <name> [duration_rounds] [save_dc] [save_ability]
+  ```
+- **View Combat Status**:
+  ```bash
+  ./dnd-agent combat status <encounter_id> [--json]
+  ```
+  *Shows full turn order with HP/AC/position/flags for every participant.*
+- **End Combat**:
+  ```bash
+  ./dnd-agent combat end <encounter_id>
+  ```
+  *Archives encounter, clears combat flags on all character participants.*
+
+---
+
 ## Automatic Database Schema Migrations
 The tool handles schema updates automatically using SQLite's internal versioning integer `PRAGMA user_version`. 
 
@@ -804,6 +890,20 @@ Below is an example session tracking story progression, character resting resour
 
 ./dnd-agent character damage 1 10 # Grog takes another 10 damage
 # Output: Character HP now: 55/60 (Temp HP: 0) (Took 10 damage)
+
+# 6b. Short Rest (spend hit dice to heal after taking damage)
+./dnd-agent rest short 1 2
+# Output: Short rest: character 1 healed 14 HP, spent 2 hit dice.
+
+# 6c. Combat Encounter with the new engine
+./dnd-agent creature create "Goblin Scout" 7 7 14 10 12 12 8 10 1 1 1 1
+./dnd-agent combat start 1 1
+./dnd-agent combat join 1 character 1 18
+./dnd-agent combat join 1 creature 1 8
+./dnd-agent combat init 1
+./dnd-agent combat attack 1 character 1 creature 1 15 str
+./dnd-agent combat damage 1 creature 1 7 slashing "Grog's greataxe"
+./dnd-agent combat end 1
 
 # 7. Log Story Actions and Link Actors
 ./dnd-agent faction create "Harpers" "Defenders of peace."

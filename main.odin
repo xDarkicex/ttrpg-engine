@@ -194,6 +194,27 @@ HELP_COMMANDS := []CommandHelp{
 		},
 	},
 		{
+			command = "combat",
+			description = "Manage D&D 5e combat encounters with turn tracking, attack resolution, damage application, and condition handling.",
+			subcommands = []SubcommandHelp{
+				{"start", "<campaign_id> <location_id>", "Create a new combat encounter."},
+				{"join", "<encounter_id> <char|npc|creature> <id> <initiative> [mod] [position]", "Add a participant to the encounter."},
+				{"join-all", "<encounter_id>", "Auto-add all characters/creatures with combat=1 at the encounter location."},
+				{"init", "<encounter_id>", "Lock turn order sorted by initiative (descending)."},
+				{"next", "<encounter_id>", "Advance to the next turn. Resets reactions on new rounds."},
+				{"attack", "<encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <roll> [ability] [adv|disadv]", "Resolve an attack roll vs target AC."},
+				{"damage", "<encounter_id> <target_type> <target_id> <amount> <type> [source]", "Apply damage with resistance/vulnerability/immunity."},
+				{"save", "<encounter_id> <actor_type> <actor_id> <ability> <roll> [dc] [adv|disadv]", "Resolve a saving throw."},
+				{"move", "<encounter_id> <actor_type> <actor_id> <position>", "Change position (melee, ranged, cover, hidden, fleeing)."},
+				{"condition", "<encounter_id> <target_type> <target_id> <name> [dur] [dc] [save]", "Apply a condition during combat."},
+				{"death-save", "<character_id> <roll>", "Roll a death saving throw."},
+				{"react", "<encounter_id> <actor_type> <actor_id> <reaction> [target_type] [target_id]", "Use a reaction."},
+				{"ready", "<encounter_id> <actor_type> <actor_id> \"<action>\" <trigger>", "Ready an action with a trigger condition."},
+				{"status", "<encounter_id>", "Show full combat state."},
+				{"end", "<encounter_id>", "End the encounter and archive it."},
+			},
+		},
+		{
 			command = "rest",
 			description = "Take a short or long rest to recover HP, hit dice, spell slots, and resources.",
 			subcommands = []SubcommandHelp{
@@ -289,6 +310,8 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_game_command(db, cmd_name, args)
 	case "condition":
 		return route_condition(db, args)
+		case "combat":
+			return route_combat(db, args)
 		case "rest":
 			return route_rest(db, args)
 	case "location", "house", "shop", "encounter", "setpiece":
@@ -759,6 +782,35 @@ route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 		} else {
 			fmt.eprintln("Unknown condition subcommand:", args[0])
 		}
+		return 1
+	}
+}
+
+route_combat :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent combat <subcommand> ..."}`) }
+		else { fmt.eprintln("Usage: dnd-agent combat <subcommand> ...") }
+		return 1
+	}
+	switch args[0] {
+	case "start":       return cmd.combat_start(db, args)
+	case "join":        return cmd.combat_join(db, args)
+	case "join-all":    return cmd.combat_join_all(db, args)
+	case "init":        return cmd.combat_init(db, args)
+	case "next":        return cmd.combat_next(db, args)
+	case "attack":      return cmd.combat_attack(db, args)
+	case "damage":      return cmd.combat_damage(db, args)
+	case "save":        return cmd.combat_save(db, args)
+	case "move":        return cmd.combat_move(db, args)
+	case "condition":   return cmd.combat_condition(db, args)
+	case "death-save":  return cmd.combat_death_save(db, args)
+	case "react":       return cmd.combat_react(db, args)
+	case "ready":       return cmd.combat_ready(db, args)
+	case "status":      return cmd.combat_status(db, args)
+	case "end":         return cmd.combat_end(db, args)
+	case:
+		if db.is_json { fmt.println(`{"success":false,"error":"Unknown combat subcommand"}`) }
+		else { fmt.eprintln("Unknown combat subcommand:", args[0]) }
 		return 1
 	}
 }

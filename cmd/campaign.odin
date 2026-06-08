@@ -900,6 +900,7 @@ print_text_story_state :: proc(db: ^lib.Db, campaign_id: int) {
 	print_text_npc_relationships(db, campaign_id)
 	print_text_story_state_standings(db, campaign_id)
 		print_text_party_standings(db, campaign_id)
+		print_text_combat(db, campaign_id)
 	print_text_story_state_actions(db, campaign_id)
 }
 
@@ -1041,6 +1042,8 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 		print_json_standings_by_id(db, campaign_id)
 		fmt.print(`,"party_faction_standings":`)
 		print_json_party_standings(db, campaign_id)
+		fmt.print(`,"combat":`)
+		print_json_combat(db, campaign_id)
 		fmt.print(`,"story_actions":`)
 		print_json_actions_by_id(db, campaign_id)
 		fmt.println(`}`)

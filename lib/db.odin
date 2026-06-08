@@ -316,6 +316,31 @@ db_run_migrations_1_4 :: proc(db: ^Db, current_version: i32) -> Error {
 			actor_id INTEGER NOT NULL,
 			UNIQUE(action_id, actor_type, actor_id)
 		);
+		CREATE TABLE IF NOT EXISTS combat_encounters (
+			id INTEGER PRIMARY KEY,
+			campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+			location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+			round INTEGER DEFAULT 1,
+			turn_index INTEGER DEFAULT 0,
+			status TEXT DEFAULT 'active',
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE TABLE IF NOT EXISTS combat_participants (
+			id INTEGER PRIMARY KEY,
+			encounter_id INTEGER REFERENCES combat_encounters(id) ON DELETE CASCADE,
+			actor_type TEXT NOT NULL,
+			actor_id INTEGER NOT NULL,
+			initiative_roll INTEGER NOT NULL,
+			initiative_mod INTEGER DEFAULT 0,
+			sort_order INTEGER DEFAULT 0,
+			is_active INTEGER DEFAULT 1,
+			position TEXT DEFAULT 'melee',
+			reaction_used INTEGER DEFAULT 0,
+			action_used INTEGER DEFAULT 0,
+			bonus_action_used INTEGER DEFAULT 0,
+			readied_action TEXT DEFAULT '',
+			UNIQUE(encounter_id, actor_type, actor_id)
+		);
 		CREATE TABLE IF NOT EXISTS character_skills (
 			id INTEGER PRIMARY KEY,
 			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
@@ -862,7 +887,53 @@ db_init_schema :: proc(db: ^Db) -> Error {
 
 	current_version = get_db_version(db)
 	err = db_run_migrations_18(db, i32(current_version))
+		if err != Error.None do return err
+
+		current_version = get_db_version(db)
+		err = db_run_migrations_19(db, i32(current_version))
 	if err != Error.None do return err
+
+	return Error.None
+}
+
+db_run_migrations_19 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 19 {
+		// Combat: temp HP for NPCs and creatures, concentration tracking for creatures
+		db_exec(db, "ALTER TABLE npcs ADD COLUMN temp_hp INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN temp_hp INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE creatures ADD COLUMN concentrating_on TEXT DEFAULT '';")
+
+		// Combat encounter tables
+		db_exec(db, `CREATE TABLE IF NOT EXISTS combat_encounters (
+			id INTEGER PRIMARY KEY,
+			campaign_id INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+			location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+			round INTEGER DEFAULT 1,
+			turn_index INTEGER DEFAULT 0,
+			status TEXT DEFAULT 'active',
+			created_at TEXT DEFAULT CURRENT_TIMESTAMP
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS combat_participants (
+			id INTEGER PRIMARY KEY,
+			encounter_id INTEGER REFERENCES combat_encounters(id) ON DELETE CASCADE,
+			actor_type TEXT NOT NULL,
+			actor_id INTEGER NOT NULL,
+			initiative_roll INTEGER NOT NULL,
+			initiative_mod INTEGER DEFAULT 0,
+			sort_order INTEGER DEFAULT 0,
+			is_active INTEGER DEFAULT 1,
+			position TEXT DEFAULT 'melee',
+			reaction_used INTEGER DEFAULT 0,
+			action_used INTEGER DEFAULT 0,
+			bonus_action_used INTEGER DEFAULT 0,
+			readied_action TEXT DEFAULT '',
+			UNIQUE(encounter_id, actor_type, actor_id)
+		);`)
+
+		set_version_err := set_db_version(db, 19)
+		if set_version_err != Error.None do return set_version_err
+	}
 
 	return Error.None
 }
