@@ -9,9 +9,9 @@ import sqlite "ext:sqlite3"
 specialty_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent class-specialty upsert <class_name> <level> <ability_name> <description>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine class-specialty upsert <class_name> <level> <ability_name> <description>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent class-specialty upsert <class_name> <level> <ability_name> <description>")
+			fmt.eprintln("Usage: ttrpg-engine class-specialty upsert <class_name> <level> <ability_name> <description>")
 		}
 		return 1
 	}

@@ -10,9 +10,9 @@ import sqlite "ext:sqlite3"
 campaign_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign create <name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign create <name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent campaign create <name>")
+			fmt.eprintln("Usage: ttrpg-engine campaign create <name>")
 		}
 		return 1
 	}
@@ -81,9 +81,9 @@ campaign_list :: proc(db: ^lib.Db) -> int {
 campaign_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign get <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign get <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent campaign get <id>")
+			fmt.eprintln("Usage: ttrpg-engine campaign get <id>")
 		}
 		return 1
 	}
@@ -132,9 +132,9 @@ campaign_get :: proc(db: ^lib.Db, args: []string) -> int {
 campaign_delete :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign delete <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign delete <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent campaign delete <id>")
+			fmt.eprintln("Usage: ttrpg-engine campaign delete <id>")
 		}
 		return 1
 	}
@@ -160,9 +160,9 @@ campaign_delete :: proc(db: ^lib.Db, args: []string) -> int {
 campaign_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign set-chapter <id> <chapter>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign set-chapter <id> <chapter>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent campaign set-chapter <id> <chapter>")
+			fmt.eprintln("Usage: ttrpg-engine campaign set-chapter <id> <chapter>")
 		}
 		return 1
 	}
@@ -188,9 +188,9 @@ campaign_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 campaign_next_session :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign next-session <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign next-session <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent campaign next-session <id>")
+			fmt.eprintln("Usage: ttrpg-engine campaign next-session <id>")
 		}
 		return 1
 	}
@@ -483,7 +483,7 @@ print_text_actions_stmt :: proc(db: ^lib.Db, stmt: ^sqlite.Statement) {
 
 campaign_add_location :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		return print_error(db, "Usage: dnd-agent campaign add-location <campaign_id> <name> <description> [chapter]")
+		return print_error(db, "Usage: ttrpg-engine campaign add-location <campaign_id> <name> <description> [chapter]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -510,7 +510,7 @@ campaign_add_location :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent campaign set-location <campaign_id> <location_id>")
+		return print_error(db, "Usage: ttrpg-engine campaign set-location <campaign_id> <location_id>")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -546,7 +546,7 @@ campaign_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_list_locations :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent campaign list-locations <campaign_id>")
+		return print_error(db, "Usage: ttrpg-engine campaign list-locations <campaign_id>")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -570,7 +570,7 @@ campaign_list_locations :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_add_action :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent campaign add-action <campaign_id> <description> [location_id] [faction_id] [standing_impact] [story_progression] [status]")
+		return print_error(db, "Usage: ttrpg-engine campaign add-action <campaign_id> <description> [location_id] [faction_id] [standing_impact] [story_progression] [status]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -603,7 +603,7 @@ campaign_add_action :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_link_actor :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		return print_error(db, "Usage: dnd-agent campaign link-actor <action_id> <char|npc> <actor_id>")
+		return print_error(db, "Usage: ttrpg-engine campaign link-actor <action_id> <char|npc> <actor_id>")
 	}
 
 	action_id := strconv.atoi(args[1])
@@ -637,7 +637,7 @@ campaign_link_actor :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_list_actions :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent campaign list-actions <campaign_id> [location_id]")
+		return print_error(db, "Usage: ttrpg-engine campaign list-actions <campaign_id> [location_id]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -1019,7 +1019,7 @@ print_text_story_state_actions :: proc(db: ^lib.Db, campaign_id: int) {
 
 campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent campaign get-story-state <campaign_id>")
+		return print_error(db, "Usage: ttrpg-engine campaign get-story-state <campaign_id>")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -1059,7 +1059,7 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_add_journal_entry :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		return print_error(db, "Usage: dnd-agent campaign add-journal-entry <campaign_id> <entry_type> <description> [location_id] [session_num]")
+		return print_error(db, "Usage: ttrpg-engine campaign add-journal-entry <campaign_id> <entry_type> <description> [location_id] [session_num]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -1088,7 +1088,7 @@ campaign_add_journal_entry :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_list_journal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent campaign list-journal <campaign_id> [limit]")
+		return print_error(db, "Usage: ttrpg-engine campaign list-journal <campaign_id> [limit]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -1147,7 +1147,7 @@ campaign_list_journal :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_set_dm_notes :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent campaign set-dm-notes <campaign_id> <text>")
+		return print_error(db, "Usage: ttrpg-engine campaign set-dm-notes <campaign_id> <text>")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -1168,7 +1168,7 @@ campaign_set_dm_notes :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_set_time :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
-		return print_error(db, "Usage: dnd-agent campaign set-time <campaign_id> <in_game_day> <time_of_day> <season>")
+		return print_error(db, "Usage: ttrpg-engine campaign set-time <campaign_id> <in_game_day> <time_of_day> <season>")
 	}
 
 	campaign_id := strconv.atoi(args[1])

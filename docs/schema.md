@@ -1,6 +1,6 @@
 # D&D Agent Database Schema
 
-This document details the SQLite database schema (`dnd-agent.db`) used by the D&D campaign management CLI tool. The schema is highly relational, enforcing foreign keys, cascade deletes, and unique constraints to maintain campaign data integrity.
+This document details the SQLite database schema (`ttrpg-engine.db`) used by the D&D campaign management CLI tool. The schema is highly relational, enforcing foreign keys, cascade deletes, and unique constraints to maintain campaign data integrity.
 
 ---
 
@@ -200,7 +200,7 @@ Tracks max/used spell slots per level for each character. Pre-cast-table use; pe
 ---
 
 ### 7. `conditions`
-Structured condition tracker replacing ad-hoc `status_effects` strings. Each row is one active condition on one entity (character, NPC, or creature). Use the top-level `dnd-agent condition` command — not a per-entity subcommand.
+Structured condition tracker replacing ad-hoc `status_effects` strings. Each row is one active condition on one entity (character, NPC, or creature). Use the top-level `ttrpg-engine condition` command — not a per-entity subcommand.
 * **Columns**:
   * `id`: `INTEGER` (PRIMARY KEY)
   * `target_type`: `TEXT NOT NULL` (One of `character`, `npc`, `creature` — no FK, polymorphic)

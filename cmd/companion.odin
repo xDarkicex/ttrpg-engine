@@ -33,9 +33,9 @@ CompanionStats :: struct {
 companion_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 9 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>")
+			fmt.eprintln("Usage: ttrpg-engine companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>")
 		}
 		return 1
 	}
@@ -74,9 +74,9 @@ companion_create :: proc(db: ^lib.Db, args: []string) -> int {
 companion_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 8 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
+			fmt.eprintln("Usage: ttrpg-engine companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
 		}
 		return 1
 	}
@@ -214,9 +214,9 @@ fetch_companion_stats :: proc(db: ^lib.Db, id: int) -> (comp: CompanionStats, fo
 companion_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion get <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion get <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent companion get <id>")
+			fmt.eprintln("Usage: ttrpg-engine companion get <id>")
 		}
 		return 1
 	}
@@ -255,9 +255,9 @@ companion_get :: proc(db: ^lib.Db, args: []string) -> int {
 companion_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion heal <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion heal <id> <amount>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent companion heal <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine companion heal <id> <amount>")
 		}
 		return 1
 	}
@@ -322,9 +322,9 @@ calculate_companion_save :: proc(comp: CompanionStats, save_type: string, dc: in
 companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
+			fmt.eprintln("Usage: ttrpg-engine companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
 		}
 		return 1
 	}

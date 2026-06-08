@@ -1086,9 +1086,9 @@ parse_damage_args :: proc(args: []string) -> DamageArgs {
 character_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character create <name> <class> <level> <max_hp>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character create <name> <class> <level> <max_hp>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character create <name> <class> <level> <max_hp>")
+			fmt.eprintln("Usage: ttrpg-engine character create <name> <class> <level> <max_hp>")
 		}
 		return 1
 	}
@@ -1575,9 +1575,9 @@ character_get_text :: proc(db: ^lib.Db, char: CharacterStats) {
 character_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character get <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character get <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character get <id>")
+			fmt.eprintln("Usage: ttrpg-engine character get <id>")
 		}
 		return 1
 	}
@@ -1605,9 +1605,9 @@ character_get :: proc(db: ^lib.Db, args: []string) -> int {
 character_delete :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character delete <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character delete <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character delete <id>")
+			fmt.eprintln("Usage: ttrpg-engine character delete <id>")
 		}
 		return 1
 	}
@@ -1635,9 +1635,9 @@ character_delete :: proc(db: ^lib.Db, args: []string) -> int {
 character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll] [source]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll] [source]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll] [source]")
+			fmt.eprintln("Usage: ttrpg-engine character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll] [source]")
 		}
 		return 1
 	}
@@ -1744,9 +1744,9 @@ character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 character_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character heal <id> <amount> [source]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character heal <id> <amount> [source]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character heal <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine character heal <id> <amount>")
 		}
 		return 1
 	}
@@ -1792,9 +1792,9 @@ character_heal :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 8 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
+			fmt.eprintln("Usage: ttrpg-engine character set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
 		}
 		return 1
 	}
@@ -1831,9 +1831,9 @@ character_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_save_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 8 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-save-prof <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-save-prof <id> <str> <dex> <con> <int> <wis> <cha>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-save-prof <id> <str> <dex> <con> <int> <wis> <cha>")
+			fmt.eprintln("Usage: ttrpg-engine character set-save-prof <id> <str> <dex> <con> <int> <wis> <cha>")
 		}
 		return 1
 	}
@@ -1870,9 +1870,9 @@ character_set_save_prof :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_details :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-details <id> <ac> <race> <speed> [alignment] [size]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-details <id> <ac> <race> <speed> [alignment] [size]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-details <id> <ac> <race> <speed> [alignment] [size]")
+			fmt.eprintln("Usage: ttrpg-engine character set-details <id> <ac> <race> <speed> [alignment] [size]")
 		}
 		return 1
 	}
@@ -1923,9 +1923,9 @@ character_set_details :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-combat-meta <id> <resistances> <vulnerabilities> <immunities>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-combat-meta <id> <resistances> <vulnerabilities> <immunities>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-combat-meta <id> <resistances> <vulnerabilities> <immunities>")
+			fmt.eprintln("Usage: ttrpg-engine character set-combat-meta <id> <resistances> <vulnerabilities> <immunities>")
 		}
 		return 1
 	}
@@ -1959,9 +1959,9 @@ character_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-status <id> <status_effects>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-status <id> <status_effects>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-status <id> <status_effects>")
+			fmt.eprintln("Usage: ttrpg-engine character set-status <id> <status_effects>")
 		}
 		return 1
 	}
@@ -1993,9 +1993,9 @@ character_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 character_add_class :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character add-class <char_id> <class_name> <level>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character add-class <char_id> <class_name> <level>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character add-class <char_id> <class_name> <level>")
+			fmt.eprintln("Usage: ttrpg-engine character add-class <char_id> <class_name> <level>")
 		}
 		return 1
 	}
@@ -2029,9 +2029,9 @@ character_add_class :: proc(db: ^lib.Db, args: []string) -> int {
 character_list_classes :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character list-classes <char_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character list-classes <char_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character list-classes <char_id>")
+			fmt.eprintln("Usage: ttrpg-engine character list-classes <char_id>")
 		}
 		return 1
 	}
@@ -2074,9 +2074,9 @@ character_list_classes :: proc(db: ^lib.Db, args: []string) -> int {
 character_add_xp :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character add-xp <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character add-xp <id> <amount>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character add-xp <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine character add-xp <id> <amount>")
 		}
 		return 1
 	}
@@ -2105,9 +2105,9 @@ character_add_xp :: proc(db: ^lib.Db, args: []string) -> int {
 character_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character add-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character add-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character add-money <id> <gold> <silver> <copper> [platinum] [electrum]")
+			fmt.eprintln("Usage: ttrpg-engine character add-money <id> <gold> <silver> <copper> [platinum] [electrum]")
 		}
 		return 1
 	}
@@ -2145,9 +2145,9 @@ character_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 character_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character remove-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character remove-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character remove-money <id> <gold> <silver> <copper> [platinum] [electrum]")
+			fmt.eprintln("Usage: ttrpg-engine character remove-money <id> <gold> <silver> <copper> [platinum] [electrum]")
 		}
 		return 1
 	}
@@ -2185,9 +2185,9 @@ character_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-action <id> <action>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-action <id> <action>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-action <id> <action>")
+			fmt.eprintln("Usage: ttrpg-engine character set-action <id> <action>")
 		}
 		return 1
 	}
@@ -2216,9 +2216,9 @@ character_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_party :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-party <id> <party_name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-party <id> <party_name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-party <id> <party_name>")
+			fmt.eprintln("Usage: ttrpg-engine character set-party <id> <party_name>")
 		}
 		return 1
 	}
@@ -2247,9 +2247,9 @@ character_set_party :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_campaign :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-campaign <id> <campaign_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-campaign <id> <campaign_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-campaign <id> <campaign_id>")
+			fmt.eprintln("Usage: ttrpg-engine character set-campaign <id> <campaign_id>")
 		}
 		return 1
 	}
@@ -2910,9 +2910,9 @@ print_conditions_text :: proc(db: ^lib.Db, target_type: string, target_id: int) 
 character_set_temp_hp :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-temp-hp <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-temp-hp <id> <amount>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-temp-hp <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine character set-temp-hp <id> <amount>")
 		}
 		return 1
 	}
@@ -2942,9 +2942,9 @@ character_set_temp_hp :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_death_saves :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-death-saves <id> <successes> <failures>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-death-saves <id> <successes> <failures>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-death-saves <id> <successes> <failures>")
+			fmt.eprintln("Usage: ttrpg-engine character set-death-saves <id> <successes> <failures>")
 		}
 		return 1
 	}
@@ -2987,9 +2987,9 @@ character_set_death_saves :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_exhaustion :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-exhaustion <id> <level>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-exhaustion <id> <level>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-exhaustion <id> <level>")
+			fmt.eprintln("Usage: ttrpg-engine character set-exhaustion <id> <level>")
 		}
 		return 1
 	}
@@ -3028,9 +3028,9 @@ character_set_exhaustion :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_hit_dice :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-hit-dice <id> <expended>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-hit-dice <id> <expended>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-hit-dice <id> <expended>")
+			fmt.eprintln("Usage: ttrpg-engine character set-hit-dice <id> <expended>")
 		}
 		return 1
 	}
@@ -3060,9 +3060,9 @@ character_set_hit_dice :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_inspiration :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-inspiration <id> <0/1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-inspiration <id> <0/1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-inspiration <id> <0/1>")
+			fmt.eprintln("Usage: ttrpg-engine character set-inspiration <id> <0/1>")
 		}
 		return 1
 	}
@@ -3101,9 +3101,9 @@ character_set_inspiration :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_rests :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-rests <id> <short_rests> <long_rests>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-rests <id> <short_rests> <long_rests>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-rests <id> <short_rests> <long_rests>")
+			fmt.eprintln("Usage: ttrpg-engine character set-rests <id> <short_rests> <long_rests>")
 		}
 		return 1
 	}
@@ -3132,9 +3132,9 @@ character_set_rests :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-skill <char_id> <skill_name> <proficiency_level> [source]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-skill <char_id> <skill_name> <proficiency_level> [source]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-skill <char_id> <skill_name> <proficiency_level> [source]")
+			fmt.eprintln("Usage: ttrpg-engine character set-skill <char_id> <skill_name> <proficiency_level> [source]")
 		}
 		return 1
 	}
@@ -3182,9 +3182,9 @@ character_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 character_list_skills :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character list-skills <char_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character list-skills <char_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character list-skills <char_id>")
+			fmt.eprintln("Usage: ttrpg-engine character list-skills <char_id>")
 		}
 		return 1
 	}
@@ -3237,9 +3237,9 @@ character_list_skills :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_resource :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-resource <char_id> <resource_name> <max> <current> [reset_condition]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-resource <char_id> <resource_name> <max> <current> [reset_condition]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-resource <char_id> <resource_name> <max> <current> [reset_condition]")
+			fmt.eprintln("Usage: ttrpg-engine character set-resource <char_id> <resource_name> <max> <current> [reset_condition]")
 		}
 		return 1
 	}
@@ -3276,9 +3276,9 @@ character_set_resource :: proc(db: ^lib.Db, args: []string) -> int {
 character_use_resource :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character use-resource <char_id> <resource_name> [amount]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character use-resource <char_id> <resource_name> [amount]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character use-resource <char_id> <resource_name> [amount]")
+			fmt.eprintln("Usage: ttrpg-engine character use-resource <char_id> <resource_name> [amount]")
 		}
 		return 1
 	}
@@ -3345,9 +3345,9 @@ character_use_resource :: proc(db: ^lib.Db, args: []string) -> int {
 character_reset_resources :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character reset-resources <char_id> [reset_condition]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character reset-resources <char_id> [reset_condition]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character reset-resources <char_id> [reset_condition]")
+			fmt.eprintln("Usage: ttrpg-engine character reset-resources <char_id> [reset_condition]")
 		}
 		return 1
 	}
@@ -3443,9 +3443,9 @@ character_reset_resources :: proc(db: ^lib.Db, args: []string) -> int {
 character_list_resources :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character list-resources <char_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character list-resources <char_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character list-resources <char_id>")
+			fmt.eprintln("Usage: ttrpg-engine character list-resources <char_id>")
 		}
 		return 1
 	}
@@ -3481,9 +3481,9 @@ character_list_resources :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_backstory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-backstory <id> <backstory>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-backstory <id> <backstory>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-backstory <id> <backstory>")
+			fmt.eprintln("Usage: ttrpg-engine character set-backstory <id> <backstory>")
 		}
 		return 1
 	}
@@ -3513,9 +3513,9 @@ character_set_backstory :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-location <id> <location_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-location <id> <location_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-location <id> <location_id>")
+			fmt.eprintln("Usage: ttrpg-engine character set-location <id> <location_id>")
 		}
 		return 1
 	}
@@ -3545,9 +3545,9 @@ character_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-chapter <id> <chapter_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-chapter <id> <chapter_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-chapter <id> <chapter_id>")
+			fmt.eprintln("Usage: ttrpg-engine character set-chapter <id> <chapter_id>")
 		}
 		return 1
 	}
@@ -3577,9 +3577,9 @@ character_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_owner :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-owner <id> <owner_name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-owner <id> <owner_name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-owner <id> <owner_name>")
+			fmt.eprintln("Usage: ttrpg-engine character set-owner <id> <owner_name>")
 		}
 		return 1
 	}
@@ -3609,9 +3609,9 @@ character_set_owner :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_gender :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-gender <id> <gender>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-gender <id> <gender>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-gender <id> <gender>")
+			fmt.eprintln("Usage: ttrpg-engine character set-gender <id> <gender>")
 		}
 		return 1
 	}
@@ -3638,9 +3638,9 @@ character_set_gender :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_age :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-age <id> <age>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-age <id> <age>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-age <id> <age>")
+			fmt.eprintln("Usage: ttrpg-engine character set-age <id> <age>")
 		}
 		return 1
 	}
@@ -3667,9 +3667,9 @@ character_set_age :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_proficiency :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-proficiency <id> <bonus>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-proficiency <id> <bonus>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-proficiency <id> <bonus>")
+			fmt.eprintln("Usage: ttrpg-engine character set-proficiency <id> <bonus>")
 		}
 		return 1
 	}
@@ -3697,9 +3697,9 @@ character_set_proficiency :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_spellcasting :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-spellcasting <id> <dc> <attack_bonus>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-spellcasting <id> <dc> <attack_bonus>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-spellcasting <id> <dc> <attack_bonus>")
+			fmt.eprintln("Usage: ttrpg-engine character set-spellcasting <id> <dc> <attack_bonus>")
 		}
 		return 1
 	}
@@ -3728,9 +3728,9 @@ character_set_spellcasting :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-initiative <id> <modifier>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-initiative <id> <modifier>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-initiative <id> <modifier>")
+			fmt.eprintln("Usage: ttrpg-engine character set-initiative <id> <modifier>")
 		}
 		return 1
 	}
@@ -3758,9 +3758,9 @@ character_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-passive-perception <id> <value>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-passive-perception <id> <value>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-passive-perception <id> <value>")
+			fmt.eprintln("Usage: ttrpg-engine character set-passive-perception <id> <value>")
 		}
 		return 1
 	}
@@ -3788,9 +3788,9 @@ character_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_languages :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-languages <id> <csv>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-languages <id> <csv>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-languages <id> <csv>")
+			fmt.eprintln("Usage: ttrpg-engine character set-languages <id> <csv>")
 		}
 		return 1
 	}
@@ -3818,9 +3818,9 @@ character_set_languages :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_max_hit_dice :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-max-hit-dice <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-max-hit-dice <id> <amount>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-max-hit-dice <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine character set-max-hit-dice <id> <amount>")
 		}
 		return 1
 	}
@@ -3848,9 +3848,9 @@ character_set_max_hit_dice :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-combat <id> <0|1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-combat <id> <0|1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-combat <id> <0|1>")
+			fmt.eprintln("Usage: ttrpg-engine character set-combat <id> <0|1>")
 		}
 		return 1
 	}
@@ -3886,9 +3886,9 @@ character_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_concentrating :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-concentrating <id> <spell_name_or_blank>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-concentrating <id> <spell_name_or_blank>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-concentrating <id> <spell_name_or_blank>")
+			fmt.eprintln("Usage: ttrpg-engine character set-concentrating <id> <spell_name_or_blank>")
 		}
 		return 1
 	}
@@ -3920,9 +3920,9 @@ character_set_concentrating :: proc(db: ^lib.Db, args: []string) -> int {
 character_add_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character add-prof <id> <weapon|armor|tool> <name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character add-prof <id> <weapon|armor|tool> <name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character add-prof <id> <weapon|armor|tool> <name>")
+			fmt.eprintln("Usage: ttrpg-engine character add-prof <id> <weapon|armor|tool> <name>")
 		}
 		return 1
 	}
@@ -3972,9 +3972,9 @@ character_add_prof :: proc(db: ^lib.Db, args: []string) -> int {
 character_remove_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character remove-prof <id> <weapon|armor|tool> <name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character remove-prof <id> <weapon|armor|tool> <name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character remove-prof <id> <weapon|armor|tool> <name>")
+			fmt.eprintln("Usage: ttrpg-engine character remove-prof <id> <weapon|armor|tool> <name>")
 		}
 		return 1
 	}
@@ -4024,9 +4024,9 @@ character_remove_prof :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_spell_slot :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-spell-slot <id> <slot_level> <max> <used>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-spell-slot <id> <slot_level> <max> <used>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-spell-slot <id> <slot_level> <max> <used>")
+			fmt.eprintln("Usage: ttrpg-engine character set-spell-slot <id> <slot_level> <max> <used>")
 		}
 		return 1
 	}
@@ -4056,9 +4056,9 @@ character_set_spell_slot :: proc(db: ^lib.Db, args: []string) -> int {
 condition_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent condition add <character|npc|creature> <id> <name> [source] [duration_amount] [save_dc] [save_ability] [duration_type]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine condition add <character|npc|creature> <id> <name> [source] [duration_amount] [save_dc] [save_ability] [duration_type]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent condition add <character|npc|creature> <id> <name> [source] [duration_amount] [save_dc] [save_ability] [duration_type]")
+			fmt.eprintln("Usage: ttrpg-engine condition add <character|npc|creature> <id> <name> [source] [duration_amount] [save_dc] [save_ability] [duration_type]")
 			fmt.eprintln("  duration_type: rounds (default), concentration, hours, days, until_rest, permanent")
 		}
 		return 1
@@ -4098,9 +4098,9 @@ condition_add :: proc(db: ^lib.Db, args: []string) -> int {
 condition_remove :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent <entity> remove-condition <id> <name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine <entity> remove-condition <id> <name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent <entity> remove-condition <id> <name>")
+			fmt.eprintln("Usage: ttrpg-engine <entity> remove-condition <id> <name>")
 		}
 		return 1
 	}
@@ -4130,9 +4130,9 @@ condition_remove :: proc(db: ^lib.Db, args: []string) -> int {
 condition_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent <entity> list-conditions <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine <entity> list-conditions <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent <entity> list-conditions <id>")
+			fmt.eprintln("Usage: ttrpg-engine <entity> list-conditions <id>")
 		}
 		return 1
 	}
@@ -4152,9 +4152,9 @@ condition_list :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_darkvision :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character set-darkvision <id> <range_in_feet>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character set-darkvision <id> <range_in_feet>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character set-darkvision <id> <range_in_feet>")
+			fmt.eprintln("Usage: ttrpg-engine character set-darkvision <id> <range_in_feet>")
 		}
 		return 1
 	}
@@ -4192,9 +4192,9 @@ character_set_appearance :: proc(db: ^lib.Db, args: []string) -> int {
 character_set_text_field :: proc(db: ^lib.Db, args: []string, column: string, label: string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.printf(`{"success":false,"error":"Usage: dnd-agent character set-%s <id> <text>"}\n`, column)
+			fmt.printf(`{"success":false,"error":"Usage: ttrpg-engine character set-%s <id> <text>"}\n`, column)
 		} else {
-			fmt.eprintln(fmt.tprintf("Usage: dnd-agent character set-%s <id> <text>", column))
+			fmt.eprintln(fmt.tprintf("Usage: ttrpg-engine character set-%s <id> <text>", column))
 		}
 		return 1
 	}

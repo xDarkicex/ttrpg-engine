@@ -9,9 +9,9 @@ import sqlite "ext:sqlite3"
 spell_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 9 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>")
+			fmt.eprintln("Usage: ttrpg-engine spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>")
 		}
 		return 1
 	}
@@ -92,9 +92,9 @@ spell_list :: proc(db: ^lib.Db) -> int {
 spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]")
+			fmt.eprintln("Usage: ttrpg-engine spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]")
 		}
 		return 1
 	}
@@ -137,9 +137,9 @@ spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 spell_prepare :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell prepare <char_id> <spell_id> <0/1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell prepare <char_id> <spell_id> <0/1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell prepare <char_id> <spell_id> <0/1>")
+			fmt.eprintln("Usage: ttrpg-engine spell prepare <char_id> <spell_id> <0/1>")
 		}
 		return 1
 	}
@@ -171,9 +171,9 @@ spell_prepare :: proc(db: ^lib.Db, args: []string) -> int {
 spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell list-character <char_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell list-character <char_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell list-character <char_id>")
+			fmt.eprintln("Usage: ttrpg-engine spell list-character <char_id>")
 		}
 		return 1
 	}
@@ -236,9 +236,9 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 spell_forget :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell forget <char_id> <spell_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell forget <char_id> <spell_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell forget <char_id> <spell_id>")
+			fmt.eprintln("Usage: ttrpg-engine spell forget <char_id> <spell_id>")
 		}
 		return 1
 	}

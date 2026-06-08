@@ -72,9 +72,9 @@ CreatureStats :: struct {
 creature_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 7 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>")
+			fmt.eprintln("Usage: ttrpg-engine creature create <name> <max_hp> <ac> <attacks> <story_role> <campaign_id>")
 		}
 		return 1
 	}
@@ -241,9 +241,9 @@ fetch_creature_stats :: proc(db: ^lib.Db, id: int) -> (c: CreatureStats, found: 
 creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature get <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature get <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature get <id>")
+			fmt.eprintln("Usage: ttrpg-engine creature get <id>")
 		}
 		return 1
 	}
@@ -486,9 +486,9 @@ creature_get :: proc(db: ^lib.Db, args: []string) -> int {
 creature_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature heal <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature heal <id> <amount>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature heal <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine creature heal <id> <amount>")
 		}
 		return 1
 	}
@@ -530,9 +530,9 @@ creature_heal :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-status <id> <status_effects>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-status <id> <status_effects>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-status <id> <status_effects>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-status <id> <status_effects>")
 		}
 		return 1
 	}
@@ -561,9 +561,9 @@ creature_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-combat-meta <id> <resistances> <vulnerabilities> <immunities>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-combat-meta <id> <resistances> <vulnerabilities> <immunities>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-combat-meta <id> <resistances> <vulnerabilities> <immunities>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-combat-meta <id> <resistances> <vulnerabilities> <immunities>")
 		}
 		return 1
 	}
@@ -594,9 +594,9 @@ creature_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-action <id> <action>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-action <id> <action>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-action <id> <action>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-action <id> <action>")
 		}
 		return 1
 	}
@@ -625,9 +625,9 @@ creature_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 creature_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
+			fmt.eprintln("Usage: ttrpg-engine creature damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
 		}
 		return 1
 	}
@@ -718,9 +718,9 @@ creature_damage :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-location <creature_id> <location_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-location <creature_id> <location_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-location <creature_id> <location_id>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-location <creature_id> <location_id>")
 		}
 		return 1
 	}
@@ -889,9 +889,9 @@ print_creature_loot_text :: proc(db: ^lib.Db, creature_id: int) {
 creature_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 8 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
 		}
 		return 1
 	}
@@ -928,9 +928,9 @@ creature_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 creature_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature add-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature add-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature add-money <id> <gold> <silver> <copper> [platinum] [electrum]")
+			fmt.eprintln("Usage: ttrpg-engine creature add-money <id> <gold> <silver> <copper> [platinum] [electrum]")
 		}
 		return 1
 	}
@@ -968,9 +968,9 @@ creature_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 creature_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature remove-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature remove-money <id> <gold> <silver> <copper> [platinum] [electrum]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature remove-money <id> <gold> <silver> <copper> [platinum] [electrum]")
+			fmt.eprintln("Usage: ttrpg-engine creature remove-money <id> <gold> <silver> <copper> [platinum] [electrum]")
 		}
 		return 1
 	}
@@ -1008,9 +1008,9 @@ creature_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 creature_add_ability :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature add-ability <creature_id> <feature_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature add-ability <creature_id> <feature_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature add-ability <creature_id> <feature_id>")
+			fmt.eprintln("Usage: ttrpg-engine creature add-ability <creature_id> <feature_id>")
 		}
 		return 1
 	}
@@ -1039,9 +1039,9 @@ creature_add_ability :: proc(db: ^lib.Db, args: []string) -> int {
 creature_remove_ability :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature remove-ability <creature_id> <feature_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature remove-ability <creature_id> <feature_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature remove-ability <creature_id> <feature_id>")
+			fmt.eprintln("Usage: ttrpg-engine creature remove-ability <creature_id> <feature_id>")
 		}
 		return 1
 	}
@@ -1070,9 +1070,9 @@ creature_remove_ability :: proc(db: ^lib.Db, args: []string) -> int {
 creature_list_abilities :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature list-abilities <creature_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature list-abilities <creature_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature list-abilities <creature_id>")
+			fmt.eprintln("Usage: ttrpg-engine creature list-abilities <creature_id>")
 		}
 		return 1
 	}
@@ -1090,9 +1090,9 @@ creature_list_abilities :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_attack :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-attack <id> <bonus> <damage_dice> <damage_type>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-attack <id> <bonus> <damage_dice> <damage_type>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-attack <id> <bonus> <damage_dice> <damage_type>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-attack <id> <bonus> <damage_dice> <damage_type>")
 		}
 		return 1
 	}
@@ -1122,9 +1122,9 @@ creature_set_attack :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_cr :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-cr <id> <cr>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-cr <id> <cr>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-cr <id> <cr>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-cr <id> <cr>")
 		}
 		return 1
 	}
@@ -1152,9 +1152,9 @@ creature_set_cr :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-initiative <id> <modifier>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-initiative <id> <modifier>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-initiative <id> <modifier>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-initiative <id> <modifier>")
 		}
 		return 1
 	}
@@ -1182,9 +1182,9 @@ creature_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-passive-perception <id> <value>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-passive-perception <id> <value>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-passive-perception <id> <value>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-passive-perception <id> <value>")
 		}
 		return 1
 	}
@@ -1212,9 +1212,9 @@ creature_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_reactions :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-reactions <id> <text>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-reactions <id> <text>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-reactions <id> <text>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-reactions <id> <text>")
 		}
 		return 1
 	}
@@ -1242,9 +1242,9 @@ creature_set_reactions :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_legendary :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-legendary <id> <text>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-legendary <id> <text>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-legendary <id> <text>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-legendary <id> <text>")
 		}
 		return 1
 	}
@@ -1272,9 +1272,9 @@ creature_set_legendary :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-combat <id> <0|1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-combat <id> <0|1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature set-combat <id> <0|1>")
+			fmt.eprintln("Usage: ttrpg-engine creature set-combat <id> <0|1>")
 		}
 		return 1
 	}
@@ -1309,7 +1309,7 @@ creature_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 
 creature_set_darkvision :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent creature set-darkvision <id> <range_in_feet>"}`) } else { fmt.eprintln("Usage: dnd-agent creature set-darkvision <id> <range_in_feet>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature set-darkvision <id> <range_in_feet>"}`) } else { fmt.eprintln("Usage: ttrpg-engine creature set-darkvision <id> <range_in_feet>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -1327,9 +1327,9 @@ creature_set_darkvision :: proc(db: ^lib.Db, args: []string) -> int {
 creature_set_text_field :: proc(db: ^lib.Db, args: []string, column: string, label: string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.printf(`{"success":false,"error":"Usage: dnd-agent creature set-%s <id> <text>"}\n`, column)
+			fmt.printf(`{"success":false,"error":"Usage: ttrpg-engine creature set-%s <id> <text>"}\n`, column)
 		} else {
-			fmt.eprintln(fmt.tprintf("Usage: dnd-agent creature set-%s <id> <text>", column))
+			fmt.eprintln(fmt.tprintf("Usage: ttrpg-engine creature set-%s <id> <text>", column))
 		}
 		return 1
 	}
@@ -1364,7 +1364,7 @@ creature_set_skills_text :: proc(db: ^lib.Db, args: []string) -> int { return cr
 creature_set_languages_full :: proc(db: ^lib.Db, args: []string) -> int { return creature_set_text_field(db, args, "languages_full", "Languages") }
 
 creature_set_speed_fly :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 3 { fmt.eprintln("Usage: dnd-agent creature set-speed-fly <id> <ft>"); return 1 }
+	if len(args) < 3 { fmt.eprintln("Usage: ttrpg-engine creature set-speed-fly <id> <ft>"); return 1 }
 	id := strconv.atoi(args[1])
 	v := strconv.atoi(args[2])
 	sql := fmt.tprintf("UPDATE creatures SET speed_fly=%d WHERE id=%d", v, id)
@@ -1374,7 +1374,7 @@ creature_set_speed_fly :: proc(db: ^lib.Db, args: []string) -> int {
 }
 
 creature_set_hover :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 3 { fmt.eprintln("Usage: dnd-agent creature set-hover <id> <0|1>"); return 1 }
+	if len(args) < 3 { fmt.eprintln("Usage: ttrpg-engine creature set-hover <id> <0|1>"); return 1 }
 	id := strconv.atoi(args[1])
 	v := strconv.atoi(args[2])
 	if v != 0 && v != 1 { fmt.eprintln("Hover must be 0 or 1"); return 1 }
@@ -1385,7 +1385,7 @@ creature_set_hover :: proc(db: ^lib.Db, args: []string) -> int {
 }
 
 creature_set_blindsight :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 3 { fmt.eprintln("Usage: dnd-agent creature set-blindsight <id> <ft>"); return 1 }
+	if len(args) < 3 { fmt.eprintln("Usage: ttrpg-engine creature set-blindsight <id> <ft>"); return 1 }
 	id := strconv.atoi(args[1])
 	v := strconv.atoi(args[2])
 	sql := fmt.tprintf("UPDATE creatures SET blindsight=%d WHERE id=%d", v, id)
@@ -1395,7 +1395,7 @@ creature_set_blindsight :: proc(db: ^lib.Db, args: []string) -> int {
 }
 
 creature_set_telepathy :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 3 { fmt.eprintln("Usage: dnd-agent creature set-telepathy <id> <ft>"); return 1 }
+	if len(args) < 3 { fmt.eprintln("Usage: ttrpg-engine creature set-telepathy <id> <ft>"); return 1 }
 	id := strconv.atoi(args[1])
 	v := strconv.atoi(args[2])
 	sql := fmt.tprintf("UPDATE creatures SET telepathy=%d WHERE id=%d", v, id)
@@ -1405,7 +1405,7 @@ creature_set_telepathy :: proc(db: ^lib.Db, args: []string) -> int {
 }
 
 creature_set_speed :: proc(db: ^lib.Db, args: []string) -> int {
-	if len(args) < 3 { fmt.eprintln("Usage: dnd-agent creature set-speed <id> <ft>"); return 1 }
+	if len(args) < 3 { fmt.eprintln("Usage: ttrpg-engine creature set-speed <id> <ft>"); return 1 }
 	id := strconv.atoi(args[1])
 	v := strconv.atoi(args[2])
 	sql := fmt.tprintf("UPDATE creatures SET speed=%d WHERE id=%d", v, id)

@@ -9,9 +9,9 @@ import sqlite "ext:sqlite3"
 feature_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent feature upsert <name> <source> <description>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature upsert <name> <source> <description>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent feature upsert <name> <source> <description>")
+			fmt.eprintln("Usage: ttrpg-engine feature upsert <name> <source> <description>")
 		}
 		return 1
 	}
@@ -85,9 +85,9 @@ feature_list :: proc(db: ^lib.Db) -> int {
 feature_add_to_char :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent feature add-to-char <char_id> <feature_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature add-to-char <char_id> <feature_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent feature add-to-char <char_id> <feature_id>")
+			fmt.eprintln("Usage: ttrpg-engine feature add-to-char <char_id> <feature_id>")
 		}
 		return 1
 	}
@@ -118,9 +118,9 @@ feature_add_to_char :: proc(db: ^lib.Db, args: []string) -> int {
 feature_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent feature list-character <char_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature list-character <char_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent feature list-character <char_id>")
+			fmt.eprintln("Usage: ttrpg-engine feature list-character <char_id>")
 		}
 		return 1
 	}

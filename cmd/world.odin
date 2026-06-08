@@ -21,8 +21,8 @@ import sqlite "ext:sqlite3"
 // Set a location's parent_id (sub-location). Pass 0 to make it a root location.
 location_set_parent :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent location set-parent <id> <parent_id|0>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent location set-parent <id> <parent_id|0>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine location set-parent <id> <parent_id|0>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine location set-parent <id> <parent_id|0>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -56,8 +56,8 @@ location_set_parent :: proc(db: ^lib.Db, args: []string) -> int {
 
 location_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent location set-restricted <id> <0|1> <until>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent location set-restricted <id> <0|1> <until>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine location set-restricted <id> <0|1> <until>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine location set-restricted <id> <0|1> <until>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -118,8 +118,8 @@ location_breadcrumb :: proc(db: ^lib.Db, location_id: int) -> string {
 // Add a house to a location. The npc_id is the resident.
 house_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house add <location_id> <name> [description] [npc_id] [scale]"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house add <location_id> <name> [description] [npc_id] [scale]") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house add <location_id> <name> [description] [npc_id] [scale]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house add <location_id> <name> [description] [npc_id] [scale]") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -150,8 +150,8 @@ house_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house list <location_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house list <location_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house list <location_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house list <location_id>") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -192,8 +192,8 @@ house_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house set-inventory <id> <text>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house set-inventory <id> <text>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house set-inventory <id> <text>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house set-inventory <id> <text>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -211,8 +211,8 @@ house_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house set-restricted <id> <0|1> <until>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house set-restricted <id> <0|1> <until>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house set-restricted <id> <0|1> <until>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house set-restricted <id> <0|1> <until>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -233,8 +233,8 @@ house_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]"}`) }
-		else { fmt.eprintln("Usage: dnd-agent shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -266,8 +266,8 @@ shop_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent shop list <location_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent shop list <location_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop list <location_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine shop list <location_id>") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -308,8 +308,8 @@ shop_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent shop set-inventory <id> <text>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent shop set-inventory <id> <text>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop set-inventory <id> <text>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine shop set-inventory <id> <text>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -329,8 +329,8 @@ shop_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 
 encounter_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent encounter add <location_id> <type> [description] [npc_id]"}`) }
-		else { fmt.eprintln("Usage: dnd-agent encounter add <location_id> <type> [description] [npc_id]") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine encounter add <location_id> <type> [description] [npc_id]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine encounter add <location_id> <type> [description] [npc_id]") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -360,8 +360,8 @@ encounter_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 encounter_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent encounter list <location_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent encounter list <location_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine encounter list <location_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine encounter list <location_id>") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -399,8 +399,8 @@ encounter_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 setpiece_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent setpiece add <location_id> <name> [description] [chapter_event]"}`) }
-		else { fmt.eprintln("Usage: dnd-agent setpiece add <location_id> <name> [description] [chapter_event]") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine setpiece add <location_id> <name> [description] [chapter_event]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine setpiece add <location_id> <name> [description] [chapter_event]") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -424,8 +424,8 @@ setpiece_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 setpiece_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent setpiece list <location_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent setpiece list <location_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine setpiece list <location_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine setpiece list <location_id>") }
 		return 1
 	}
 	location_id := strconv.atoi(args[1])
@@ -603,8 +603,8 @@ can_enter :: proc(
 
 house_add_resident :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house add-resident <house_id> <npc_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house add-resident <house_id> <npc_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house add-resident <house_id> <npc_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house add-resident <house_id> <npc_id>") }
 		return 1
 	}
 	house_id := strconv.atoi(args[1])
@@ -623,8 +623,8 @@ house_add_resident :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_remove_resident :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house remove-resident <house_id> <npc_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house remove-resident <house_id> <npc_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house remove-resident <house_id> <npc_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house remove-resident <house_id> <npc_id>") }
 		return 1
 	}
 	house_id := strconv.atoi(args[1])
@@ -643,8 +643,8 @@ house_remove_resident :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_list_residents :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house list-residents <house_id>"}`) }
-		else { fmt.eprintln("Usage: dnd-agent house list-residents <house_id>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house list-residents <house_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine house list-residents <house_id>") }
 		return 1
 	}
 	house_id := strconv.atoi(args[1])

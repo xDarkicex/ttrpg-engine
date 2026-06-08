@@ -257,7 +257,7 @@ also apply to creatures. Fix in v15 alongside the world model.
 | 4 | `Abilities: None` is misleading on monsters (the traits/actions ARE the abilities) | creature `get` | Drop the `Abilities:` table call for monsters. |
 | 5 | `CR: 0` for commoners                                  | npc `get`                                       | Don't print a CR line for NPCs (it's a creature stat). |
 | 6 | `Daily Role: Daily Role` echo                          | input handling                                  | Already fixed in this session by passing the right arg; document the order: `npc set-details <id> <ac> <story_role> <daily_role> <backstory>`. |
-| 7 | No `help` subcommand for `npc`                         | route_npc                                      | Add `case "help":` that prints the same help table as the top-level `dnd-agent help` filtered to npc, or just lists `npc` subcommands. |
+| 7 | No `help` subcommand for `npc`                         | route_npc                                      | Add `case "help":` that prints the same help table as the top-level `ttrpg-engine help` filtered to npc, or just lists `npc` subcommands. |
 
 ---
 

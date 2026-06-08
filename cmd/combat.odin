@@ -228,7 +228,7 @@ get_char_save_prof :: proc(db: ^lib.Db, char_id: int, ability: string) -> int {
 // ---------------------------------------------------------------------------
 combat_start :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 3 {
-        return print_error(db, "Usage: dnd-agent combat start <campaign_id> <location_id>")
+        return print_error(db, "Usage: ttrpg-engine combat start <campaign_id> <location_id>")
     }
     campaign_id := strconv.atoi(args[1])
     location_id := strconv.atoi(args[2])
@@ -258,7 +258,7 @@ combat_start :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_join :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 5 {
-        return print_error(db, "Usage: dnd-agent combat join <encounter_id> <char|npc|creature> <id> <initiative_roll> [initiative_mod] [position]")
+        return print_error(db, "Usage: ttrpg-engine combat join <encounter_id> <char|npc|creature> <id> <initiative_roll> [initiative_mod] [position]")
     }
     enc_id := strconv.atoi(args[1])
     actor_type := args[2]
@@ -300,7 +300,7 @@ combat_join :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_join_all :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 2 {
-        return print_error(db, "Usage: dnd-agent combat join-all <encounter_id>")
+        return print_error(db, "Usage: ttrpg-engine combat join-all <encounter_id>")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -355,7 +355,7 @@ combat_join_all :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_init :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 2 {
-        return print_error(db, "Usage: dnd-agent combat init <encounter_id>")
+        return print_error(db, "Usage: ttrpg-engine combat init <encounter_id>")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -390,7 +390,7 @@ combat_init :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_next :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 2 {
-        return print_error(db, "Usage: dnd-agent combat next <encounter_id>")
+        return print_error(db, "Usage: ttrpg-engine combat next <encounter_id>")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -443,7 +443,7 @@ combat_next :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_attack :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 7 {
-        return print_error(db, "Usage: dnd-agent combat attack <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <attack_roll> [ability] [adv|disadv]")
+        return print_error(db, "Usage: ttrpg-engine combat attack <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <attack_roll> [ability] [adv|disadv]")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -490,7 +490,7 @@ combat_attack :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_damage :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 6 {
-        return print_error(db, "Usage: dnd-agent combat damage <encounter_id> <target_type> <target_id> <amount> <type> [source]")
+        return print_error(db, "Usage: ttrpg-engine combat damage <encounter_id> <target_type> <target_id> <amount> <type> [source]")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -550,7 +550,7 @@ combat_damage :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_save :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 6 {
-        return print_error(db, "Usage: dnd-agent combat save <encounter_id> <actor_type> <actor_id> <ability> <save_roll> [dc] [adv|disadv]")
+        return print_error(db, "Usage: ttrpg-engine combat save <encounter_id> <actor_type> <actor_id> <ability> <save_roll> [dc] [adv|disadv]")
     }
     enc_id := strconv.atoi(args[1])
     actor_type := args[2]; if actor_type == "char" do actor_type = "character"
@@ -590,7 +590,7 @@ combat_save :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_move :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 5 {
-        return print_error(db, "Usage: dnd-agent combat move <encounter_id> <actor_type> <actor_id> <position>")
+        return print_error(db, "Usage: ttrpg-engine combat move <encounter_id> <actor_type> <actor_id> <position>")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -620,7 +620,7 @@ combat_move :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_condition :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 5 {
-        return print_error(db, "Usage: dnd-agent combat condition <encounter_id> <target_type> <target_id> <name> [duration_rounds] [save_dc] [save_ability]")
+        return print_error(db, "Usage: ttrpg-engine combat condition <encounter_id> <target_type> <target_id> <name> [duration_rounds] [save_dc] [save_ability]")
     }
     _ = strconv.atoi(args[1]) // enc_id validated by condition_add context
     tgt_type := args[2]; if tgt_type == "char" do tgt_type = "character"
@@ -651,7 +651,7 @@ combat_condition :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_death_save :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 3 {
-        return print_error(db, "Usage: dnd-agent combat death-save <character_id> <roll>")
+        return print_error(db, "Usage: ttrpg-engine combat death-save <character_id> <roll>")
     }
     char_id := strconv.atoi(args[1])
     roll := strconv.atoi(args[2])
@@ -702,7 +702,7 @@ combat_death_save :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_react :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 5 {
-        return print_error(db, "Usage: dnd-agent combat react <encounter_id> <actor_type> <actor_id> <reaction_type> [target_type] [target_id]")
+        return print_error(db, "Usage: ttrpg-engine combat react <encounter_id> <actor_type> <actor_id> <reaction_type> [target_type] [target_id]")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -748,7 +748,7 @@ combat_react :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_ready :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 6 {
-        return print_error(db, "Usage: dnd-agent combat ready <encounter_id> <actor_type> <actor_id> \"<action>\" <trigger>")
+        return print_error(db, "Usage: ttrpg-engine combat ready <encounter_id> <actor_type> <actor_id> \"<action>\" <trigger>")
     }
     enc_id := strconv.atoi(args[1])
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
@@ -776,7 +776,7 @@ combat_ready :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_status :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 2 {
-        return print_error(db, "Usage: dnd-agent combat status <encounter_id>")
+        return print_error(db, "Usage: ttrpg-engine combat status <encounter_id>")
     }
     enc_id := strconv.atoi(args[1])
 
@@ -855,7 +855,7 @@ combat_status :: proc(db: ^lib.Db, args: []string) -> int {
 // ---------------------------------------------------------------------------
 combat_end :: proc(db: ^lib.Db, args: []string) -> int {
     if len(args) < 2 {
-        return print_error(db, "Usage: dnd-agent combat end <encounter_id>")
+        return print_error(db, "Usage: ttrpg-engine combat end <encounter_id>")
     }
     enc_id := strconv.atoi(args[1])
 

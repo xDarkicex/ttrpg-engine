@@ -81,7 +81,7 @@ short_rest_heal :: proc(db: ^lib.Db, char_id: int, hit_dice_count: int) -> (int,
 
 rest_short :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent rest short <character_id> <hit_dice_count>")
+		return print_error(db, "Usage: ttrpg-engine rest short <character_id> <hit_dice_count>")
 	}
 	char_id := strconv.atoi(args[1])
 	hit_dice_count := strconv.atoi(args[2])
@@ -127,7 +127,7 @@ rest_short :: proc(db: ^lib.Db, args: []string) -> int {
 
 rest_long :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent rest long <character_id>")
+		return print_error(db, "Usage: ttrpg-engine rest long <character_id>")
 	}
 	char_id := strconv.atoi(args[1])
 

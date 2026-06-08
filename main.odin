@@ -286,7 +286,7 @@ main :: proc() {
 		os.exit(1)
 	}
 
-	db, db_err := lib.db_open("dnd-agent.db")
+	db, db_err := lib.db_open("ttrpg-engine.db")
 	if db_err != lib.Error.None {
 		fmt.eprintln("Failed to open DB:", db_err)
 		os.exit(1)
@@ -368,9 +368,9 @@ route_asset_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> in
 route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent class-specialty <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine class-specialty <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent class-specialty <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine class-specialty <subcommand> [args]")
 		}
 		return 1
 	}
@@ -391,9 +391,9 @@ route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
 route_quest :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent quest <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine quest <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent quest <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine quest <subcommand> [args]")
 		}
 		return 1
 	}
@@ -421,9 +421,9 @@ route_meta_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int
 	case "campaign": return route_campaign(db, args)
 	case "init":
 		if db.is_json {
-			fmt.println(`{"success":true,"message":"dnd-agent initialized"}`)
+			fmt.println(`{"success":true,"message":"ttrpg-engine initialized"}`)
 		} else {
-			fmt.println("dnd-agent initialized.")
+			fmt.println("ttrpg-engine initialized.")
 		}
 		return 0
 	case "help":
@@ -436,9 +436,9 @@ route_meta_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int
 route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine character <subcommand> [args]")
 		}
 		return 1
 	}
@@ -527,9 +527,9 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 route_item :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent item <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine item <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent item <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine item <subcommand> [args]")
 		}
 		return 1
 	}
@@ -552,9 +552,9 @@ route_item :: proc(db: ^lib.Db, args: []string) -> int {
 route_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent inventory <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine inventory <subcommand> [args]")
 		}
 		return 1
 	}
@@ -578,9 +578,9 @@ route_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 route_spell :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent spell <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent spell <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine spell <subcommand> [args]")
 		}
 		return 1
 	}
@@ -605,9 +605,9 @@ route_spell :: proc(db: ^lib.Db, args: []string) -> int {
 route_feature :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent feature <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent feature <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine feature <subcommand> [args]")
 		}
 		return 1
 	}
@@ -630,9 +630,9 @@ route_feature :: proc(db: ^lib.Db, args: []string) -> int {
 route_companion :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent companion <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent companion <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine companion <subcommand> [args]")
 		}
 		return 1
 	}
@@ -657,9 +657,9 @@ route_companion :: proc(db: ^lib.Db, args: []string) -> int {
 route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent creature <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent creature <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine creature <subcommand> [args]")
 		}
 		return 1
 	}
@@ -736,9 +736,9 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent faction <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent faction <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine faction <subcommand> [args]")
 		}
 		return 1
 	}
@@ -766,9 +766,9 @@ route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
+			fmt.eprintln("Usage: ttrpg-engine condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
 		}
 		return 1
 	}
@@ -788,8 +788,8 @@ route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 
 route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent combat <subcommand> ..."}`) }
-		else { fmt.eprintln("Usage: dnd-agent combat <subcommand> ...") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine combat <subcommand> ..."}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine combat <subcommand> ...") }
 		return 1
 	}
 	switch args[0] {
@@ -818,9 +818,9 @@ route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent rest <short|long> <character_id> [hit_dice_count]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine rest <short|long> <character_id> [hit_dice_count]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent rest <short|long> <character_id> [hit_dice_count]")
+			fmt.eprintln("Usage: ttrpg-engine rest <short|long> <character_id> [hit_dice_count]")
 		}
 		return 1
 	}
@@ -840,9 +840,9 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine npc <subcommand> [args]")
 		}
 		return 1
 	}
@@ -920,9 +920,9 @@ route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 route_campaign :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent campaign <subcommand> [args]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign <subcommand> [args]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent campaign <subcommand> [args]")
+			fmt.eprintln("Usage: ttrpg-engine campaign <subcommand> [args]")
 		}
 		return 1
 	}
@@ -993,9 +993,9 @@ print_usage_json :: proc() {
 }
 
 print_usage_text :: proc() {
-	fmt.println("dnd-agent - D&D campaign management CLI")
+	fmt.println("ttrpg-engine - D&D campaign management CLI")
 	fmt.println()
-	fmt.println("Usage: dnd-agent <command> [args] [--json]")
+	fmt.println("Usage: ttrpg-engine <command> [args] [--json]")
 	fmt.println()
 	fmt.println("Commands:")
 	for cmd in HELP_COMMANDS {
@@ -1027,8 +1027,8 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 			fmt.println(cmd.location_breadcrumb(db, id))
 			return 0
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent location <set-parent|set-restricted|breadcrumb> ..."}`) }
-			else { fmt.eprintln("Usage: dnd-agent location <set-parent|set-restricted|breadcrumb> ...") }
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine location <set-parent|set-restricted|breadcrumb> ..."}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine location <set-parent|set-restricted|breadcrumb> ...") }
 			return 1
 		}
 	case "house":
@@ -1041,8 +1041,8 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "remove-resident":  return cmd.house_remove_resident(db, args)
 		case "list-residents":   return cmd.house_list_residents(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent house <add|list|set-inventory|set-restricted> ..."}`) }
-			else { fmt.eprintln("Usage: dnd-agent house <add|list|set-inventory|set-restricted> ...") }
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house <add|list|set-inventory|set-restricted> ..."}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine house <add|list|set-inventory|set-restricted> ...") }
 			return 1
 		}
 	case "shop":
@@ -1051,8 +1051,8 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "list":             return cmd.shop_list(db, args)
 		case "set-inventory":    return cmd.shop_set_inventory(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent shop <add|list|set-inventory> ..."}`) }
-			else { fmt.eprintln("Usage: dnd-agent shop <add|list|set-inventory> ...") }
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop <add|list|set-inventory> ..."}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine shop <add|list|set-inventory> ...") }
 			return 1
 		}
 	case "encounter":
@@ -1060,8 +1060,8 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "add":              return cmd.encounter_add(db, args)
 		case "list":             return cmd.encounter_list(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent encounter <add|list> ..."}`) }
-			else { fmt.eprintln("Usage: dnd-agent encounter <add|list> ...") }
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine encounter <add|list> ..."}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine encounter <add|list> ...") }
 			return 1
 		}
 	case "setpiece":
@@ -1069,8 +1069,8 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "add":              return cmd.setpiece_add(db, args)
 		case "list":             return cmd.setpiece_list(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent setpiece <add|list> ..."}`) }
-			else { fmt.eprintln("Usage: dnd-agent setpiece <add|list> ...") }
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine setpiece <add|list> ..."}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine setpiece <add|list> ...") }
 			return 1
 		}
 	}
@@ -1078,10 +1078,10 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 }
 
 route_can_enter :: proc(db: ^lib.Db, args: []string) -> int {
-	// Usage: dnd-agent can-enter <property_kind> <property_id> [visitor_npc_id] [visitor_char_id] [in_game_day]
+	// Usage: ttrpg-engine can-enter <property_kind> <property_id> [visitor_npc_id] [visitor_char_id] [in_game_day]
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]"}`) }
-		else { fmt.eprintln("Usage: dnd-agent can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]") }
 		return 1
 	}
 	property_kind := args[0]

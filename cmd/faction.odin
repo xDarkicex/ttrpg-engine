@@ -9,9 +9,9 @@ import sqlite "ext:sqlite3"
 faction_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent faction create <name> <description>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction create <name> <description>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent faction create <name> <description>")
+			fmt.eprintln("Usage: ttrpg-engine faction create <name> <description>")
 		}
 		return 1
 	}
@@ -82,9 +82,9 @@ faction_list :: proc(db: ^lib.Db) -> int {
 faction_join :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent faction join <char|npc> <id> <faction_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction join <char|npc> <id> <faction_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent faction join <char|npc> <id> <faction_id>")
+			fmt.eprintln("Usage: ttrpg-engine faction join <char|npc> <id> <faction_id>")
 		}
 		return 1
 	}
@@ -157,9 +157,9 @@ print_faction_standings :: proc(stmt: ^sqlite.Statement, is_json: bool) {
 faction_set_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent faction set-standing <character_id> <faction_id> <standing> [notes]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction set-standing <character_id> <faction_id> <standing> [notes]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent faction set-standing <character_id> <faction_id> <standing> [notes]")
+			fmt.eprintln("Usage: ttrpg-engine faction set-standing <character_id> <faction_id> <standing> [notes]")
 		}
 		return 1
 	}
@@ -193,9 +193,9 @@ faction_set_standing :: proc(db: ^lib.Db, args: []string) -> int {
 faction_get_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent faction get-standing <character_id> [faction_id]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction get-standing <character_id> [faction_id]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent faction get-standing <character_id> [faction_id]")
+			fmt.eprintln("Usage: ttrpg-engine faction get-standing <character_id> [faction_id]")
 		}
 		return 1
 	}
@@ -262,7 +262,7 @@ print_party_faction_standings :: proc(stmt: ^sqlite.Statement, is_json: bool) {
 
 faction_set_party_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		return print_error(db, "Usage: dnd-agent faction set-party-standing <campaign_id> <faction_id> <standing> [notes]")
+		return print_error(db, "Usage: ttrpg-engine faction set-party-standing <campaign_id> <faction_id> <standing> [notes]")
 	}
 	campaign_id := strconv.atoi(args[1])
 	faction_id := strconv.atoi(args[2])
@@ -288,7 +288,7 @@ faction_set_party_standing :: proc(db: ^lib.Db, args: []string) -> int {
 
 faction_get_party_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent faction get-party-standing <campaign_id> [faction_id]")
+		return print_error(db, "Usage: ttrpg-engine faction get-party-standing <campaign_id> [faction_id]")
 	}
 	campaign_id := strconv.atoi(args[1])
 	faction_id := 0
@@ -317,7 +317,7 @@ faction_get_party_standing :: proc(db: ^lib.Db, args: []string) -> int {
 
 faction_effective_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent faction effective-standing <campaign_id> <faction_id>")
+		return print_error(db, "Usage: ttrpg-engine faction effective-standing <campaign_id> <faction_id>")
 	}
 	campaign_id := strconv.atoi(args[1])
 	faction_id := strconv.atoi(args[2])

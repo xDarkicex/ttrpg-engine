@@ -1,4 +1,4 @@
-# dnd-agent — project rules
+# ttrpg-engine — project rules
 
 CLI tool for D&D game management backed by SQLite. Single DM model — the
 DM's agent is the sole writer; all players query through the DM.
@@ -51,7 +51,7 @@ DM's agent is the sole writer; all players query through the DM.
   truly unrecoverable setup failures.
 - No comments that describe *what* the code does. Comments
   describe *why* a non-obvious decision was made.
-- Public CLI surface is `dnd-agent <command> [args] [--json]`.
+- Public CLI surface is `ttrpg-engine <command> [args] [--json]`.
   All commands output JSON when `--json` is passed.
   Every command returns 0 on success, non-zero on failure with a
   descriptive error on stderr.

@@ -13,7 +13,7 @@ import sqlite "ext:sqlite3"
 
 quest_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent quest add <campaign_id> <name> [description] [quest_giver_npc_id] [reward] [chapter]")
+		return print_error(db, "Usage: ttrpg-engine quest add <campaign_id> <name> [description] [quest_giver_npc_id] [reward] [chapter]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -43,7 +43,7 @@ quest_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 quest_add_objective :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent quest add-objective <quest_id> <description> [sort_order]")
+		return print_error(db, "Usage: ttrpg-engine quest add-objective <quest_id> <description> [sort_order]")
 	}
 
 	quest_id := strconv.atoi(args[1])
@@ -70,7 +70,7 @@ quest_add_objective :: proc(db: ^lib.Db, args: []string) -> int {
 
 quest_complete_objective :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent quest complete-objective <objective_id>")
+		return print_error(db, "Usage: ttrpg-engine quest complete-objective <objective_id>")
 	}
 
 	obj_id := strconv.atoi(args[1])
@@ -90,7 +90,7 @@ quest_complete_objective :: proc(db: ^lib.Db, args: []string) -> int {
 
 quest_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		return print_error(db, "Usage: dnd-agent quest set-status <quest_id> <active|completed|failed|abandoned>")
+		return print_error(db, "Usage: ttrpg-engine quest set-status <quest_id> <active|completed|failed|abandoned>")
 	}
 
 	quest_id := strconv.atoi(args[1])
@@ -116,7 +116,7 @@ quest_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 
 quest_add_actor :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		return print_error(db, "Usage: dnd-agent quest add-actor <quest_id> <char|npc> <actor_id> [role]")
+		return print_error(db, "Usage: ttrpg-engine quest add-actor <quest_id> <char|npc> <actor_id> [role]")
 	}
 
 	quest_id := strconv.atoi(args[1])
@@ -152,7 +152,7 @@ quest_add_actor :: proc(db: ^lib.Db, args: []string) -> int {
 
 quest_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent quest list <campaign_id> [status]")
+		return print_error(db, "Usage: ttrpg-engine quest list <campaign_id> [status]")
 	}
 
 	campaign_id := strconv.atoi(args[1])
@@ -234,7 +234,7 @@ quest_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 quest_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		return print_error(db, "Usage: dnd-agent quest get <quest_id>")
+		return print_error(db, "Usage: ttrpg-engine quest get <quest_id>")
 	}
 
 	quest_id := strconv.atoi(args[1])

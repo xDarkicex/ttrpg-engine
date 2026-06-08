@@ -55,9 +55,9 @@ NpcStats :: struct {
 npc_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc create <name> <desc> <max_hp> <camp_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc create <name> <desc> <max_hp> <camp_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc create <name> <desc> <max_hp> <camp_id>")
+			fmt.eprintln("Usage: ttrpg-engine npc create <name> <desc> <max_hp> <camp_id>")
 		}
 		return 1
 	}
@@ -209,9 +209,9 @@ faction_id_json_str :: proc(fid: int) -> string {
 npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc get <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc get <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc get <id>")
+			fmt.eprintln("Usage: ttrpg-engine npc get <id>")
 		}
 		return 1
 	}
@@ -318,9 +318,9 @@ npc_get :: proc(db: ^lib.Db, args: []string) -> int {
 npc_delete :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc delete <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc delete <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc delete <id>")
+			fmt.eprintln("Usage: ttrpg-engine npc delete <id>")
 		}
 		return 1
 	}
@@ -347,9 +347,9 @@ npc_delete :: proc(db: ^lib.Db, args: []string) -> int {
 npc_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc heal <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc heal <id> <amount>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc heal <id> <amount>")
+			fmt.eprintln("Usage: ttrpg-engine npc heal <id> <amount>")
 		}
 		return 1
 	}
@@ -390,9 +390,9 @@ npc_heal :: proc(db: ^lib.Db, args: []string) -> int {
 npc_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
+			fmt.eprintln("Usage: ttrpg-engine npc damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
 		}
 		return 1
 	}
@@ -484,9 +484,9 @@ npc_damage :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_details :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 6 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-details <id> <ac> <story_role> <daily_role> <backstory>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-details <id> <ac> <story_role> <daily_role> <backstory>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-details <id> <ac> <story_role> <daily_role> <backstory>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-details <id> <ac> <story_role> <daily_role> <backstory>")
 		}
 		return 1
 	}
@@ -517,9 +517,9 @@ npc_set_details :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-combat-meta <id> <resistances> <vulnerabilities> <immunities>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-combat-meta <id> <resistances> <vulnerabilities> <immunities>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-combat-meta <id> <resistances> <vulnerabilities> <immunities>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-combat-meta <id> <resistances> <vulnerabilities> <immunities>")
 		}
 		return 1
 	}
@@ -549,9 +549,9 @@ npc_set_combat_meta :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-status <id> <status_effects>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-status <id> <status_effects>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-status <id> <status_effects>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-status <id> <status_effects>")
 		}
 		return 1
 	}
@@ -579,9 +579,9 @@ npc_set_status :: proc(db: ^lib.Db, args: []string) -> int {
 npc_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc add-money <id> <gold> <silver> <copper>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc add-money <id> <gold> <silver> <copper>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc add-money <id> <gold> <silver> <copper>")
+			fmt.eprintln("Usage: ttrpg-engine npc add-money <id> <gold> <silver> <copper>")
 		}
 		return 1
 	}
@@ -611,9 +611,9 @@ npc_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 npc_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc remove-money <id> <gold> <silver> <copper>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc remove-money <id> <gold> <silver> <copper>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc remove-money <id> <gold> <silver> <copper>")
+			fmt.eprintln("Usage: ttrpg-engine npc remove-money <id> <gold> <silver> <copper>")
 		}
 		return 1
 	}
@@ -643,9 +643,9 @@ npc_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-action <id> <action>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-action <id> <action>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-action <id> <action>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-action <id> <action>")
 		}
 		return 1
 	}
@@ -673,9 +673,9 @@ npc_set_action :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_relationship :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]")
+			fmt.eprintln("Usage: ttrpg-engine npc set-relationship <npc_id_1> <npc_id_2> <friendship_level> [type] [notes]")
 		}
 		return 1
 	}
@@ -709,9 +709,9 @@ npc_set_relationship :: proc(db: ^lib.Db, args: []string) -> int {
 npc_list_relationships :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc list-relationships <npc_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc list-relationships <npc_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc list-relationships <npc_id>")
+			fmt.eprintln("Usage: ttrpg-engine npc list-relationships <npc_id>")
 		}
 		return 1
 	}
@@ -770,9 +770,9 @@ npc_list_relationships :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-location <npc_id> <location_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-location <npc_id> <location_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-location <npc_id> <location_id>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-location <npc_id> <location_id>")
 		}
 		return 1
 	}
@@ -806,9 +806,9 @@ npc_set_location :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 8 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
 		}
 		return 1
 	}
@@ -1071,9 +1071,9 @@ print_npc_skills_text :: proc(db: ^lib.Db, npc_id: int) {
 npc_add_ability :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc add-ability <npc_id> <feature_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc add-ability <npc_id> <feature_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc add-ability <npc_id> <feature_id>")
+			fmt.eprintln("Usage: ttrpg-engine npc add-ability <npc_id> <feature_id>")
 		}
 		return 1
 	}
@@ -1102,9 +1102,9 @@ npc_add_ability :: proc(db: ^lib.Db, args: []string) -> int {
 npc_remove_ability :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc remove-ability <npc_id> <feature_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc remove-ability <npc_id> <feature_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc remove-ability <npc_id> <feature_id>")
+			fmt.eprintln("Usage: ttrpg-engine npc remove-ability <npc_id> <feature_id>")
 		}
 		return 1
 	}
@@ -1133,9 +1133,9 @@ npc_remove_ability :: proc(db: ^lib.Db, args: []string) -> int {
 npc_list_abilities :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc list-abilities <npc_id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc list-abilities <npc_id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc list-abilities <npc_id>")
+			fmt.eprintln("Usage: ttrpg-engine npc list-abilities <npc_id>")
 		}
 		return 1
 	}
@@ -1153,9 +1153,9 @@ npc_list_abilities :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_cr :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-cr <id> <cr>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-cr <id> <cr>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-cr <id> <cr>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-cr <id> <cr>")
 		}
 		return 1
 	}
@@ -1183,9 +1183,9 @@ npc_set_cr :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_attack :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-attack <id> <bonus> <damage_dice> <damage_type>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-attack <id> <bonus> <damage_dice> <damage_type>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-attack <id> <bonus> <damage_dice> <damage_type>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-attack <id> <bonus> <damage_dice> <damage_type>")
 		}
 		return 1
 	}
@@ -1215,9 +1215,9 @@ npc_set_attack :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-initiative <id> <modifier>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-initiative <id> <modifier>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-initiative <id> <modifier>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-initiative <id> <modifier>")
 		}
 		return 1
 	}
@@ -1245,9 +1245,9 @@ npc_set_initiative :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-combat <id> <0|1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-combat <id> <0|1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-combat <id> <0|1>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-combat <id> <0|1>")
 		}
 		return 1
 	}
@@ -1283,9 +1283,9 @@ npc_set_combat :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_languages :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-languages <id> <csv>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-languages <id> <csv>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-languages <id> <csv>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-languages <id> <csv>")
 		}
 		return 1
 	}
@@ -1313,9 +1313,9 @@ npc_set_languages :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-passive-perception <id> <value>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-passive-perception <id> <value>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-passive-perception <id> <value>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-passive-perception <id> <value>")
 		}
 		return 1
 	}
@@ -1343,9 +1343,9 @@ npc_set_passive_perception :: proc(db: ^lib.Db, args: []string) -> int {
 npc_set_concentrating :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-concentrating <id> <spell_name_or_blank>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-concentrating <id> <spell_name_or_blank>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-concentrating <id> <spell_name_or_blank>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-concentrating <id> <spell_name_or_blank>")
 		}
 		return 1
 	}
@@ -1389,9 +1389,9 @@ get_npc_skill_ability_mod :: proc(npc: NpcStats, skill_name: string) -> int {
 npc_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-skill <npc_id> <skill_name> <proficiency_level>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-skill <npc_id> <skill_name> <proficiency_level>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc set-skill <npc_id> <skill_name> <proficiency_level>")
+			fmt.eprintln("Usage: ttrpg-engine npc set-skill <npc_id> <skill_name> <proficiency_level>")
 			fmt.eprintln("  proficiency_level: 0=none, 1=proficient, 2=expertise")
 		}
 		return 1
@@ -1438,9 +1438,9 @@ npc_set_skill :: proc(db: ^lib.Db, args: []string) -> int {
 npc_remove_skill :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent npc remove-skill <npc_id> <skill_name>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc remove-skill <npc_id> <skill_name>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent npc remove-skill <npc_id> <skill_name>")
+			fmt.eprintln("Usage: ttrpg-engine npc remove-skill <npc_id> <skill_name>")
 		}
 		return 1
 	}
@@ -1467,7 +1467,7 @@ npc_remove_skill :: proc(db: ^lib.Db, args: []string) -> int {
 
 npc_set_darkvision :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent npc set-darkvision <id> <range_in_feet>"}`) } else { fmt.eprintln("Usage: dnd-agent npc set-darkvision <id> <range_in_feet>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-darkvision <id> <range_in_feet>"}`) } else { fmt.eprintln("Usage: ttrpg-engine npc set-darkvision <id> <range_in_feet>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -1489,7 +1489,7 @@ npc_set_appearance :: proc(db: ^lib.Db, args: []string) -> int { return npc_set_
 
 npc_set_text_field :: proc(db: ^lib.Db, args: []string, column: string, label: string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(fmt.tprintf(`{"success":false,"error":"Usage: dnd-agent npc set-%s <id> <text>"}`, column)) } else { fmt.eprintln(fmt.tprintf("Usage: dnd-agent npc set-%s <id> <text>", column)) }
+		if db.is_json { fmt.println(fmt.tprintf(`{"success":false,"error":"Usage: ttrpg-engine npc set-%s <id> <text>"}`, column)) } else { fmt.eprintln(fmt.tprintf("Usage: ttrpg-engine npc set-%s <id> <text>", column)) }
 		return 1
 	}
 	id := strconv.atoi(args[1])
@@ -1509,7 +1509,7 @@ npc_set_text_field :: proc(db: ^lib.Db, args: []string, column: string, label: s
 
 npc_add_tool_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent npc add-tool-prof <npc_id> <tool_name>"}`) } else { fmt.eprintln("Usage: dnd-agent npc add-tool-prof <npc_id> <tool_name>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc add-tool-prof <npc_id> <tool_name>"}`) } else { fmt.eprintln("Usage: ttrpg-engine npc add-tool-prof <npc_id> <tool_name>") }
 		return 1
 	}
 	npc_id := strconv.atoi(args[1])
@@ -1525,7 +1525,7 @@ npc_add_tool_prof :: proc(db: ^lib.Db, args: []string) -> int {
 
 npc_remove_tool_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: dnd-agent npc remove-tool-prof <npc_id> <tool_name>"}`) } else { fmt.eprintln("Usage: dnd-agent npc remove-tool-prof <npc_id> <tool_name>") }
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc remove-tool-prof <npc_id> <tool_name>"}`) } else { fmt.eprintln("Usage: ttrpg-engine npc remove-tool-prof <npc_id> <tool_name>") }
 		return 1
 	}
 	npc_id := strconv.atoi(args[1])

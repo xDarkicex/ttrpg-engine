@@ -9,9 +9,9 @@ import sqlite "ext:sqlite3"
 item_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]")
+			fmt.eprintln("Usage: ttrpg-engine item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]")
 		}
 		return 1
 	}
@@ -109,9 +109,9 @@ get_inventory_column_name :: proc(target_type: string) -> (col: string, ok: bool
 inventory_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory add <char|npc|creature> <id> <item_id> <qty>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory add <char|npc|creature> <id> <item_id> <qty>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent inventory add <char|npc|creature> <id> <item_id> <qty>")
+			fmt.eprintln("Usage: ttrpg-engine inventory add <char|npc|creature> <id> <item_id> <qty>")
 		}
 		return 1
 	}
@@ -197,9 +197,9 @@ print_inventory :: proc(stmt: ^sqlite.Statement, is_json: bool) {
 inventory_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory get <char|npc|creature> <id>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory get <char|npc|creature> <id>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent inventory get <char|npc|creature> <id>")
+			fmt.eprintln("Usage: ttrpg-engine inventory get <char|npc|creature> <id>")
 		}
 		return 1
 	}
@@ -235,9 +235,9 @@ inventory_get :: proc(db: ^lib.Db, args: []string) -> int {
 inventory_remove :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory remove <char|npc|creature> <id> <item_id> <qty>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory remove <char|npc|creature> <id> <item_id> <qty>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent inventory remove <char|npc|creature> <id> <item_id> <qty>")
+			fmt.eprintln("Usage: ttrpg-engine inventory remove <char|npc|creature> <id> <item_id> <qty>")
 		}
 		return 1
 	}
@@ -281,9 +281,9 @@ inventory_remove :: proc(db: ^lib.Db, args: []string) -> int {
 inventory_equip :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory equip <char|npc|creature> <id> <item_id> <0/1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory equip <char|npc|creature> <id> <item_id> <0/1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent inventory equip <char|npc|creature> <id> <item_id> <0/1>")
+			fmt.eprintln("Usage: ttrpg-engine inventory equip <char|npc|creature> <id> <item_id> <0/1>")
 		}
 		return 1
 	}
@@ -324,9 +324,9 @@ inventory_equip :: proc(db: ^lib.Db, args: []string) -> int {
 inventory_attune :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent inventory attune <char|npc|creature> <id> <item_id> <0/1>"}`)
+			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory attune <char|npc|creature> <id> <item_id> <0/1>"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent inventory attune <char|npc|creature> <id> <item_id> <0/1>")
+			fmt.eprintln("Usage: ttrpg-engine inventory attune <char|npc|creature> <id> <item_id> <0/1>")
 		}
 		return 1
 	}
