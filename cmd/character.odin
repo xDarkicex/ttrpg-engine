@@ -1068,6 +1068,7 @@ DamageArgs :: struct {
 	attack_or_save: string,
 	save_dc: int,
 	d20_roll: int,
+	source: string,
 }
 
 parse_damage_args :: proc(args: []string) -> DamageArgs {
@@ -1078,6 +1079,7 @@ parse_damage_args :: proc(args: []string) -> DamageArgs {
 	if len(args) >= 5 do d.attack_or_save = args[4]
 	if len(args) >= 6 do d.save_dc = strconv.atoi(args[5])
 	if len(args) >= 7 do d.d20_roll = strconv.atoi(args[6])
+	if len(args) >= 8 do d.source = args[7]
 	return d
 }
 
@@ -1633,9 +1635,9 @@ character_delete :: proc(db: ^lib.Db, args: []string) -> int {
 character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll] [source]"}`)
 		} else {
-			fmt.eprintln("Usage: dnd-agent character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
+			fmt.eprintln("Usage: dnd-agent character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll] [source]")
 		}
 		return 1
 	}
@@ -1721,13 +1723,17 @@ character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if db.is_json {
 		fmt.printf(
-			`{{"success":true,"id":%d,"damage_applied":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"attack_hit":%t,"save_success":%t,"save_log":"%s"}}`,
-			char.id, final_dmg_applied, new_hp, char.max_hp, temp_hp, attack_hit, save_success, save_log,
+			`{{"success":true,"id":%d,"damage_applied":%d,"current_hp":%d,"max_hp":%d,"temp_hp":%d,"attack_hit":%t,"save_success":%t,"save_log":"%s","source":"%s","type":"%s"}}`,
+			char.id, final_dmg_applied, new_hp, char.max_hp, temp_hp, attack_hit, save_success, save_log, escape_json_string(d.source), d.damage_type,
 		)
 		fmt.println()
 	} else {
 		if len(save_log) > 0 do fmt.println(save_log)
-		fmt.printf("Character HP now: %d/%d (Temp HP: %d) (Took %d damage)\n", new_hp, char.max_hp, temp_hp, final_dmg_applied)
+		src_str := ""
+		if len(d.source) > 0 do src_str = fmt.tprintf(" from %s", d.source)
+		type_str := ""
+		if len(d.damage_type) > 0 do type_str = fmt.tprintf(" %s", d.damage_type)
+		fmt.printf("Character HP now: %d/%d (Temp HP: %d) (Took %d%s damage)%s\n", new_hp, char.max_hp, temp_hp, final_dmg_applied, type_str, src_str)
 		if new_hp == 0 {
 			fmt.println("Character is unconscious/dying!")
 		}
@@ -1738,7 +1744,7 @@ character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 character_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: dnd-agent character heal <id> <amount>"}`)
+			fmt.println(`{"success":false,"error":"Usage: dnd-agent character heal <id> <amount> [source]"}`)
 		} else {
 			fmt.eprintln("Usage: dnd-agent character heal <id> <amount>")
 		}
@@ -1746,6 +1752,8 @@ character_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 	id := strconv.atoi(args[1])
 	amt := strconv.atoi(args[2])
+	source := ""
+	if len(args) >= 4 do source = args[3]
 
 	char, found := fetch_character_stats(db, id)
 	if !found {
@@ -1771,10 +1779,12 @@ character_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	if db.is_json {
-		fmt.printf(`{{"success":true,"id":%d,"current_hp":%d,"max_hp":%d}}`, id, new_hp, char.max_hp)
+		fmt.printf(`{{"success":true,"id":%d,"current_hp":%d,"max_hp":%d,"source":"%s"}}`, id, new_hp, char.max_hp, escape_json_string(source))
 		fmt.println()
 	} else {
-		fmt.printf("Character HP now: %d/%d\n", new_hp, char.max_hp)
+		src_str := ""
+	if len(source) > 0 do src_str = fmt.tprintf(" (from %s)", source)
+	fmt.printf("Character HP now: %d/%d%s\n", new_hp, char.max_hp, src_str)
 	}
 	return 0
 }
