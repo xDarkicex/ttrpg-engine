@@ -40,15 +40,15 @@ jobs:
       - name: Build
         run: |
           ODIN_DIR=$(ls -d odin-* 2>/dev/null | head -1)
-          ./$ODIN_DIR/odin build . -collection:ext=./vendor -out:dnd-agent -define:SQLITE3_SYSTEM_LIB=true
+          ./$ODIN_DIR/odin build . -collection:ext=./vendor -out:ttrpg-engine -define:SQLITE3_SYSTEM_LIB=true
 
       - name: Package
-        run: tar -czvf dnd-agent-${{ matrix.target }}.tar.gz dnd-agent
+        run: tar -czvf ttrpg-engine-${{ matrix.target }}.tar.gz ttrpg-engine
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: dnd-agent-*.tar.gz
+          files: ttrpg-engine-*.tar.gz
 
   update-homebrew:
     needs: build
@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: xDarkicex/homebrew-dnd-agent
+          repository: xDarkicex/homebrew-ttrpg-engine
           path: homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           ref: main
@@ -66,10 +66,10 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           VERSION_NUM=${VERSION#v}
-          curl -sL https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-apple-darwin.tar.gz -o dnd-agent-apple-darwin.tar.gz
-          curl -sL https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-unknown-linux.tar.gz -o dnd-agent-unknown-linux.tar.gz
-          SHA_MAC=$(shasum -a 256 dnd-agent-apple-darwin.tar.gz | cut -d' ' -f1)
-          SHA_LINUX=$(shasum -a 256 dnd-agent-unknown-linux.tar.gz | cut -d' ' -f1)
+          curl -sL https://github.com/xDarkicex/ttrpg-engine/releases/download/v${VERSION_NUM}/ttrpg-engine-apple-darwin.tar.gz -o ttrpg-engine-apple-darwin.tar.gz
+          curl -sL https://github.com/xDarkicex/ttrpg-engine/releases/download/v${VERSION_NUM}/ttrpg-engine-unknown-linux.tar.gz -o ttrpg-engine-unknown-linux.tar.gz
+          SHA_MAC=$(shasum -a 256 ttrpg-engine-apple-darwin.tar.gz | cut -d' ' -f1)
+          SHA_LINUX=$(shasum -a 256 ttrpg-engine-unknown-linux.tar.gz | cut -d' ' -f1)
           echo "SHA_MAC=$SHA_MAC" >> $GITHUB_ENV
           echo "SHA_LINUX=$SHA_LINUX" >> $GITHUB_ENV
           echo "VERSION_NUM=$VERSION_NUM" >> $GITHUB_ENV
@@ -81,25 +81,25 @@ jobs:
           SHA_LINUX: ${{ env.SHA_LINUX }}
         run: |
           mkdir -p homebrew-tap/Formula
-          cat > homebrew-tap/Formula/dnd-agent.rb << RUBY
+          cat > homebrew-tap/Formula/ttrpg-engine.rb << RUBY
           class DndAgent < Formula
             desc "D&D campaign management CLI"
-            homepage "https://github.com/xDarkicex/dnd-agent"
+            homepage "https://github.com/xDarkicex/ttrpg-engine"
             license "MIT"
             version "${VERSION_NUM}"
 
             on_macos do
-              url "https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-apple-darwin.tar.gz"
+              url "https://github.com/xDarkicex/ttrpg-engine/releases/download/v${VERSION_NUM}/ttrpg-engine-apple-darwin.tar.gz"
               sha256 "${SHA_MAC}"
             end
 
             on_linux do
-              url "https://github.com/xDarkicex/dnd-agent/releases/download/v${VERSION_NUM}/dnd-agent-unknown-linux.tar.gz"
+              url "https://github.com/xDarkicex/ttrpg-engine/releases/download/v${VERSION_NUM}/ttrpg-engine-unknown-linux.tar.gz"
               sha256 "${SHA_LINUX}"
             end
 
             def install
-              bin.install "dnd-agent"
+              bin.install "ttrpg-engine"
             end
           end
           RUBY
@@ -109,7 +109,7 @@ jobs:
           cd homebrew-tap
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add Formula/dnd-agent.rb
-          git commit -m "Update dnd-agent to v${{ github.ref_name }}"
-          git remote set-url origin https://xDarkicex:${HOMEBREW_TAP_TOKEN}@github.com/xDarkicex/homebrew-dnd-agent.git
+          git add Formula/ttrpg-engine.rb
+          git commit -m "Update ttrpg-engine to v${{ github.ref_name }}"
+          git remote set-url origin https://xDarkicex:${HOMEBREW_TAP_TOKEN}@github.com/xDarkicex/homebrew-ttrpg-engine.git
           git push

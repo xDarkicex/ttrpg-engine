@@ -1,5 +1,5 @@
 # Build artifacts
-dnd-agent
+ttrpg-engine
 *.exe
 
 # Database
