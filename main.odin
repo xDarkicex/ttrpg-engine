@@ -215,6 +215,19 @@ HELP_COMMANDS := []CommandHelp{
 			},
 		},
 		{
+			command = "party",
+			description = "Manage adventuring parties — group characters for collective movement, resting, and treasury.",
+			subcommands = []SubcommandHelp{
+				{"create", "<campaign_id> <name> [notes]", "Create a new adventuring party."},
+				{"add", "<party_id> <character_id>", "Add a character to a party."},
+				{"remove", "<character_id>", "Remove a character from their party."},
+				{"list", "<campaign_id>", "List parties and their members."},
+				{"rest", "<party_id> <short|long> [hit_dice_count]", "Rest all party members at once."},
+				{"move", "<party_id> <location_id>", "Move the entire party to a new location."},
+				{"treasury", "<party_id> <add|remove|set> <gold> <silver> <copper>", "Manage party shared treasury."},
+			},
+		},
+		{
 			command = "rest",
 			description = "Take a short or long rest to recover HP, hit dice, spell slots, and resources.",
 			subcommands = []SubcommandHelp{
@@ -312,6 +325,8 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_condition(db, args)
 		case "combat":
 			return route_combat(db, args)
+		case "party":
+			return route_party(db, args)
 		case "rest":
 			return route_rest(db, args)
 	case "location", "house", "shop", "encounter", "setpiece":
@@ -811,6 +826,27 @@ route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	case:
 		if db.is_json { fmt.println(`{"success":false,"error":"Unknown combat subcommand"}`) }
 		else { fmt.eprintln("Unknown combat subcommand:", args[0]) }
+		return 1
+	}
+}
+
+route_party :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 1 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine party <subcommand> ..."}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine party <subcommand> ...") }
+		return 1
+	}
+	switch args[0] {
+	case "create":   return cmd.party_create(db, args)
+	case "add":      return cmd.party_add(db, args)
+	case "remove":   return cmd.party_remove(db, args)
+	case "list":     return cmd.party_list(db, args)
+	case "rest":     return cmd.party_rest(db, args)
+	case "move":     return cmd.party_move(db, args)
+	case "treasury": return cmd.party_treasury(db, args)
+	case:
+		if db.is_json { fmt.println(`{"success":false,"error":"Unknown party subcommand"}`) }
+		else { fmt.eprintln("Unknown party subcommand:", args[0]) }
 		return 1
 	}
 }

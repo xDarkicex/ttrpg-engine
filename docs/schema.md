@@ -61,6 +61,7 @@ erDiagram
     campaigns ||--o{ story_actions : "logs"
     locations ||--o{ story_actions : "logs"
     story_actions ||--o{ story_action_actors : "actor"
+    campaigns ||--o{ parties : "has"
     campaigns ||--o{ combat_encounters : "has"
     locations ||--o{ combat_encounters : "locale"
     combat_encounters ||--o{ combat_participants : "participants"
@@ -564,7 +565,24 @@ Existing table, now with sub-location support and restricted access.
   * `restricted`: `INTEGER DEFAULT 0` (Access restriction flag) — *v15*
   * `restricted_until`: `TEXT DEFAULT ''` (e.g. `24/7`, `open_hours`, `1492-03-15`) — *v15*
 
-### 28. `combat_encounters` & `combat_participants` (v19)
+### 28. `parties` (v19)
+
+Groups characters into adventuring parties with shared location, treasury, and collective operations (rest, move).
+
+* **`parties` Table**:
+  * `id`: `INTEGER` (PRIMARY KEY)
+  * `campaign_id`: `INTEGER` (REFERENCES `campaigns(id)` ON DELETE CASCADE)
+  * `name`: `TEXT NOT NULL`
+  * `location_id`: `INTEGER` (REFERENCES `locations(id)` ON DELETE SET NULL)
+  * `treasury_gold`: `INTEGER DEFAULT 0`
+  * `treasury_silver`: `INTEGER DEFAULT 0`
+  * `treasury_copper`: `INTEGER DEFAULT 0`
+  * `notes`: `TEXT DEFAULT ''`
+  * **Constraints**: `UNIQUE(campaign_id, name)`
+
+Characters link to a party via `characters.party_id` (added in v19) or the legacy `party` text field (synced by `party add`). Use `party rest` and `party move` for single-command group operations. Parties appear in `get-story-state` JSON and text output.
+
+### 29. `combat_encounters` & `combat_participants` (v19)
 
 Full D&D 5e combat tracking integrated into the engine. Encounters are owned by a campaign, optionally at a location, and track round/turn state. Participants are characters, NPCs, or creatures with initiative-based turn order.
 

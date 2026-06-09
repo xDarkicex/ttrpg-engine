@@ -17,7 +17,7 @@ ttrpg-engine models your tabletop world as a **relational database** — every t
 
 **The combat engine.** Turn-based D&D 5e combat lives inside the database. `combat start`, `combat join`, `combat init` set up the encounter. `combat attack` resolves attack rolls against AC, `combat damage` applies damage with automatic resistance/vulnerability/immunity. `combat save` handles saving throws with proficiency bonuses. `combat next` advances turns, resets reactions each round. Death saves, concentration, conditions, reactions, and ready actions are all tracked. The combat snapshot appears in `get-story-state` — the AI always knows who's up, what HP everyone has, and what conditions are active.
 
-**The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have personal faction standings, and campaigns track party-wide institutional faction reputation — a faction can hate one PC but still mark the party as hostile for the group's actions. Houses have residents. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
+**The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have personal faction standings, and campaigns track party-wide institutional faction reputation — a faction can hate one PC but still mark the party as hostile for the group's actions. Houses have residents. Characters group into parties with shared treasury and location. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
 
 **Built for AI pipelines.** Every command emits `--json` output for piping into LLM agents, Discord bots, or automation scripts. The schema is designed so an AI can call `get-story-state`, receive the full world snapshot (locations tree with all entities present, active quests, recent journal entries, faction standings, story log), and immediately begin DMing with full context. No warm-up, no context-stuffing — one query, everything it needs.
 
@@ -592,7 +592,7 @@ Manage the campaign world, track sessions, log story events, write session recap
   ```bash
   ./ttrpg-engine campaign get-story-state <campaign_id> [--json]
   ```
-  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), factions, NPC relationships, character faction standings, party faction standings, active combat encounter with turn order/HP/conditions, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
+  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), factions, NPC relationships, character faction standings, party faction standings, parties with members and treasury, active combat encounter with turn order/HP/conditions, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
 
 ---
 
@@ -777,7 +777,44 @@ Enforce items configurations and map item ownership, equipment, and attunement s
 
 ---
 
-### 16. Combat Engine
+### 16. Party Management
+
+Group characters into adventuring parties for collective movement, resting, and treasury management. Parties appear in `get-story-state`.
+
+- **Create Party**:
+  ```bash
+  ./ttrpg-engine party create <campaign_id> <name> [notes]
+  ```
+- **Add Character to Party**:
+  ```bash
+  ./ttrpg-engine party add <party_id> <character_id>
+  ```
+  *Also updates the character's party text field for backward compatibility.*
+- **Remove Character from Party**:
+  ```bash
+  ./ttrpg-engine party remove <character_id>
+  ```
+- **List Parties and Members**:
+  ```bash
+  ./ttrpg-engine party list <campaign_id> [--json]
+  ```
+- **Rest Entire Party**:
+  ```bash
+  ./ttrpg-engine party rest <party_id> <short|long> [hit_dice_count]
+  ```
+- **Move Entire Party**:
+  ```bash
+  ./ttrpg-engine party move <party_id> <location_id>
+  ```
+  *Moves all members and the party record to the new location at once.*
+- **Manage Party Treasury**:
+  ```bash
+  ./ttrpg-engine party treasury <party_id> <add|remove|set> <gold> <silver> <copper>
+  ```
+
+---
+
+### 17. Combat Engine
 
 Full D&D 5e turn-based combat tracking with attack resolution, damage application, saving throws, initiative, conditions, death saves, and reactions.
 

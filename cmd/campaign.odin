@@ -813,6 +813,45 @@ print_json_npc_relationships :: proc(db: ^lib.Db, campaign_id: int) {
 	fmt.print(strings.to_string(builder))
 }
 
+print_json_parties :: proc(db: ^lib.Db, campaign_id: int) {
+	stmt: ^sqlite.Statement
+	parties_sql := fmt.tprintf("SELECT id, name, notes, COALESCE(location_id,0), treasury_gold, treasury_silver, treasury_copper FROM parties WHERE campaign_id=%d ORDER BY name", campaign_id)
+	parties_c := cstring(raw_data(parties_sql))
+	if sqlite.prepare(db.ptr, parties_c, i32(len(parties_sql)), &stmt, nil) != .Ok { fmt.print("[]"); return }
+	defer sqlite.finalize(stmt)
+
+	fmt.print("[")
+	first := true
+	for sqlite.step(stmt) == .Row {
+		if !first do fmt.print(",")
+		first = false
+		pid := int(sqlite.column_int(stmt, 0))
+		pname := column_text_safe(stmt, 1)
+		pnotes := column_text_safe(stmt, 2)
+		ploc := int(sqlite.column_int(stmt, 3))
+		pgold := int(sqlite.column_int(stmt, 4))
+		psilver := int(sqlite.column_int(stmt, 5))
+		pcopper := int(sqlite.column_int(stmt, 6))
+
+		fmt.printf(`{"id":%d,"name":"%s","notes":"%s","location_id":%d,"treasury":{"gold":%d,"silver":%d,"copper":%d},"members":[`, pid, escape_json_string(pname), escape_json_string(pnotes), ploc, pgold, psilver, pcopper)
+
+		mem_stmt: ^sqlite.Statement
+		mem_sql := fmt.tprintf("SELECT id, name, current_hp, max_hp, ac FROM characters WHERE party_id=%d ORDER BY name", pid)
+		mem_c := cstring(raw_data(mem_sql))
+		if sqlite.prepare(db.ptr, mem_c, i32(len(mem_sql)), &mem_stmt, nil) == .Ok {
+			first_mem := true
+			for sqlite.step(mem_stmt) == .Row {
+				if !first_mem do fmt.print(",")
+				first_mem = false
+				fmt.printf(`{"id":%d,"name":"%s","hp":%d,"max_hp":%d,"ac":%d}`, int(sqlite.column_int(mem_stmt, 0)), escape_json_string(column_text_safe(mem_stmt, 1)), int(sqlite.column_int(mem_stmt, 2)), int(sqlite.column_int(mem_stmt, 3)), int(sqlite.column_int(mem_stmt, 4)))
+			}
+			sqlite.finalize(mem_stmt)
+		}
+		fmt.print("]}")
+	}
+	fmt.print("]")
+}
+
 print_json_factions :: proc(db: ^lib.Db, campaign_id: int) {
 	stmt: ^sqlite.Statement
 	sql_str := "SELECT id, name, description FROM factions ORDER BY id"
@@ -1034,6 +1073,8 @@ campaign_get_story_state :: proc(db: ^lib.Db, args: []string) -> int {
 		print_json_quests_for_state(db, campaign_id)
 		fmt.print(`,"locations_tree":`)
 		print_json_locations_tree(db, campaign_id)
+		fmt.print(`,"parties":`)
+		print_json_parties(db, campaign_id)
 		fmt.print(`,"factions":`)
 		print_json_factions(db, campaign_id)
 		fmt.print(`,"npc_relationships":`)
@@ -1702,6 +1743,42 @@ print_text_npc_relationships :: proc(db: ^lib.Db, campaign_id: int) {
 }
 
 // Text-mode helpers for location tree display.
+
+print_text_parties :: proc(db: ^lib.Db, campaign_id: int) {
+	fmt.println("--------------------------------------------------------------------------------")
+	fmt.println("PARTIES")
+	fmt.println("--------------------------------------------------------------------------------")
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT id, name, notes, COALESCE(location_id,0), treasury_gold, treasury_silver, treasury_copper FROM parties WHERE campaign_id=%d ORDER BY name", campaign_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) == .Ok {
+		defer sqlite.finalize(stmt)
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			pid := int(sqlite.column_int(stmt, 0))
+			pname := column_text_safe(stmt, 1)
+			pnotes := column_text_safe(stmt, 2)
+			pgold := int(sqlite.column_int(stmt, 4))
+			psilver := int(sqlite.column_int(stmt, 5))
+			pcopper := int(sqlite.column_int(stmt, 6))
+			fmt.printf("  %s (ID: %d)\n", pname, pid)
+			if len(pnotes) > 0 do fmt.printf("    Notes: %s\n", pnotes)
+			fmt.printf("    Treasury: %d gp, %d sp, %d cp\n", pgold, psilver, pcopper)
+			mem_stmt: ^sqlite.Statement
+			mem_sql := fmt.tprintf("SELECT name, current_hp, max_hp, ac FROM characters WHERE party_id=%d ORDER BY name", pid)
+			mem_c := cstring(raw_data(mem_sql))
+			if sqlite.prepare(db.ptr, mem_c, i32(len(mem_sql)), &mem_stmt, nil) == .Ok {
+				for sqlite.step(mem_stmt) == .Row {
+					fmt.printf("    - %s  HP:%d/%d AC:%d\n", column_text_safe(mem_stmt, 0), int(sqlite.column_int(mem_stmt, 1)), int(sqlite.column_int(mem_stmt, 2)), int(sqlite.column_int(mem_stmt, 3)))
+				}
+				sqlite.finalize(mem_stmt)
+			}
+		}
+		if !has_any do fmt.println("  No parties defined.")
+	}
+	fmt.println()
+}
 
 print_text_sub_locations :: proc(db: ^lib.Db, location_id: int, indent: string) {
 	stmt: ^sqlite.Statement
