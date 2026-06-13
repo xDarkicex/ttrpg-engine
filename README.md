@@ -61,7 +61,8 @@ odin build . -file -collection:ext=./vendor -out:ttrpg-engine
 2. [Installation & Build](#installation--build)
 3. [Database Schema](#database-schema)
 4. [Global Output Flags](#global-output-flags)
-5. [CLI Command Reference](#cli-command-reference)
+5. [Dice Notation](#dice-notation)
+6. [CLI Command Reference](#cli-command-reference)
    - [Characters & Multiclassing](#1-characters--multiclassing)
    - [Vitals & Resting Setters](#2-vitals--resting-setters)
    - [Combat Stats & Spellcasting](#3-combat-stats--spellcasting)
@@ -77,8 +78,14 @@ odin build . -file -collection:ext=./vendor -out:ttrpg-engine
    - [Factions & Standings](#13-factions--standings)
    - [Spells & Features](#14-spells--features)
    - [Items & Inventory Management](#15-items--inventory-management)
-6. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
-7. [Example Walkthrough Scenario](#example-walkthrough-scenario)
+   - [Shop & Economy](#16-shop--economy)
+   - [Player Trading](#17-player-trading)
+   - [Party Management](#18-party-management)
+   - [Combat Engine](#19-combat-engine)
+   - [Time, Calendar & Decay](#20-time-calendar--decay)
+   - [Wanted & Crime System](#21-wanted--crime-system)
+7. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
+8. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
 ---
 
@@ -111,6 +118,31 @@ The CLI supports two output modes:
 ```bash
 ./ttrpg-engine character list --json
 ```
+
+---
+
+## Dice Notation
+
+All damage, healing, attack rolls, saving throws, initiative, and hit dice values accept **dice specs** instead of plain integers. The engine rolls cryptographically secure random numbers internally.
+
+**Format:** `[count]d<sides>[+modifier]` with optional suffixes:
+
+| Example | Meaning |
+|---|---|
+| `d20` | Roll 1d20 |
+| `2d6+3` | Roll 2d6, add 3 |
+| `8d6` | Roll 8d6 (Fireball) |
+| `4d8+5` | Roll 4d8, add 5 |
+| `d20+5` | Roll 1d20, add 5 |
+| `1d20+3` | Roll initiative (d20 + DEX mod) |
+| `4d6k3` | Roll 4d6, keep highest 3 |
+| `4d6d1` | Roll 4d6, drop lowest 1 |
+| `3d6!` | Roll 3d6, exploding (reroll on max) |
+| `2d20r1` | Roll 2d20, reroll 1s |
+| `5d10t8` | Roll 5d10, count successes ≥ 8 |
+| `4dF` | Roll 4 Fudge dice |
+
+Every command that previously accepted a raw integer now accepts a dice spec. The engine parses the spec, rolls with cryptographically secure RNG, and uses the total.
 
 ---
 
@@ -161,17 +193,19 @@ Manage combat conditions, resting metrics, and temporary states.
 
 - **Apply Combat Damage (Depletes Temporary HP first)**:
   ```bash
-  ./ttrpg-engine character damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]
+  ./ttrpg-engine character damage <id> <dice_spec> [damage_type] [attack_or_save] [save_dc] [d20_roll]
   ```
-  *Handles evasion feats, races, resistances, vulnerabilities, immunities, and saving throw modifier calculations automatically.*
+  *`dice_spec` is a dice expression like `2d6+3` or `8d6`. The `attack_or_save` argument accepts dice specs (e.g. `d20+5`) for attack rolls, or save ability names (str/dex/con/int/wis/cha) for saving throws. Handles evasion feats, races, resistances, vulnerabilities, immunities, and saving throw modifier calculations automatically.*
 - **Apply Healing**:
   ```bash
-  ./ttrpg-engine character heal <id> <amount>
+  ./ttrpg-engine character heal <id> <dice_spec> [source]
   ```
+  *`dice_spec` is a dice expression like `3d8+5`. Heals up to max HP.*
 - **Set Temporary Hit Points**:
   ```bash
-  ./ttrpg-engine character set-temp-hp <id> <amount>
+  ./ttrpg-engine character set-temp-hp <id> <dice_spec>
   ```
+  *`dice_spec` is a dice expression like `2d6+3`.*
 - **Set Death Saving Throws**:
   ```bash
   ./ttrpg-engine character set-death-saves <id> <successes_count> <failures_count>
@@ -322,7 +356,7 @@ Track custom class resource pools (Rage, Ki, Sorcery Points) and spell slots.
   ```bash
   ./ttrpg-engine rest short <character_id> <hit_dice_count>
   ```
-  *Heals hit_dice_count × (avg_hit_die + CON_mod). Resets short-rest resources, decrements available short rests, clears rest-duration conditions. Hit die size determined by character class (d6→4, d8→5, d10→6, d12→7 average).*
+  *Rolls `hit_dice_count` hit dice (largest available from character class) with CON modifier per die. Resets short-rest resources, decrements available short rests, clears rest-duration conditions.*
 - **Long Rest (Full recovery)**:
   ```bash
   ./ttrpg-engine rest long <character_id>
@@ -362,9 +396,10 @@ Track character companions, mounts, pets, and familiars.
   ```
 - **Damage/Heal Companion**:
   ```bash
-  ./ttrpg-engine companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]
-  ./ttrpg-engine companion heal <id> <amount>
+  ./ttrpg-engine companion damage <id> <dice_spec> [damage_type] [attack_or_save] [save_dc] [d20_roll]
+  ./ttrpg-engine companion heal <id> <dice_spec>
   ```
+  *`dice_spec` is a dice expression like `2d6+3`. Supports resistances, vulnerabilities, and immunities.*
 
 ---
 
@@ -449,11 +484,24 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ./ttrpg-engine npc set-personality-traits <id> <text>
   ./ttrpg-engine npc set-appearance <id> <text>
   ```
+- **Damage/Heal NPC**:
+  ```bash
+  ./ttrpg-engine npc damage <id> <dice_spec> [damage_type] [attack_or_save] [save_dc] [d20_roll]
+  ./ttrpg-engine npc heal <id> <dice_spec>
+  ```
+  *`dice_spec` is a dice expression like `2d6+3`. Supports resistances, vulnerabilities, and immunities.*
 - **Manage NPC Tool Proficiencies** (e.g. `smith's tools`, `herbalism kit`):
   ```bash
   ./ttrpg-engine npc add-tool-prof <npc_id> <tool_name>
   ./ttrpg-engine npc remove-tool-prof <npc_id> <tool_name>
   ```
+- **Character↔NPC Standing**:
+  ```bash
+  ./ttrpg-engine npc set-char-standing <npc_id> <character_id> <standing> [notes]
+  ./ttrpg-engine npc get-char-standing <character_id> [npc_id]
+  ```
+  *Track individual reputation between a player character and an NPC. Standing ranges from -100 (hated) to +100 (trusted). Affects haggle DCs, shop prices, and access checks. Decays over time (14-day half-life) — reset by any interaction or by calling `set-char-standing`. If `npc_id` is omitted from `get-char-standing`, returns all standings for that character.*
+
 
 ---
 
@@ -475,9 +523,10 @@ Manage active monsters, beasts, and campaign enemies. Supports ability scores, l
   *Displays HP, AC, linked campaign/location, full ability scores, loot currency, abilities, and inventory items.*
 - **Apply Combat Damage/Healing**:
   ```bash
-  ./ttrpg-engine creature damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]
-  ./ttrpg-engine creature heal <id> <amount>
+  ./ttrpg-engine creature damage <id> <dice_spec> [damage_type] [attack_or_save] [save_dc] [d20_roll]
+  ./ttrpg-engine creature heal <id> <dice_spec>
   ```
+  *`dice_spec` is a dice expression like `2d6+3`. Supports resistances, vulnerabilities, and immunities.*
 - **Configure Creature Ability Scores**:
   ```bash
   ./ttrpg-engine creature set-stats <id> <str> <dex> <con> <int> <wis> <cha>
@@ -557,7 +606,22 @@ Manage the campaign world, track sessions, log story events, write session recap
   ```bash
   ./ttrpg-engine campaign set-time <campaign_id> <in_game_day> <time_of_day> <season>
   ```
-  *Example: `ttrpg-engine campaign set-time 1 42 evening autumn` — it is day 42, evening, in autumn.*
+  *Example: `ttrpg-engine campaign set-time 1 42 evening autumn` — it is day 42, evening, in autumn. This is the legacy command; prefer `set-calendar` for full date control.*
+- **Advance Time**:
+  ```bash
+  ./ttrpg-engine campaign advance-time <campaign_id> <hours>
+  ```
+  *Tick the in-game clock forward by N hours. Auto-expires hour-based conditions. Recomputes all derived calendar fields.*
+- **Set Calendar (DM Override)**:
+  ```bash
+  ./ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>
+  ```
+  *Absolute date/time override — supports rewind (shows warning) and fast-forward.*
+- **Get Current Time**:
+  ```bash
+  ./ttrpg-engine campaign get-time <campaign_id> [--json]
+  ```
+  *Display full calendar state: year, month, day, hour, time of day, season, total day count.*
 - **Set Private DM Notes**:
   ```bash
   ./ttrpg-engine campaign set-dm-notes <campaign_id> <text>
@@ -703,6 +767,7 @@ Configure factions and standings metrics.
   ```bash
   ./ttrpg-engine faction get-standing <character_id> [faction_id]
   ```
+  *Displays both raw standing and decay-adjusted value. Standing decays toward zero over time (14-day half-life) — every `set-standing` call resets the decay timer.*
 - **Set Party Standing** (institutional party-wide reputation):
   ```bash
   ./ttrpg-engine faction set-party-standing <campaign_id> <faction_id> <standing> [notes]
@@ -775,9 +840,92 @@ Enforce items configurations and map item ownership, equipment, and attunement s
 
 ---
 
+
+### 16. Shop & Economy
+
+Browse shop inventory, stock items with custom prices, buy and sell with full currency exchange. Shops have their own treasuries — they gain coins when characters buy and lose coins when they buy items back. Linked to an owner NPC via `npc_id`.
+
+**Shop scale** (`low`, `mid`, `high`, `luxury`) controls three mechanics automatically:
+
+| Scale | Auto-treasury | Buyback rate | Max item value |
+|---|---|---|---|
+| `low` | 50 gp | 30% | 50 gp |
+| `mid` | 500 gp | 50% | 500 gp |
+| `high` | 2,000 gp | 60% | 5,000 gp |
+| `luxury` | 10,000 gp | 70% | no limit |
+
+*The DM can override the auto-treasury with `shop add-money` / `shop remove-money` at any time.*
+
+- **Browse Shop Inventory**:
+  ```bash
+  ./ttrpg-engine shop browse <shop_id> [--json]
+  ```
+  *Lists all items in stock with quantities and per-unit prices. Price shows the shop’s custom price if set, otherwise the item’s base `value_gp`.*
+
+- **Stock Items (DM)**:
+  ```bash
+  ./ttrpg-engine shop stock <shop_id> <item_id> <quantity> [price_gp]
+  ```
+  *Add or replace item stock in a shop. If `price_gp` is omitted or 0, the item’s base `value_gp` is used.*
+
+- **Purchase from Shop**:
+  ```bash
+  ./ttrpg-engine shop buy <shop_id> <char_id> <item_id> <quantity> [--json]
+  ```
+  *Character buys items. Auto-deducts coins from character (pp→gp→ep→sp→cp, largest first), credits shop treasury. Enforces the shop's max item value by scale. Validates sufficient stock and funds. Returns exit code 1 on failure.*
+
+- **Sell to Shop**:
+  ```bash
+  ./ttrpg-engine shop sell <shop_id> <char_id> <item_id> <quantity> [--json]
+  ```
+  *Character sells items at the shop's scale-based buyback rate (30%–70% of base `value_gp`). Shop pays from its treasury — if the shop can’t afford the buyback, the sale is rejected with exit code 1. Removed from character inventory, restocked in shop.*
+
+- **Manage Shop Treasury (DM)**:
+  ```bash
+  ./ttrpg-engine shop add-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]
+  ./ttrpg-engine shop remove-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]
+  ```
+  *Seed or drain a shop’s operating funds. Multi-denomination — the engine converts and distributes across coin types automatically.*
+
+- **View Shop Details**:
+  ```bash
+  ./ttrpg-engine shop get <shop_id> [--json]
+  ```
+  *Displays shop name, location, scale, open hours, proprietor NPC, and current treasury breakdown.*
+
+- **Haggle for a Discount**:
+  ```bash
+  ./ttrpg-engine shop haggle <shop_id> <char_id> <item_id> <quantity> <discount_pct> [--json]
+  ```
+  *Attempt a Persuasion (CHA) check to negotiate a discount with the shop owner. **3 attempts per shop per in-game day.** DC escalates with each failure, and a critical fail (miss by 10+) damages reputation with the NPC. On success, the item is purchased automatically at the discounted price — coins are deducted from the character and credited to the shop treasury.*
+
+  | Mechanic | Detail |
+  |---|---|
+  | DC formula | `10 + discount%/5 + fail_streak×2 − standing/20` |
+  | Success | Pays `price × (100 − discount%) / 100` |
+  | Failure | `fail_streak++`, 1 attempt burned, DC rises |
+  | Critical fail (by ≥ 10) | Standing with NPC reduced by 1d4 |
+  | 3 failures | NPC refuses further haggling for the day |
+  | Standing bonus | Every +20 standing reduces DC by 1 |
+
+  *Example: `ttrpg-engine shop haggle 1 3 2 1 20` — character #3 tries for 20% off item #2 at shop #1.*
+
+### 17. Player Trading
+
+Atomic item-and-coin transfers between two player characters. Both participants must exist and the sender must own the item.
+
+- **Trade Between Characters**:
+  ```bash
+  ./ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]
+  ```
+  *Transfers the item from sender to recipient. Optional coin amounts (any combination of gp/sp/cp/pp/ep) are deducted from sender and credited to recipient in the same atomic operation.*
+
+  *Example: `ttrpg-engine trade 1 2 3 1 10 0 0` — Aria sends item #3 plus 10gp to Bran.*
+
+---
 ---
 
-### 16. Party Management
+### 18. Party Management
 
 Group characters into adventuring parties for collective movement, resting, and treasury management. Parties appear in `get-story-state`.
 
@@ -814,9 +962,11 @@ Group characters into adventuring parties for collective movement, resting, and 
 
 ---
 
-### 17. Combat Engine
+### 19. Combat Engine
 
-Full D&D 5e turn-based combat tracking with attack resolution, damage application, saving throws, initiative, conditions, death saves, and reactions.
+Full D&D 5e turn-based combat with action economy enforcement, spell slot tracking, weapon auto-lookup, skill checks, concentration auto-rolls, and feature resource consumption. All dice values are dice specs — the engine rolls cryptographically secure random numbers internally.
+
+#### Encounter Lifecycle
 
 - **Start Combat**:
   ```bash
@@ -824,47 +974,101 @@ Full D&D 5e turn-based combat tracking with attack resolution, damage applicatio
   ```
 - **Add Participants**:
   ```bash
-  ./ttrpg-engine combat join <encounter_id> <char|npc|creature> <id> <initiative_roll> [initiative_mod] [position]
+  ./ttrpg-engine combat join <encounter_id> <char|npc|creature> <id> <dice_spec> [initiative_mod] [position]
   ./ttrpg-engine combat join-all <encounter_id>
   ```
+  *`dice_spec` is an initiative expression like `1d20+3` or `d20`.*
 - **Lock Turn Order**:
   ```bash
   ./ttrpg-engine combat init <encounter_id>
   ```
+  *Sorts participants by initiative roll (descending), then initiative mod (descending). Sets round 1, turn 0.*
 - **Advance Turn**:
   ```bash
   ./ttrpg-engine combat next <encounter_id>
   ```
-- **Resolve Attack (roll vs AC)**:
+  *Advances to next turn. Resets action_used, bonus_action_used, attacks_used, and movement_used for the incoming actor. Resets reactions for all participants on round wrap. Auto-reports who's up next.*
+- **View Combat Status**:
   ```bash
-  ./ttrpg-engine combat attack <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <attack_roll> [ability] [adv|disadv]
+  ./ttrpg-engine combat status <encounter_id> [--json]
   ```
-  *Auto-computes attack modifier (proficiency + ability mod for characters, attack_bonus for NPCs/creatures). Includes cover bonus from target position.*
-- **Apply Damage**:
+  *Full turn order with HP/AC/position, action economy flags ([action] [BA] [react] [readied]), and current-actor marker.*
+- **End Combat**:
   ```bash
-  ./ttrpg-engine combat damage <encounter_id> <target_type> <target_id> <amount> <type> [source]
+  ./ttrpg-engine combat end <encounter_id>
   ```
-  *Auto-applies resistance (half), vulnerability (double), immunity (zero). Depletes temp HP first. Tracks concentration break DC, handles death at 0 HP.*
+  *Archives encounter, clears combat flags on all character participants.*
+
+#### Actions (enforce action economy)
+
+The engine enforces 5e action economy: one action (with Extra Attack / Multiattack), one bonus action, one reaction per round. The `attacks_used` counter is compared against `multiattack_count` (creatures/NPCs, default 1; characters default 1 — increase via `combat use-feature` for Extra Attack).
+
+- **Attack (roll vs AC)**:
+  ```bash
+  ./ttrpg-engine combat attack <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <dice_spec> [ability] [adv|disadv]
+  ```
+  *`dice_spec` is a d20 expression like `d20` or `d20+5`. Auto-computes attack modifier (proficiency + ability mod + attack_bonus for NPCs/creatures). Adds cover bonus from target position. Marks action_used, increments attacks_used. Rejects if no actions remain.*
+
+- **Strike (attack + damage, weapon auto-lookup)**:
+  ```bash
+  ./ttrpg-engine combat strike <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> [ability] [bonus|ba]
+  ```
+  *One-command weapon attack. Auto-looks up the actor's equipped weapon from inventory: reads damage dice, damage type, magic bonus. Determines ability (STR for melee, DEX for ranged/finesse). Rolls d20 + mod + proficiency + magic vs AC. On hit: rolls weapon damage + ability mod + magic bonus, applies resistance/vulnerability/immunity, drains temp HP, auto-rolls concentration save, marks death at 0 HP. Falls back to unarmed strike (1 + STR bludgeoning) if no weapon equipped. Use `bonus` or `ba` as 7th argument for bonus-action attacks (e.g. off-hand).*
+
+- **Cast a Spell**:
+  ```bash
+  ./ttrpg-engine combat cast <encounter_id> <caster_type> <caster_id> <spell_name> <slot_level> <target_type> <target_id> [save_ability] [dice_spec] [dc_override]
+  ```
+  *For characters: verifies spell is known and prepared, checks spell slots, consumes a slot. For all casters: uses character's spell_attack_bonus / spell_save_dc, or computes DC (8 + prof + best mental mod) for NPCs/creatures. If `save_ability` given (str/dex/con/int/wis/cha): target rolls save vs caster's DC. Otherwise: rolls spell attack vs target AC. Auto-tracks concentration if the spell's duration contains "Concentration".*
+
+- **Apply Damage (manual)**:
+  ```bash
+  ./ttrpg-engine combat damage <encounter_id> <target_type> <target_id> <dice_spec> <type> [source]
+  ```
+  *`dice_spec` is a damage expression like `2d6+3` or `8d6`. Auto-applies resistance (half), vulnerability (double), immunity (zero). Depletes temp HP first. Auto-rolls concentration save if target is concentrating. Handles death at 0 HP (unconscious for characters, killed for NPCs/creatures).*
+
+- **Use a Feature / Class Ability**:
+  ```bash
+  ./ttrpg-engine combat use-feature <encounter_id> <actor_type> <actor_id> <feature_name>
+  ```
+  *Activates a class feature or monster ability. Auto-matches feature to resource pool by naming convention (Rage → "Rage", Ki/Flurry of Blows → "Ki Points", Action Surge → "Action Surge", Second Wind → "Second Wind", Channel Divinity → "Channel Divinity", Bardic Inspiration, Sorcery Points, Wild Shape, etc.). Decrements resource by 1. Applies mechanical effects for known features:*
+  - **Rage**: adds "rage" to status_effects (B/P/S resistance, +2 STR damage)
+  - **Action Surge**: resets action_used and attacks_used (grants an extra action)
+  - **Second Wind**: auto-heals 1d10 + character level
+  - **Ki / Flurry / Patient Defense / Step of the Wind**: reports ki spent
+  - **Divine Smite**: notes that a spell slot must be consumed via `combat cast`
+
+- **Skill Check**:
+  ```bash
+  ./ttrpg-engine combat check <encounter_id> <actor_type> <actor_id> <skill_name> [dc] [contest_type] [contest_id]
+  ```
+  *Rolls d20 + ability mod + proficiency bonus × proficiency_level. Auto-maps skill to ability (Athletics→STR, Stealth→DEX, Perception→WIS, etc.). Supports both DC checks and contested rolls (grapple/shove — pass target actor as contest target).*
+
 - **Saving Throw**:
   ```bash
-  ./ttrpg-engine combat save <encounter_id> <actor_type> <actor_id> <ability> <save_roll> [dc] [adv|disadv]
+  ./ttrpg-engine combat save <encounter_id> <actor_type> <actor_id> <ability> <dice_spec> [dc] [adv|disadv]
   ```
-  *Applies ability mod + save proficiency (characters only) + cover bonus.*
+  *Rolls d20 + ability mod + save proficiency (characters only). Compares against DC.*
+
 - **Move/Position**:
   ```bash
   ./ttrpg-engine combat move <encounter_id> <actor_type> <actor_id> <position>
   ```
   *Positions: melee, ranged, cover, hidden, fleeing. Warns about opportunity attacks when leaving melee.*
+
 - **Death Saving Throw**:
   ```bash
-  ./ttrpg-engine combat death-save <character_id> <roll>
+  ./ttrpg-engine combat death-save <character_id> <dice_spec>
   ```
-  *Nat 20: regains 1 HP. Nat 1: 2 failures. 3 successes: stabilized. 3 failures: dead.*
-- **Use Reaction**:
+  *`dice_spec` is typically `d20`. Nat 20: regains 1 HP. Nat 1: 2 failures. 3 successes: stabilized. 3 failures: dead. Refuses if character HP > 0.*
+
+#### Reactions & Other
+
+- **Use Reaction** (1/round enforced):
   ```bash
   ./ttrpg-engine combat react <encounter_id> <actor_type> <actor_id> <reaction_type> [target_type] [target_id]
   ```
-- **Ready Action**:
+- **Ready Action** (marks action_used, stores trigger):
   ```bash
   ./ttrpg-engine combat ready <encounter_id> <actor_type> <actor_id> "<action>" <trigger>
   ```
@@ -872,18 +1076,178 @@ Full D&D 5e turn-based combat tracking with attack resolution, damage applicatio
   ```bash
   ./ttrpg-engine combat condition <encounter_id> <target_type> <target_id> <name> [duration_rounds] [save_dc] [save_ability]
   ```
-- **View Combat Status**:
-  ```bash
-  ./ttrpg-engine combat status <encounter_id> [--json]
-  ```
-  *Shows full turn order with HP/AC/position/flags for every participant.*
-- **End Combat**:
-  ```bash
-  ./ttrpg-engine combat end <encounter_id>
-  ```
-  *Archives encounter, clears combat flags on all character participants.*
+
+#### Action Economy Summary
+
+| Economy | Tracked? | Enforced? | Reset |
+|---|---|---|---|
+| Action | `action_used` flag | Yes — attack/strike/cast reject if used (unless multiattack) | `combat next` |
+| Extra Attack / Multiattack | `attacks_used` counter vs `multiattack_count` | Yes — rejects when attacks_used ≥ multiattack_count | `combat next` |
+| Bonus Action | `bonus_action_used` flag | Yes — "bonus"/"ba" arg on strike, enforced | `combat next` |
+| Reaction | `reaction_used` flag | Yes — react rejects if already used | Round wrap in `combat next` |
+| Movement | `movement_used` (integer, feet) | Tracked, not enforced | `combat next` |
+| Concentration | Auto-rolled on any damage > 0 | d20 + CON mod + prof vs DC = max(10, dmg/2) | Cleared on fail |
 
 ---
+
+### 20. Time, Calendar & Decay
+
+A unified time progression system with a 360-day Forgotten Realms calendar. All reputation and standing values decay over time toward zero (14-day half-life), encouraging characters to maintain relationships.
+
+**Calendar model:** `total_elapsed_hours` is the single source of truth — 7 fields derive from it:
+
+| Field | Derivation |
+|---|---|
+| `in_game_hour` | `total_hours % 24` |
+| `in_game_day_of_month` | `(total_hours / 24) % 30 + 1` |
+| `in_game_month` | `(total_hours / 720) % 12 + 1` |
+| `in_game_year` | `1492 + total_hours / 8640` |
+| `in_game_day` | `total_hours / 24` |
+| `in_game_time` | hour 6-11=morning, 12-17=afternoon, 18-21=evening, else=night |
+| `current_season` | month 1-3=winter, 4-6=spring, 7-9=summer, 10-12=autumn |
+
+- **Advance Time**:
+  ```bash
+  ./ttrpg-engine campaign advance-time <campaign_id> <hours>
+  ```
+  *Ticks the in-game clock forward by N hours. Auto-expires time-based conditions (duration_type='hours'). After advancing, all derived calendar fields are recomputed.*
+
+- **Set Calendar (DM Override)**:
+  ```bash
+  ./ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>
+  ```
+  *Sets the in-game date/time to an absolute value. Supports rewinding (shows a warning) and fast-forwarding. Useful for starting a new chapter, time-skips, or correcting mistakes.*
+
+- **View Current Time**:
+  ```bash
+  ./ttrpg-engine campaign get-time <campaign_id> [--json]
+  ```
+  *Displays the full calendar state: year, month, day, hour, time of day, season, total day count, and total elapsed hours.*
+
+- **Rest Auto-Advance**:
+  *Short rests automatically advance the clock by 1 hour. Long rests advance by 8 hours. No separate command needed — the rest commands handle it.*
+
+**Unified decay** applies to all reputation systems:
+
+| System | Decay trigger | Display |
+|---|---|---|
+| Faction standings | `faction set-standing` touches timestamp | `faction get-standing` shows raw + decayed |
+| Character↔NPC standings | `npc set-char-standing` and `shop haggle` touch timestamp | Decay computed at query time |
+| NPC↔NPC relationships | `npc set-relationship` touches timestamp | `can-enter` access checks use decayed score |
+| Wanted heat | `wanted crime` and `wanted set` touch timestamp | `wanted get` and `wanted list` show decayed heat |
+
+**Decay formula:** `standing × e^(-0.05 × days_elapsed)` — half-life of ~14 days. After 30 days without interaction, standing drops to ~22% of its original value.
+
+**Wanted heat decay** uses the same exponential curve, calculated per-hour: `heat × e^(-0.05/24 × hours_elapsed)`. The finer granularity prevents edge cases on day 0 (the first day of a campaign).
+
+
+### 21. Wanted & Crime System
+
+Track criminal heat per character/NPC, per faction (jurisdiction), per location. Wanted levels decay over time, inherit through the location hierarchy, and map to 0–5 narrative tiers the AI DM uses to describe guard behavior.
+
+**Design.** The system answers one question: "Who is wanted, where, by whom, and for what?" It was built as a world-consistency harness — the AI DM queries it to ground its narrative in canonical state rather than hallucinating jurisdictional boundaries across sessions.
+
+#### Core concepts
+
+| Concept | Description |
+|---|---|
+| **Heat points** | Internal simulation value (0–100+). Crimes add heat; time decays it. |
+| **Tier** | AI-facing narrative level (0–5), derived from heat. Each tier has a label and guard behavior. |
+| **Jurisdiction** | A faction that enforces law (e.g. "Waterdeep Watch", "Thieves' Guild"). Heat is per-faction — you can be Hunted by the Watch but Protected by the Guild. |
+| **Location** | Where the crime happened. Wanted levels propagate up the location tree — being wanted in a child location inherits from the parent unless explicitly overridden. |
+| **Crime log** | Immutable audit trail of every crime: who did what, where, when, and how much heat it added. |
+
+#### Tier mapping
+
+| Heat | Tier | Label | Guard behavior |
+|---|---|---|---|
+| 0 | 0 | Clean | Ignore |
+| 1–15 | 1 | Suspicious | Question |
+| 16–35 | 2 | Wanted | Detain |
+| 36–60 | 3 | Hunted | Attack on sight |
+| 61–85 | 4 | Infamous | Mobilize guards |
+| 86+ | 5 | Legendary Fugitive | Scry & strike |
+
+#### CLI reference
+
+- **Commit a Crime** (logs the crime AND auto-applies heat):
+  ```bash
+  ./ttrpg-engine wanted crime <char|npc> <actor_id> <faction_id> <location_id> <severity> <description>
+  ```
+  *Adds severity heat points to the actor's wanted level for that faction+location. Resets the decay timer. Logs the crime to the crime_log table. Severity is in heat points — typical values: petty theft 5, assault 15, murder 40, arson 25.*
+
+- **Get Wanted Status** (with decay and location inheritance):
+  ```bash
+  ./ttrpg-engine wanted get <char|npc> <actor_id> <faction_id> [location_id] [--json]
+  ```
+  *If `location_id` is given: walks the location parent chain to find the effective wanted level. Reports raw heat, decayed heat, tier, label, guard behavior, and whether the result was inherited from a parent location. If `location_id` is omitted: lists wanted entries across all locations for that actor+faction pair.*
+
+- **Set Heat Directly** (DM override):
+  ```bash
+  ./ttrpg-engine wanted set <char|npc> <actor_id> <faction_id> <location_id> <heat>
+  ```
+  *Overrides heat points to an exact value. Resets the decay timer to the current in-game hour.*
+
+- **Clear Wanted Level**:
+  ```bash
+  ./ttrpg-engine wanted clear <char|npc> <actor_id> <faction_id> <location_id>
+  ```
+  *Removes the wanted record entirely — the actor is clean at this location for this faction.*
+
+- **List Wanted Entities at a Location**:
+  ```bash
+  ./ttrpg-engine wanted list <faction_id> <location_id> [--json]
+  ```
+  *Shows every character and NPC with a wanted record at this location for this faction, including names, decayed heat, tiers, and guard behaviors.*
+
+#### Location inheritance
+
+When you query `wanted get` for a specific location, the engine walks the `parent_id` chain upward:
+
+1. Check for an explicit `wanted_heat` row at the requested location
+2. If none found, check the parent location
+3. Continue until a row is found or the root is reached
+
+An **explicit row at a child location takes precedence** over the parent — this is the opt-out mechanism. A character wanted at Heat 3 in Waterdeep can be explicitly set to Heat 0 (Clean) in the Dock Ward (e.g., "Thieves' Guild protection"), and `wanted get` for the Dock Ward will return Clean.
+
+#### Decay
+
+Wanted heat decays exponentially with the same ~14-day half-life as faction standings. The decay is computed **at query time** from the `last_decay_hour` timestamp (stored as `total_elapsed_hours`) and never persisted back — the raw heat remains unchanged, only the displayed value decays. Setting heat via `crime` or `set` resets the decay timer.
+
+Actors without a campaign assignment can still accumulate wanted heat (decay timer is 0, meaning "never decays"). Assign the actor to a campaign and advance time to enable decay.
+
+#### Example
+
+```bash
+# Create a jurisdiction and locations
+./ttrpg-engine faction create "Waterdeep Watch" "City guards of Waterdeep"
+./ttrpg-engine campaign add-location 1 "Waterdeep" "The City of Splendors"
+./ttrpg-engine campaign add-location 1 "Dock Ward" "The rough docks district"
+./ttrpg-engine location set-parent 2 1   # Dock Ward is in Waterdeep
+
+# Grimgar murders a noble in Waterdeep
+./ttrpg-engine wanted crime char 1 1 1 40 "Murdered a noble in Castle Ward"
+# Output: Heat: 40 (+40) [Tier 3: Hunted]  Location: #1 | Faction: #1
+
+# Check status in the Dock Ward — inherits from Waterdeep
+./ttrpg-engine wanted get char 1 1 2
+# Output: Effective heat: 40 (raw: 40) [Tier 3: Hunted]
+#         Inherited from location #1 (queried #2)
+#         Guard behavior: Attack on sight
+
+# Grimgar commits another crime — heat accumulates
+./ttrpg-engine wanted crime char 1 1 1 15 "Assaulted a guard"
+# Output: Heat: 55 (+15) [Tier 3: Hunted]
+
+# 30 days pass — heat decays
+./ttrpg-engine campaign advance-time 1 720
+./ttrpg-engine wanted get char 1 1 1
+# Output: Heat: 12 (raw: 55) [Tier 1: Suspicious]
+
+# List everyone wanted by the Watch in Waterdeep
+./ttrpg-engine wanted list 1 1
+```
+
 
 ## Automatic Database Schema Migrations
 The tool handles schema updates automatically using SQLite's internal versioning integer `PRAGMA user_version`. 
@@ -921,25 +1285,51 @@ Below is an example session tracking story progression, character resting resour
 ./ttrpg-engine character set-resource 1 "Second Wind" 1 1 short_rest
 
 # 6. Combat Scenario: Add Temp HP and Take Damage
-./ttrpg-engine character set-temp-hp 1 15
-./ttrpg-engine character damage 1 10 # Grog takes 10 damage
-# Output: Character HP now: 60/60 (Temp HP: 5) (Took 10 damage)
+./ttrpg-engine character set-temp-hp 1 2d6+3
+# Output: Character HP now: 60/60 (Temp HP: 11) (rolled 2d6+3)
 
-./ttrpg-engine character damage 1 10 # Grog takes another 10 damage
-# Output: Character HP now: 55/60 (Temp HP: 0) (Took 10 damage)
+./ttrpg-engine character damage 1 2d6+3 # Grog takes 2d6+3 slashing damage
+# Output: Character HP now: 55/60 (Temp HP: 0) (Took 10 slashing damage)
+
+./ttrpg-engine character damage 1 1d8+2 # Grog takes another 1d8+2 damage
+# Output: Character HP now: 48/60 (Temp HP: 0) (Took 7 damage)
 
 # 6b. Short Rest (spend hit dice to heal after taking damage)
 ./ttrpg-engine rest short 1 2
-# Output: Short rest: character 1 healed 14 HP, spent 2 hit dice.
+# Output: Short rest: character 1 healed 13 HP, spent 2 hit dice.
 
-# 6c. Combat Encounter with the new engine
+# 6c. Combat Encounter — full turn with the new engine
+# Setup: create goblin scout, equip Grog with a greataxe
 ./ttrpg-engine creature create "Goblin Scout" 7 7 14 10 12 12 8 10 1 1 1 1
+./ttrpg-engine item upsert "Greataxe" "A heavy axe" weapon 1d12 slashing 0 "heavy,two-handed" 7 30
+./ttrpg-engine inventory add character 1 3 1       # give Grog the greataxe
+./ttrpg-engine inventory equip character 1 3 1      # equip it
 ./ttrpg-engine combat start 1 1
-./ttrpg-engine combat join 1 character 1 18
-./ttrpg-engine combat join 1 creature 1 8
+./ttrpg-engine combat join 1 character 1 1d20+3      # Grog rolls initiative (d20 + DEX + Alert)
+./ttrpg-engine combat join 1 creature 1 1d20         # Goblin rolls flat initiative
 ./ttrpg-engine combat init 1
-./ttrpg-engine combat attack 1 character 1 creature 1 15 str
-./ttrpg-engine combat damage 1 creature 1 7 slashing "Grog's greataxe"
+
+# Round 1, Turn 1: Grog rages and attacks
+./ttrpg-engine combat use-feature 1 character 1 Rage
+# Output: Grog uses Rage (Rage: 3 → 2) — B/P/S resistance active, +2 damage
+./ttrpg-engine combat strike 1 character 1 creature 1
+# Output: Grog hits Goblin Scout: 14 + 5 = 19 vs AC 14 → HIT | 1d12+3 slashing → 9/14 HP
+
+# Round 1, Turn 2: Goblin attacks Grog
+./ttrpg-engine combat next 1
+# Output: Round 1, turn 2: Goblin Scout (creature 1)
+./ttrpg-engine combat attack 1 creature 1 character 1 d20+2 dex
+# Output: Goblin Scout attacks Grog: 7 + 2 = 9 vs AC 15 → MISS
+
+# Round 2, Turn 1: Grog's second rage-powered attack
+./ttrpg-engine combat next 1
+./ttrpg-engine combat strike 1 character 1 creature 1
+# Output: Grog hits Goblin Scout: 18 + 5 = 23 vs AC 14 → HIT | 1d12+3 slashing → 0/14 HP | Killed
+
+# Grog tries a skill check to intimidate the remaining goblins
+./ttrpg-engine combat check 1 character 1 intimidation 12
+# Output: Grog intimidation check (cha): 15 + 2 + 0 = 17 vs DC 12 → PASS
+
 ./ttrpg-engine combat end 1
 
 # 7. Log Story Actions and Link Actors

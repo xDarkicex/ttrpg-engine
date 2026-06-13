@@ -64,11 +64,7 @@ short_rest_heal :: proc(db: ^lib.Db, char_id: int, hit_dice_count: int) -> (int,
 	if dice_to_spend > available do dice_to_spend = available
 
 	con_mod := (con - 10) / 2
-	avg_per_die := hit_die_average(best_die)
-	heal_per_die := avg_per_die + con_mod
-	if heal_per_die < 1 do heal_per_die = 1
-
-	total_heal := dice_to_spend * heal_per_die
+	total_heal, _ := roll_hit_dice(best_die, dice_to_spend, con_mod)
 	new_hp := current_hp + total_heal
 	if new_hp > max_hp do new_hp = max_hp
 	new_expended := expended + dice_to_spend
@@ -122,6 +118,7 @@ rest_short :: proc(db: ^lib.Db, args: []string) -> int {
 	} else {
 		fmt.printf("Short rest: character %d healed %d HP, spent %d hit dice.\n", char_id, healed, dice_count)
 	}
+	advance_rest_time(db, char_id, 1)
 	return 0
 }
 
@@ -169,6 +166,24 @@ rest_long :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf(`{{"success":true,"message":"Long rest completed","character_id":%d}}` + "\n", char_id)
 	} else {
 		fmt.printf("Long rest: character %d fully healed, resources and spell slots reset.\n", char_id)
+	advance_rest_time(db, char_id, 8)
 	}
 	return 0
+}
+
+advance_rest_time :: proc(db: ^lib.Db, char_id: int, hours: int) {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT campaign_id FROM characters WHERE id=%d", char_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return
+	}
+	campaign_id := int(sqlite.column_int(stmt, 0))
+	if campaign_id > 0 {
+		advance_campaign_time(db, campaign_id, hours)
+	}
 }

@@ -1882,3 +1882,247 @@ print_text_creatures_at :: proc(db: ^lib.Db, location_id: int, indent: string) {
 		fmt.printf("%sCreature: [%d] %s (%d/%d hp)\n", indent, sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), sqlite.column_int(stmt, 2), sqlite.column_int(stmt, 3))
 	}
 }
+
+// ----- time & calendar -----
+
+advance_campaign_time :: proc(db: ^lib.Db, campaign_id: int, hours: int) -> bool {
+	stmt: ^sqlite.Statement
+	read_sql := fmt.tprintf("SELECT total_elapsed_hours FROM campaigns WHERE id=%d", campaign_id)
+	read_sql_c := cstring(raw_data(read_sql))
+	if sqlite.prepare(db.ptr, read_sql_c, i32(len(read_sql)), &stmt, nil) != .Ok {
+		return false
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return false
+	}
+	old_hours := int(sqlite.column_int(stmt, 0))
+	new_hours := old_hours + hours
+	lib.db_exec(db, fmt.tprintf("UPDATE campaigns SET total_elapsed_hours=%d WHERE id=%d", new_hours, campaign_id))
+	recompute_calendar_fields(db, campaign_id)
+	expire_hour_conditions(db, campaign_id, new_hours)
+	return true
+}
+
+// Recompute all derived calendar fields from total_elapsed_hours.
+recompute_calendar_fields :: proc(db: ^lib.Db, campaign_id: int) -> bool {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT total_elapsed_hours FROM campaigns WHERE id=%d", campaign_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return false
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return false
+	}
+	hours := int(sqlite.column_int(stmt, 0))
+
+	day_total := hours / 24
+	hour := hours % 24
+	day_of_month := (day_total % 30) + 1
+	month := ((day_total / 30) % 12) + 1
+	year := 1492 + (day_total / 360)
+	time_of_day := calendar_hour_to_time_of_day(hour)
+	season := calendar_month_to_season(month)
+
+	update_sql := fmt.tprintf(
+		"UPDATE campaigns SET in_game_year=%d, in_game_month=%d, in_game_day_of_month=%d, in_game_hour=%d, in_game_day=%d, in_game_time='%s', current_season='%s' WHERE id=%d",
+		year, month, day_of_month, hour, day_total, escape_sql(time_of_day), escape_sql(season), campaign_id,
+	)
+	return lib.db_exec(db, update_sql) == lib.Error.None
+}
+
+calendar_hour_to_time_of_day :: proc(hour: int) -> string {
+	if hour >= 6 && hour < 12 do return "morning"
+	if hour >= 12 && hour < 18 do return "afternoon"
+	if hour >= 18 && hour < 22 do return "evening"
+	return "night"
+}
+
+calendar_month_to_season :: proc(month: int) -> string {
+	if month >= 3 && month <= 5 do return "spring"
+	if month >= 6 && month <= 8 do return "summer"
+	if month >= 9 && month <= 11 do return "autumn"
+	return "winter"
+}
+
+// expire_hour_conditions removes conditions whose duration in hours has elapsed.
+expire_hour_conditions :: proc(db: ^lib.Db, campaign_id: int, new_total_hours: int) -> int {
+	// Find conditions tied to this campaign's actors that have expired
+	// We use a simple approach: any condition with duration_type='hours' and applied_at_hour > 0
+	// where applied_at_hour + duration_rounds < new_total_hours gets deleted.
+	stmt: ^sqlite.Statement
+	del_sql := fmt.tprintf(
+		"DELETE FROM conditions WHERE duration_type='hours' AND applied_at_hour > 0 AND (applied_at_hour + duration_rounds) <= %d",
+		new_total_hours,
+	)
+	_ = campaign_id
+	del_sql_c := cstring(raw_data(del_sql))
+	if sqlite.prepare(db.ptr, del_sql_c, i32(len(del_sql)), &stmt, nil) != .Ok {
+		return 0
+	}
+	defer sqlite.finalize(stmt)
+	sqlite.step(stmt)
+	return int(sqlite.changes(db.ptr))
+}
+
+// ----- CLI commands -----
+
+campaign_advance_time :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 3 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign advance-time <campaign_id> <hours>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine campaign advance-time <campaign_id> <hours>") }
+		return 1
+	}
+	campaign_id := strconv.atoi(args[1])
+	hours := strconv.atoi(args[2])
+	if hours <= 0 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Hours must be positive"}`) }
+		else { fmt.eprintln("Hours must be positive") }
+		return 1
+	}
+
+	// Read current total
+	stmt: ^sqlite.Statement
+	read_sql := fmt.tprintf("SELECT total_elapsed_hours FROM campaigns WHERE id=%d", campaign_id)
+	read_sql_c := cstring(raw_data(read_sql))
+	if sqlite.prepare(db.ptr, read_sql_c, i32(len(read_sql)), &stmt, nil) != .Ok {
+		return print_error(db, "Failed to read campaign time")
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return print_error(db, "Campaign not found")
+	}
+	old_hours := int(sqlite.column_int(stmt, 0))
+	new_hours := old_hours + hours
+
+	// Update total_elapsed_hours
+	update_sql := fmt.tprintf("UPDATE campaigns SET total_elapsed_hours=%d WHERE id=%d", new_hours, campaign_id)
+	if lib.db_exec(db, update_sql) != lib.Error.None {
+		return print_error(db, "Failed to advance time")
+	}
+
+	recompute_calendar_fields(db, campaign_id)
+	expired := expire_hour_conditions(db, campaign_id, new_hours)
+
+	// Read back new state for output
+	new_day := new_hours / 24
+	new_hour := new_hours % 24
+	new_month := ((new_day / 30) % 12) + 1
+	new_year := 1492 + (new_day / 360)
+	day_of_month := (new_day % 30) + 1
+	tod := calendar_hour_to_time_of_day(new_hour)
+	season := calendar_month_to_season(new_month)
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"hours_advanced":%d,"total_hours":%d,"year":%d,"month":%d,"day":%d,"hour":%d,"time_of_day":"%s","season":"%s","day_total":%d,"conditions_expired":%d}}` + "\n",
+			hours, new_hours, new_year, new_month, day_of_month, new_hour, tod, season, new_day, expired)
+	} else {
+		fmt.printf("Advanced %d hours → Year %d, Month %d, Day %d, %s (%s) — Day %d.\n",
+			hours, new_year, new_month, day_of_month, tod, season, new_day)
+		if expired > 0 do fmt.printf("  %d time-based condition(s) expired.\n", expired)
+	}
+	return 0
+}
+
+campaign_set_calendar :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 6 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>") }
+		return 1
+	}
+	campaign_id := strconv.atoi(args[1])
+	year := strconv.atoi(args[2])
+	month := strconv.atoi(args[3])
+	day := strconv.atoi(args[4])
+	hour := strconv.atoi(args[5])
+
+	if month < 1 || month > 12 || day < 1 || day > 30 || hour < 0 || hour > 23 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Invalid date values (month 1-12, day 1-30, hour 0-23)"}`) }
+		else { fmt.eprintln("Invalid date values (month 1-12, day 1-30, hour 0-23)") }
+		return 1
+	}
+
+	// Read old total for rewind detection
+	stmt: ^sqlite.Statement
+	read_sql := fmt.tprintf("SELECT total_elapsed_hours FROM campaigns WHERE id=%d", campaign_id)
+	read_sql_c := cstring(raw_data(read_sql))
+	if sqlite.prepare(db.ptr, read_sql_c, i32(len(read_sql)), &stmt, nil) != .Ok {
+		return print_error(db, "Failed to read campaign time")
+	}
+	defer sqlite.finalize(stmt)
+	old_hours := 0
+	if sqlite.step(stmt) == .Row {
+		old_hours = int(sqlite.column_int(stmt, 0))
+	}
+
+	total_days := (year - 1492) * 360 + (month - 1) * 30 + (day - 1)
+	new_hours := total_days * 24 + hour
+
+	is_rewind := new_hours < old_hours
+
+	update_sql := fmt.tprintf("UPDATE campaigns SET total_elapsed_hours=%d WHERE id=%d", new_hours, campaign_id)
+	if lib.db_exec(db, update_sql) != lib.Error.None {
+		return print_error(db, "Failed to set calendar")
+	}
+
+	recompute_calendar_fields(db, campaign_id)
+
+	tod := calendar_hour_to_time_of_day(hour)
+	season := calendar_month_to_season(month)
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"year":%d,"month":%d,"day":%d,"hour":%d,"time_of_day":"%s","season":"%s","day_total":%d,"rewind":%s}}` + "\n",
+			year, month, day, hour, tod, season, total_days, is_rewind ? "true" : "false")
+	} else {
+		rewind_note := ""
+		if is_rewind do rewind_note = " (rewind)"
+		fmt.printf("Calendar set to Year %d, Month %d, Day %d, %s (%s) — Day %d.%s\n",
+			year, month, day, tod, season, total_days, rewind_note)
+	}
+	return 0
+}
+
+campaign_get_time :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 2 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign get-time <campaign_id>"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine campaign get-time <campaign_id>") }
+		return 1
+	}
+	campaign_id := strconv.atoi(args[1])
+	recompute_calendar_fields(db, campaign_id)
+
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf(
+		"SELECT name, in_game_year, in_game_month, in_game_day_of_month, in_game_hour, in_game_time, current_season, in_game_day, total_elapsed_hours FROM campaigns WHERE id=%d",
+		campaign_id,
+	)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return print_error(db, "Failed to read campaign")
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return print_error(db, "Campaign not found")
+	}
+
+	name := column_text_safe(stmt, 0)
+	year := int(sqlite.column_int(stmt, 1))
+	month := int(sqlite.column_int(stmt, 2))
+	dom := int(sqlite.column_int(stmt, 3))
+	hour := int(sqlite.column_int(stmt, 4))
+	tod := column_text_safe(stmt, 5)
+	season := column_text_safe(stmt, 6)
+	day_total := int(sqlite.column_int(stmt, 7))
+	total_hrs := int(sqlite.column_int(stmt, 8))
+
+	if db.is_json {
+		fmt.printf(`{{"success":true,"campaign":"%s","year":%d,"month":%d,"day":%d,"hour":%d,"time_of_day":"%s","season":"%s","day_total":%d,"total_elapsed_hours":%d}}` + "\n",
+			name, year, month, dom, hour, tod, season, day_total, total_hrs)
+	} else {
+		fmt.printf("Campaign \"%s\" — Year %d, Month %d, Day %d, %s (%s)  |  Day %d  |  %d total hours\n",
+			name, year, month, dom, tod, season, day_total, total_hrs)
+	}
+	return 0
+}

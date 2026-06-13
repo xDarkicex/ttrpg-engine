@@ -102,13 +102,7 @@ parse_int :: proc(s: string) -> int {
 }
 
 is_numeric :: proc(s: string) -> bool {
-	if len(s) == 0 do return false
-	for i := 0; i < len(s); i += 1 {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return true
+	return is_rollable(s)
 }
 
 has_string_in_list :: proc(list_str: string, target: string) -> bool {
@@ -1071,16 +1065,20 @@ DamageArgs :: struct {
 	source: string,
 }
 
-parse_damage_args :: proc(args: []string) -> DamageArgs {
+parse_damage_args :: proc(args: []string) -> (DamageArgs, bool) {
 	d: DamageArgs
 	d.id = strconv.atoi(args[1])
-	d.amount = strconv.atoi(args[2])
+	amt, ok := resolve_amount(args[2])
+	if !ok {
+		return d, false
+	}
+	d.amount = amt
 	if len(args) >= 4 do d.damage_type = args[3]
 	if len(args) >= 5 do d.attack_or_save = args[4]
 	if len(args) >= 6 do d.save_dc = strconv.atoi(args[5])
 	if len(args) >= 7 do d.d20_roll = strconv.atoi(args[6])
 	if len(args) >= 8 do d.source = args[7]
-	return d
+	return d, true
 }
 
 character_create :: proc(db: ^lib.Db, args: []string) -> int {
@@ -1642,7 +1640,15 @@ character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 
-	d := parse_damage_args(args)
+	d, parse_ok := parse_damage_args(args)
+	if !parse_ok {
+		if db.is_json {
+			fmt.println(`{{"success":false,"error":"Invalid damage amount — expected dice spec like 2d6+3 or 8d6"}}`)
+		} else {
+			fmt.eprintln("Invalid damage amount — expected dice spec like 2d6+3 or 8d6")
+		}
+		return 1
+	}
 	char, found := fetch_character_stats(db, d.id)
 	if !found {
 		if db.is_json {
@@ -1654,8 +1660,8 @@ character_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	attack_hit := true
-	if is_numeric(d.attack_or_save) {
-		attack_roll := strconv.atoi(d.attack_or_save)
+	if is_rollable(d.attack_or_save) {
+		attack_roll, _ := resolve_attack_roll(d.attack_or_save)
 		if attack_roll < char.ac {
 			if db.is_json {
 				fmt.printf(`{{"success":true,"id":%d,"attack_hit":false,"damage_applied":0,"current_hp":%d,"max_hp":%d}}`, char.id, char.current_hp, char.max_hp)
@@ -1751,7 +1757,15 @@ character_heal :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	id := strconv.atoi(args[1])
-	amt := strconv.atoi(args[2])
+	amt, ok := resolve_amount(args[2])
+	if !ok {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Invalid heal amount — expected dice spec"}`)
+		} else {
+			fmt.eprintln("Invalid heal amount — expected dice spec")
+		}
+		return 1
+	}
 	source := ""
 	if len(args) >= 4 do source = args[3]
 
@@ -2917,7 +2931,15 @@ character_set_temp_hp :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	id := strconv.atoi(args[1])
-	amount := strconv.atoi(args[2])
+	amount, ok := resolve_amount(args[2])
+	if !ok {
+		if db.is_json {
+			fmt.println(`{"success":false,"error":"Invalid temp HP amount — expected dice spec"}`)
+		} else {
+			fmt.eprintln("Invalid temp HP amount — expected dice spec")
+		}
+		return 1
+	}
 
 	sql := fmt.tprintf("UPDATE characters SET temp_hp=%d WHERE id=%d", amount, id)
 	if lib.db_exec(db, sql) != lib.Error.None {

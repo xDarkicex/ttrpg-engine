@@ -198,20 +198,24 @@ HELP_COMMANDS := []CommandHelp{
 			description = "Manage D&D 5e combat encounters with turn tracking, attack resolution, damage application, and condition handling.",
 			subcommands = []SubcommandHelp{
 				{"start", "<campaign_id> <location_id>", "Create a new combat encounter."},
-				{"join", "<encounter_id> <char|npc|creature> <id> <initiative> [mod] [position]", "Add a participant to the encounter."},
+				{"join", "<encounter_id> <char|npc|creature> <id> <dice_spec> [mod] [position]", "Add a participant. Dice spec like 1d20+3."},
 				{"join-all", "<encounter_id>", "Auto-add all characters/creatures with combat=1 at the encounter location."},
 				{"init", "<encounter_id>", "Lock turn order sorted by initiative (descending)."},
-				{"next", "<encounter_id>", "Advance to the next turn. Resets reactions on new rounds."},
-				{"attack", "<encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <roll> [ability] [adv|disadv]", "Resolve an attack roll vs target AC."},
-				{"damage", "<encounter_id> <target_type> <target_id> <amount> <type> [source]", "Apply damage with resistance/vulnerability/immunity."},
-				{"save", "<encounter_id> <actor_type> <actor_id> <ability> <roll> [dc] [adv|disadv]", "Resolve a saving throw."},
+				{"next", "<encounter_id>", "Advance turn. Resets action/BA/attacks/movement for new actor, reactions on round wrap."},
+				{"attack", "<encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> <dice_spec> [ability] [adv|disadv]", "Roll attack vs AC. Enforces action economy + multiattack."},
+				{"strike", "<encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> [ability] [bonus|ba]", "Auto-look-up equipped weapon, roll attack + damage in one command."},
+				{"cast", "<encounter_id> <caster_type> <caster_id> <spell_name> <slot_level> <target_type> <target_id> [save] [dice_spec] [dc]", "Cast a spell. Consumes slot, rolls attack/save, sets concentration."},
+				{"check", "<encounter_id> <actor_type> <actor_id> <skill_name> [dc] [contest_type] [contest_id]", "Skill check with ability mod + proficiency. Optional DC or contested roll."},
+				{"damage", "<encounter_id> <target_type> <target_id> <dice_spec> <type> [source]", "Apply damage with resistance/vulnerability/immunity + temp HP depletion."},
+				{"save", "<encounter_id> <actor_type> <actor_id> <ability> <dice_spec> [dc] [adv|disadv]", "Resolve a saving throw."},
 				{"move", "<encounter_id> <actor_type> <actor_id> <position>", "Change position (melee, ranged, cover, hidden, fleeing)."},
+				{"use-feature", "<encounter_id> <actor_type> <actor_id> <feature_name>", "Activate a feature (Rage, Ki, Action Surge, etc.). Auto-consumes resource and applies effects."},
 				{"condition", "<encounter_id> <target_type> <target_id> <name> [dur] [dc] [save]", "Apply a condition during combat."},
-				{"death-save", "<character_id> <roll>", "Roll a death saving throw."},
-				{"react", "<encounter_id> <actor_type> <actor_id> <reaction> [target_type] [target_id]", "Use a reaction."},
+				{"death-save", "<character_id> <dice_spec>", "Roll a death saving throw. Nat 20 revives, nat 1 = 2 fails."},
+				{"react", "<encounter_id> <actor_type> <actor_id> <reaction> [target_type] [target_id]", "Use reaction (1/round enforced)."},
 				{"ready", "<encounter_id> <actor_type> <actor_id> \"<action>\" <trigger>", "Ready an action with a trigger condition."},
-				{"status", "<encounter_id>", "Show full combat state."},
-				{"end", "<encounter_id>", "End the encounter and archive it."},
+				{"status", "<encounter_id>", "Show full combat state with HP/AC/position/flags."},
+				{"end", "<encounter_id>", "End encounter, archive it, clear combat flags."},
 			},
 		},
 		{
@@ -233,6 +237,27 @@ HELP_COMMANDS := []CommandHelp{
 			subcommands = []SubcommandHelp{
 				{"short", "<character_id> <hit_dice_count>", "Short rest: spend hit dice to heal, reset short-rest resources."},
 				{"long", "<character_id>", "Long rest: full heal, recover half hit dice, reset all resources and spell slots."},
+			},
+		},
+		{
+			command = "trade",
+			description = "Transfer items and coins between two player characters.",
+			subcommands = []SubcommandHelp{
+				{"", "<from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]", "Trade item and optional coins from one character to another."},
+			},
+		},
+		{
+			command = "shop",
+			description = "Browse shop inventory, stock items, buy and sell equipment.",
+			subcommands = []SubcommandHelp{
+				{"browse", "<shop_id>", "List all items available in a shop with prices."},
+				{"stock", "<shop_id> <item_id> <quantity> [price_gp]", "Add or update item stock in a shop."},
+				{"buy", "<shop_id> <char_id> <item_id> <quantity>", "Purchase items from a shop (auto-deducts coins)."},
+				{"sell", "<shop_id> <char_id> <item_id> <quantity>", "Sell items to a shop at 50% base value."},
+				{"add-money", "<shop_id> <gold> <silver> <copper> [platinum] [electrum]", "Add coins to shop treasury."},
+				{"remove-money", "<shop_id> <gold> <silver> <copper> [platinum] [electrum]", "Deduct coins from shop treasury."},
+				{"get", "<shop_id>", "Show shop details including treasury and proprietor."},
+				{"haggle", "<shop_id> <char_id> <item_id> <quantity> <discount_pct>", "Attempt to haggle for a discount (3 tries/day)."},
 			},
 		},
 			{
@@ -269,6 +294,20 @@ HELP_COMMANDS := []CommandHelp{
 				{"list-journal", "<campaign_id> [limit]", "List recent journal entries for a campaign."},
 				{"set-dm-notes", "<campaign_id> <text>", "Set private DM notes for a campaign."},
 				{"set-time", "<campaign_id> <in_game_day> <time_of_day> <season>", "Set in-game calendar state."},
+				{"advance-time", "<campaign_id> <hours>", "Advance in-game time by N hours. Auto-expires time-based conditions."},
+				{"set-calendar", "<campaign_id> <year> <month> <day> <hour>", "Override in-game date/time (rewind or fast-forward)."},
+				{"get-time", "<campaign_id>", "Display current in-game calendar date and time."},
+		},
+	},
+	{
+		command = "wanted",
+		description = "Track wanted levels, crimes, and jurisdictional heat per location with time decay.",
+		subcommands = []SubcommandHelp{
+			{"crime", "<char|npc> <actor_id> <faction_id> <location_id> <severity> <description>", "Log a crime and auto-apply heat to the actor."},
+			{"get", "<char|npc> <actor_id> <faction_id> [location_id]", "Show wanted status with decayed heat and tier. Walks location parent chain."},
+			{"set", "<char|npc> <actor_id> <faction_id> <location_id> <heat>", "Directly override wanted heat points."},
+			{"clear", "<char|npc> <actor_id> <faction_id> <location_id>", "Remove all heat at a location."},
+			{"list", "<faction_id> <location_id>", "List all wanted entities at a location."},
 		},
 	},
 	{
@@ -335,6 +374,10 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_can_enter(db, args)
 	case "quest":
 		return route_quest(db, args)
+	case "trade":
+		return route_trade(db, args)
+	case "wanted":
+		return route_wanted(db, args)
 	case "campaign", "init", "help":
 		return route_meta_command(db, cmd_name, args)
 	case:
@@ -814,6 +857,10 @@ route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	case "init":        return cmd.combat_init(db, args)
 	case "next":        return cmd.combat_next(db, args)
 	case "attack":      return cmd.combat_attack(db, args)
+	case "strike":      return cmd.combat_strike(db, args)
+	case "cast":        return cmd.combat_cast(db, args)
+	case "check":       return cmd.combat_check(db, args)
+	case "use-feature": return cmd.combat_use_feature(db, args)
 	case "damage":      return cmd.combat_damage(db, args)
 	case "save":        return cmd.combat_save(db, args)
 	case "move":        return cmd.combat_move(db, args)
@@ -873,6 +920,41 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 }
 
+
+	route_trade :: proc(db: ^lib.Db, args: []string) -> int {
+		if len(args) < 4 {
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]"}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]") }
+			return 1
+		}
+		return cmd.trade_character(db, args)
+	}
+
+	route_wanted :: proc(db: ^lib.Db, args: []string) -> int {
+		if len(args) < 1 {
+			if db.is_json {
+				fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted <crime|get|set|clear|list> [args]"}`)
+			} else {
+				fmt.eprintln("Usage: ttrpg-engine wanted <crime|get|set|clear|list> [args]")
+			}
+			return 1
+		}
+		switch args[0] {
+		case "crime": return cmd.wanted_crime(db, args)
+		case "get":   return cmd.wanted_get(db, args)
+		case "set":   return cmd.wanted_set(db, args)
+		case "clear": return cmd.wanted_clear(db, args)
+		case "list":  return cmd.wanted_list(db, args)
+		case:
+			if db.is_json {
+				fmt.println(`{"success":false,"error":"Unknown wanted subcommand. Use crime, get, set, clear, or list."}`)
+			} else {
+				fmt.eprintln("Unknown wanted subcommand:", args[0])
+			}
+			return 1
+		}
+	}
+
 route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
@@ -886,11 +968,11 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "damage", "heal":
 		return route_npc_core(db, sub, args)
-	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities", "set-cr", "set-attack", "set-initiative", "set-combat", "set-languages", "set-passive-perception", "set-concentrating", "set-skill", "remove-skill", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance", "add-tool-prof", "remove-tool-prof":
+	case "set-details", "set-stats", "set-combat-meta", "set-status", "add-money", "remove-money", "set-action", "set-relationship", "list-relationships", "set-location", "add-ability", "remove-ability", "list-abilities", "set-cr", "set-attack", "set-initiative", "set-combat", "set-languages", "set-passive-perception", "set-concentrating", "set-skill", "remove-skill", "set-darkvision", "set-bond", "set-flaw", "set-ideal", "set-personality-traits", "set-appearance", "add-tool-prof", "remove-tool-prof", "set-char-standing", "get-char-standing":
 		return route_npc_setters(db, sub, args)
 	case "help":
 		if db.is_json {
-			fmt.println(`{"success":true,"subcommands":["create","list","get","delete","damage","heal","set-details","set-stats","set-combat-meta","set-status","add-money","remove-money","set-action","set-relationship","list-relationships","set-location","add-ability","remove-ability","list-abilities","set-cr","set-attack","set-initiative","set-combat","set-languages","set-passive-perception","set-concentrating","set-skill","remove-skill","set-darkvision","set-bond","set-flaw","set-ideal","set-personality-traits","set-appearance","add-tool-prof","remove-tool-prof"]}`)
+			fmt.println(`{"success":true,"subcommands":["create","list","get","delete","damage","heal","set-details","set-stats","set-combat-meta","set-status","add-money","remove-money","set-action","set-relationship","list-relationships","set-location","add-ability","remove-ability","list-abilities","set-cr","set-attack","set-initiative","set-combat","set-languages","set-passive-perception","set-concentrating","set-skill","remove-skill","set-darkvision","set-bond","set-flaw","set-ideal","set-personality-traits","set-appearance","add-tool-prof","remove-tool-prof","set-char-standing","get-char-standing"]}`)
 		} else {
 			fmt.println("npc subcommands: create, list, get, delete, damage, heal, set-details, set-stats, set-combat-meta, set-status, add-money, remove-money, set-action, set-relationship, list-relationships, set-location, add-ability, remove-ability, list-abilities, set-cr, set-attack, set-initiative, set-combat, set-languages, set-passive-perception, set-concentrating, set-skill, remove-skill, set-darkvision, set-bond, set-flaw, set-ideal, set-personality-traits, set-appearance, add-tool-prof, remove-tool-prof")
 		}
@@ -949,6 +1031,8 @@ route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "set-appearance":           return cmd.npc_set_appearance(db, args)
 	case "add-tool-prof":            return cmd.npc_add_tool_prof(db, args)
 	case "remove-tool-prof":         return cmd.npc_remove_tool_prof(db, args)
+	case "set-char-standing":   return cmd.npc_set_char_standing(db, args)
+		case "get-char-standing":   return cmd.npc_get_char_standing(db, args)
 	}
 	return 1
 }
@@ -966,7 +1050,7 @@ route_campaign :: proc(db: ^lib.Db, args: []string) -> int {
 	switch sub {
 	case "create", "list", "get", "delete", "set-chapter", "next-session":
 		return route_campaign_core(db, sub, args)
-	case "add-location", "set-location", "list-locations", "add-action", "link-actor", "list-actions", "get-story-state", "add-journal-entry", "list-journal", "set-dm-notes", "set-time":
+	case "add-location", "set-location", "list-locations", "add-action", "link-actor", "list-actions", "get-story-state", "add-journal-entry", "list-journal", "set-dm-notes", "set-time", "advance-time", "set-calendar", "get-time":
 		return route_campaign_story(db, sub, args)
 	case:
 		if db.is_json {
@@ -1003,6 +1087,9 @@ route_campaign_story :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 	case "list-journal":       return cmd.campaign_list_journal(db, args)
 	case "set-dm-notes":       return cmd.campaign_set_dm_notes(db, args)
 	case "set-time":           return cmd.campaign_set_time(db, args)
+		case "advance-time":       return cmd.campaign_advance_time(db, args)
+		case "set-calendar":       return cmd.campaign_set_calendar(db, args)
+		case "get-time":           return cmd.campaign_get_time(db, args)
 	}
 	return 1
 }
@@ -1086,9 +1173,17 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "add":              return cmd.shop_add(db, args)
 		case "list":             return cmd.shop_list(db, args)
 		case "set-inventory":    return cmd.shop_set_inventory(db, args)
+			case "browse":           return cmd.shop_browse(db, args)
+			case "stock":            return cmd.shop_stock(db, args)
+			case "buy":              return cmd.shop_buy(db, args)
+			case "sell":             return cmd.shop_sell(db, args)
+			case "add-money":        return cmd.shop_add_money(db, args)
+			case "remove-money":     return cmd.shop_remove_money(db, args)
+			case "get":              return cmd.shop_get(db, args)
+			case "haggle":           return cmd.shop_haggle(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop <add|list|set-inventory> ..."}`) }
-			else { fmt.eprintln("Usage: ttrpg-engine shop <add|list|set-inventory> ...") }
+			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop <add|list|set-inventory|browse|stock|buy|sell|add-money|remove-money|get|haggle> ..."}`) }
+			else { fmt.eprintln("Usage: ttrpg-engine shop <add|list|set-inventory|browse|stock|buy|sell|add-money|remove-money|get|haggle> ...") }
 			return 1
 		}
 	case "encounter":

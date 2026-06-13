@@ -868,6 +868,26 @@ db_init_schema :: proc(db: ^Db) -> Error {
 		err = db_run_migrations_19(db, i32(current_version))
 	if err != Error.None do return err
 
+	current_version = get_db_version(db)
+	err = db_run_migrations_21(db, i32(current_version))
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_22(db, i32(current_version))
+	if err != Error.None do return err
+
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_23(db, i32(current_version))
+	if err != Error.None do return err
+
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_24(db, i32(current_version))
+	if err != Error.None do return err
+
+	current_version = get_db_version(db)
+	err = db_run_migrations_25(db, i32(current_version))
+	if err != Error.None do return err
 	return Error.None
 }
 
@@ -906,11 +926,142 @@ db_run_migrations_19 :: proc(db: ^Db, current_version: i32) -> Error {
 			UNIQUE(encounter_id, actor_type, actor_id)
 		);`)
 
-		set_version_err := set_db_version(db, 19)
+			set_version_err := set_db_version(db, 19)
+			if set_version_err != Error.None do return set_version_err
+		}
+
+		if curr_ver < 20 {
+			db_exec(db, "ALTER TABLE creatures ADD COLUMN multiattack_count INTEGER DEFAULT 1;")
+			db_exec(db, "ALTER TABLE npcs ADD COLUMN multiattack_count INTEGER DEFAULT 1;")
+			db_exec(db, "ALTER TABLE combat_participants ADD COLUMN attacks_used INTEGER DEFAULT 0;")
+			db_exec(db, "ALTER TABLE combat_participants ADD COLUMN movement_used INTEGER DEFAULT 0;")
+
+			set_version_err := set_db_version(db, 20)
+			if set_version_err != Error.None do return set_version_err
+		}
+
+		return Error.None
+	}
+
+	db_run_migrations_25 :: proc(db: ^Db, current_version: i32) -> Error {
+		curr_ver := current_version
+		if curr_ver < 25 {
+			db_exec(db, `CREATE TABLE IF NOT EXISTS wanted_heat (
+				id INTEGER PRIMARY KEY,
+				actor_type TEXT NOT NULL,
+				actor_id INTEGER NOT NULL,
+				faction_id INTEGER REFERENCES factions(id) ON DELETE CASCADE,
+				location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+				heat_points INTEGER DEFAULT 0,
+				last_decay_hour INTEGER DEFAULT 0,
+				notes TEXT DEFAULT '',
+				UNIQUE(actor_type, actor_id, faction_id, location_id)
+			);`)
+
+			db_exec(db, `CREATE TABLE IF NOT EXISTS crime_log (
+				id INTEGER PRIMARY KEY,
+				actor_type TEXT NOT NULL,
+				actor_id INTEGER NOT NULL,
+				faction_id INTEGER REFERENCES factions(id) ON DELETE CASCADE,
+				location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+				description TEXT NOT NULL,
+				severity INTEGER NOT NULL,
+				in_game_day INTEGER DEFAULT 0,
+				created_at TEXT DEFAULT CURRENT_TIMESTAMP
+			);`)
+
+			set_version_err := set_db_version(db, 25)
+			if set_version_err != Error.None do return set_version_err
+		}
+
+		return Error.None
+	}
+
+// last_insert_rowid not available in this sqlite3 binding
+db_run_migrations_21 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 21 {
+		db_exec(db, `CREATE TABLE IF NOT EXISTS shop_inventory (
+			id INTEGER PRIMARY KEY,
+			shop_id INTEGER REFERENCES shops(id) ON DELETE CASCADE,
+			item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+			quantity INTEGER DEFAULT 1,
+			price_gp REAL DEFAULT 0.0,
+			UNIQUE(shop_id, item_id)
+		);`)
+
+		set_version_err := set_db_version(db, 21)
 		if set_version_err != Error.None do return set_version_err
 	}
 
 	return Error.None
 }
 
-// last_insert_rowid not available in this sqlite3 binding
+db_run_migrations_22 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 22 {
+		db_exec(db, "ALTER TABLE shops ADD COLUMN gold INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE shops ADD COLUMN silver INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE shops ADD COLUMN copper INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE shops ADD COLUMN platinum INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE shops ADD COLUMN electrum INTEGER DEFAULT 0;")
+
+		set_version_err := set_db_version(db, 22)
+		if set_version_err != Error.None do return set_version_err
+	}
+
+	return Error.None
+}
+
+db_run_migrations_23 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 23 {
+		db_exec(db, `CREATE TABLE IF NOT EXISTS character_npc_standings (
+			id INTEGER PRIMARY KEY,
+			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+			npc_id INTEGER REFERENCES npcs(id) ON DELETE CASCADE,
+			standing INTEGER DEFAULT 0,
+			notes TEXT DEFAULT '',
+			UNIQUE(character_id, npc_id)
+		);`)
+		db_exec(db, `CREATE TABLE IF NOT EXISTS haggle_attempts (
+			id INTEGER PRIMARY KEY,
+			shop_id INTEGER REFERENCES shops(id) ON DELETE CASCADE,
+			character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+			in_game_day INTEGER DEFAULT 0,
+			attempts_used INTEGER DEFAULT 0,
+			fail_streak INTEGER DEFAULT 0,
+			UNIQUE(shop_id, character_id, in_game_day)
+		);`)
+		set_version_err := set_db_version(db, 23)
+		if set_version_err != Error.None do return set_version_err
+	}
+	return Error.None
+}
+
+db_run_migrations_24 :: proc(db: ^Db, current_version: i32) -> Error {
+	curr_ver := current_version
+	if curr_ver < 24 {
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN in_game_year INTEGER DEFAULT 1492;")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN in_game_month INTEGER DEFAULT 1;")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN in_game_day_of_month INTEGER DEFAULT 1;")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN in_game_hour INTEGER DEFAULT 6;")
+		db_exec(db, "ALTER TABLE campaigns ADD COLUMN total_elapsed_hours INTEGER DEFAULT 6;")
+
+		db_exec(db, "ALTER TABLE faction_standings ADD COLUMN last_interaction_day INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE character_npc_standings ADD COLUMN last_interaction_day INTEGER DEFAULT 0;")
+		db_exec(db, "ALTER TABLE npc_relationships ADD COLUMN last_interaction_day INTEGER DEFAULT 0;")
+
+		db_exec(db, "ALTER TABLE conditions ADD COLUMN applied_at_hour INTEGER DEFAULT 0;")
+
+		// Seed total_elapsed_hours from existing in_game_day + in_game_time
+		db_exec(db, "UPDATE campaigns SET total_elapsed_hours = in_game_day * 24 + 8 WHERE in_game_time = 'morning';")
+		db_exec(db, "UPDATE campaigns SET total_elapsed_hours = in_game_day * 24 + 14 WHERE in_game_time = 'afternoon';")
+		db_exec(db, "UPDATE campaigns SET total_elapsed_hours = in_game_day * 24 + 20 WHERE in_game_time = 'evening';")
+		db_exec(db, "UPDATE campaigns SET total_elapsed_hours = in_game_day * 24 + 2 WHERE in_game_time = 'night';")
+
+		set_version_err := set_db_version(db, 24)
+		if set_version_err != Error.None do return set_version_err
+	}
+	return Error.None
+}

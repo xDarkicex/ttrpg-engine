@@ -354,7 +354,15 @@ npc_heal :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	id := strconv.atoi(args[1])
-	amt := strconv.atoi(args[2])
+	amt, ok := resolve_amount(args[2])
+	if !ok {
+		if db.is_json {
+			fmt.println(`{{"success":false,"error":"Invalid heal amount — expected dice spec"}}`)
+		} else {
+			fmt.eprintln("Invalid heal amount — expected dice spec")
+		}
+		return 1
+	}
 
 	npc, found := fetch_npc_stats(db, id)
 	if !found {
@@ -397,7 +405,15 @@ npc_damage :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 
-	d := parse_damage_args(args)
+	d, parse_ok := parse_damage_args(args)
+	if !parse_ok {
+		if db.is_json {
+			fmt.println(`{{"success":false,"error":"Invalid damage amount — expected dice spec like 2d6+3 or 8d6"}}`)
+		} else {
+			fmt.eprintln("Invalid damage amount — expected dice spec like 2d6+3 or 8d6")
+		}
+		return 1
+	}
 	npc, found := fetch_npc_stats(db, d.id)
 	if !found {
 		if db.is_json {
@@ -409,8 +425,8 @@ npc_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	attack_hit := true
-	if is_numeric(d.attack_or_save) {
-		attack_roll := strconv.atoi(d.attack_or_save)
+	if is_rollable(d.attack_or_save) {
+		attack_roll, _ := resolve_attack_roll(d.attack_or_save)
 		if attack_roll < npc.ac {
 			if db.is_json {
 				fmt.printf(`{{"success":true,"id":%d,"attack_hit":false,"damage_applied":0,"current_hp":%d,"max_hp":%d}}\n`, npc.id, npc.current_hp, npc.max_hp)
@@ -697,6 +713,8 @@ npc_set_relationship :: proc(db: ^lib.Db, args: []string) -> int {
 		}
 		return 1
 	}
+
+	touch_npc_relationship_decay_day(db, n1)
 
 	if db.is_json {
 		fmt.printf(`{{"success":true,"message":"Relationship updated","npc_id_1":%d,"npc_id_2":%d,"friendship_level":%d,"type":"%s"}}\n`, n1, n2, friend, escape_json_string(rel_type))
@@ -1537,4 +1555,146 @@ npc_remove_tool_prof :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 	if db.is_json { fmt.printf(`{"success":true,"message":"Tool prof removed","npc_id":%d,"tool_name":"%s"}` + "\n", npc_id, escape_json_string(tool)) } else { fmt.printf("Removed tool prof '%s' from NPC %d\n", tool, npc_id) }
 	return 0
+}
+
+// ----- character-to-NPC standing -----
+
+get_npc_standing :: proc(db: ^lib.Db, char_id: int, npc_id: int) -> int {
+	stmt: ^sqlite.Statement
+	sql := fmt.tprintf("SELECT standing FROM character_npc_standings WHERE character_id=%d AND npc_id=%d", char_id, npc_id)
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		return 0
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) == .Row {
+		return int(sqlite.column_int(stmt, 0))
+	}
+	return 0
+}
+
+npc_set_char_standing :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 4 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc set-char-standing <npc_id> <character_id> <standing> [notes]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine npc set-char-standing <npc_id> <character_id> <standing> [notes]") }
+		return 1
+	}
+	npc_id := strconv.atoi(args[1])
+	char_id := strconv.atoi(args[2])
+	standing := strconv.atoi(args[3])
+	notes := len(args) >= 5 ? args[4] : ""
+
+	sql := fmt.tprintf(
+		"INSERT OR REPLACE INTO character_npc_standings (character_id, npc_id, standing, notes) VALUES(%d, %d, %d, '%s')",
+		char_id, npc_id, standing, escape_sql(notes),
+	)
+	if lib.db_exec(db, sql) != lib.Error.None {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set standing"}`) }
+		else { fmt.eprintln("Failed to set standing") }
+		return 1
+	}
+
+	touch_npc_standing_decay_day(db, char_id, npc_id)
+
+	if db.is_json { fmt.printf(`{{"success":true,"message":"Set character-NPC standing","npc_id":%d,"character_id":%d,"standing":%d}}` + "\n", npc_id, char_id, standing) }
+	else { fmt.printf("Set standing between NPC %d and character %d to %d\n", npc_id, char_id, standing) }
+	return 0
+}
+
+npc_get_char_standing :: proc(db: ^lib.Db, args: []string) -> int {
+	if len(args) < 2 {
+		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc get-char-standing <character_id> [npc_id]"}`) }
+		else { fmt.eprintln("Usage: ttrpg-engine npc get-char-standing <character_id> [npc_id]") }
+		return 1
+	}
+	char_id := strconv.atoi(args[1])
+
+	stmt: ^sqlite.Statement
+	sql: string
+	if len(args) >= 3 {
+		npc_id := strconv.atoi(args[2])
+		sql = fmt.tprintf(
+			"SELECT cn.npc_id, n.name, cn.standing, cn.notes FROM character_npc_standings cn JOIN npcs n ON cn.npc_id=n.id WHERE cn.character_id=%d AND cn.npc_id=%d",
+			char_id, npc_id,
+		)
+	} else {
+		sql = fmt.tprintf(
+			"SELECT cn.npc_id, n.name, cn.standing, cn.notes FROM character_npc_standings cn JOIN npcs n ON cn.npc_id=n.id WHERE cn.character_id=%d ORDER BY cn.standing DESC",
+			char_id,
+		)
+	}
+
+	sql_c := cstring(raw_data(sql))
+	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
+		if db.is_json { fmt.println(`{"success":false,"error":"Failed to get standings"}`) }
+		else { fmt.eprintln("Failed to get standings") }
+		return 1
+	}
+	defer sqlite.finalize(stmt)
+
+	if db.is_json {
+		fmt.print("[")
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do fmt.print(",")
+			first = false
+			fmt.printf(`{{"npc_id":%d,"npc_name":"%s","standing":%d,"notes":"%s"}}`,
+				sqlite.column_int(stmt, 0), column_text_safe(stmt, 1),
+				sqlite.column_int(stmt, 2), column_text_safe(stmt, 3))
+		}
+		fmt.println("]")
+	} else {
+		has_any := false
+		for sqlite.step(stmt) == .Row {
+			has_any = true
+			fmt.printf("  NPC %d (%s): standing %d\n",
+				sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), sqlite.column_int(stmt, 2))
+		}
+		if !has_any do fmt.println("  No standings found.")
+	}
+	return 0
+}
+
+touch_npc_standing_decay_day :: proc(db: ^lib.Db, char_id: int, npc_id: int) {
+	stmt: ^sqlite.Statement
+	camp_sql := fmt.tprintf("SELECT campaign_id FROM characters WHERE id=%d", char_id)
+	camp_sql_c := cstring(raw_data(camp_sql))
+	if sqlite.prepare(db.ptr, camp_sql_c, i32(len(camp_sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return
+	}
+	campaign_id := int(sqlite.column_int(stmt, 0))
+	if campaign_id <= 0 {
+		return
+	}
+	day, ok := get_current_day(db, campaign_id)
+	if !ok {
+		return
+	}
+	lib.db_exec(db, fmt.tprintf("UPDATE character_npc_standings SET last_interaction_day=%d WHERE character_id=%d AND npc_id=%d", day, char_id, npc_id))
+}
+
+touch_npc_relationship_decay_day :: proc(db: ^lib.Db, npc_id: int) {
+	stmt: ^sqlite.Statement
+	camp_sql := fmt.tprintf("SELECT campaign_id FROM npcs WHERE id=%d", npc_id)
+	camp_sql_c := cstring(raw_data(camp_sql))
+	if sqlite.prepare(db.ptr, camp_sql_c, i32(len(camp_sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return
+	}
+	campaign_id := int(sqlite.column_int(stmt, 0))
+	if campaign_id <= 0 {
+		return
+	}
+	day, ok := get_current_day(db, campaign_id)
+	if !ok {
+		return
+	}
+	lib.db_exec(db, fmt.tprintf("UPDATE npc_relationships SET last_interaction_day=%d WHERE npc_id_1=%d OR npc_id_2=%d", day, npc_id, npc_id))
 }

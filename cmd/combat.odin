@@ -264,7 +264,8 @@ combat_join :: proc(db: ^lib.Db, args: []string) -> int {
     actor_type := args[2]
     if actor_type == "char" do actor_type = "character"
     actor_id := strconv.atoi(args[3])
-    init_roll := strconv.atoi(args[4])
+    init_roll, init_ok := roll_initiative(args[4])
+    if !init_ok do return print_error(db, "Invalid initiative — expected dice spec like 1d20+3")
     init_mod := 0
     if len(args) >= 6 do init_mod = strconv.atoi(args[5])
     position := "melee"
@@ -426,7 +427,7 @@ combat_next :: proc(db: ^lib.Db, args: []string) -> int {
     // Reset action/bonus for the new current actor
     atype, aid, _ := get_current_actor(db, enc_id, next_turn)
     if len(atype) > 0 {
-        lib.db_exec(db, fmt.tprintf("UPDATE combat_participants SET action_used=0, bonus_action_used=0 WHERE encounter_id=%d AND actor_type='%s' AND actor_id=%d", enc_id, escape_sql(atype), aid))
+        lib.db_exec(db, fmt.tprintf("UPDATE combat_participants SET action_used=0, bonus_action_used=0, attacks_used=0, movement_used=0 WHERE encounter_id=%d AND actor_type='%s' AND actor_id=%d", enc_id, escape_sql(atype), aid))
     }
 
     ctype, cid, cname := get_current_actor(db, enc_id, next_turn)
@@ -451,7 +452,8 @@ combat_attack :: proc(db: ^lib.Db, args: []string) -> int {
     att_id := strconv.atoi(args[3])
     tgt_type := args[4]; if tgt_type == "char" do tgt_type = "character"
     tgt_id := strconv.atoi(args[5])
-    att_roll := strconv.atoi(args[6])
+    att_roll, att_ok := resolve_attack_roll(args[6])
+    if !att_ok do return print_error(db, "Invalid attack roll — expected dice spec like d20+5")
     ability := "str"
     if len(args) >= 8 do ability = args[7]
     advantage := 0
@@ -496,7 +498,8 @@ combat_damage :: proc(db: ^lib.Db, args: []string) -> int {
     if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
     tgt_type := args[2]; if tgt_type == "char" do tgt_type = "character"
     tgt_id := strconv.atoi(args[3])
-    amount := strconv.atoi(args[4])
+    amount, amt_ok := resolve_amount(args[4])
+    if !amt_ok do return print_error(db, "Invalid damage amount — expected dice spec like 2d6+3 or 8d6")
     dmg_type := args[5]
     source := ""; if len(args) >= 7 do source = args[6]
 
@@ -525,8 +528,9 @@ combat_damage :: proc(db: ^lib.Db, args: []string) -> int {
 
     conc_msg := ""
     if len(s.concentrating) > 0 && remaining > 0 {
-        dc := remaining / 2; if dc < 10 do dc = 10
-        conc_msg = fmt.tprintf(" | Concentration DC %d (%s)", dc, s.concentrating)
+        conc_passed, conc_log := roll_concentration_save(db, enc_id, tgt_type, tgt_id, remaining)
+        _ = conc_passed
+        conc_msg = fmt.tprintf(" | %s", conc_log)
     }
     death_msg := ""
     if new_hp <= 0 {
@@ -556,7 +560,8 @@ combat_save :: proc(db: ^lib.Db, args: []string) -> int {
     actor_type := args[2]; if actor_type == "char" do actor_type = "character"
     actor_id := strconv.atoi(args[3])
     ability := args[4]
-    save_roll := strconv.atoi(args[5])
+    save_roll, save_ok := resolve_save_roll(args[5])
+    if !save_ok do return print_error(db, "Invalid save roll — expected dice spec like d20")
     dc := 10; if len(args) >= 7 do dc = strconv.atoi(args[6])
     advantage := 0
     if len(args) >= 8 {
@@ -654,7 +659,8 @@ combat_death_save :: proc(db: ^lib.Db, args: []string) -> int {
         return print_error(db, "Usage: ttrpg-engine combat death-save <character_id> <roll>")
     }
     char_id := strconv.atoi(args[1])
-    roll := strconv.atoi(args[2])
+    roll, roll_ok := resolve_attack_roll(args[2])
+    if !roll_ok do return print_error(db, "Invalid death save — expected dice spec like d20")
 
     stmt: ^sqlite.Statement
     sel_sql := fmt.tprintf("SELECT death_saves_success, death_saves_failure, current_hp FROM characters WHERE id=%d", char_id)
@@ -979,4 +985,681 @@ print_text_combat :: proc(db: ^lib.Db, campaign_id: int) {
         }
     }
     fmt.println()
+}
+
+// ---------------------------------------------------------------------------
+// Integration helpers — weapon lookup, skill mapping, multiattack, spell slots
+// ---------------------------------------------------------------------------
+
+get_equipped_weapon :: proc(db: ^lib.Db, actor_type: string, actor_id: int) -> (damage_dice: string, damage_type: string, magic_bonus: int, found: bool) {
+    id_col := ""
+    switch actor_type {
+    case "character": id_col = "character_id"
+    case "npc":       id_col = "npc_id"
+    case "creature":  id_col = "creature_id"
+    case: return "", "", 0, false
+    }
+
+    stmt: ^sqlite.Statement
+    sql := fmt.tprintf(
+        "SELECT i.damage_dice, i.damage_type, i.name, i.properties, i.description FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.%s=%d AND inv.equipped=1 AND (i.damage_dice != '' OR i.item_type='weapon') LIMIT 1",
+        id_col, actor_id,
+    )
+    sql_c := cstring(raw_data(sql))
+    if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok do return "", "", 0, false
+    defer sqlite.finalize(stmt)
+
+    if sqlite.step(stmt) != .Row do return "", "", 0, false
+
+    damage_dice = column_text_safe(stmt, 0)
+    damage_type = column_text_safe(stmt, 1)
+    name := column_text_safe(stmt, 2)
+    props := column_text_safe(stmt, 3)
+    desc := column_text_safe(stmt, 4)
+
+    magic_bonus = get_string_magic_bonus(name)
+    if magic_bonus == 0 do magic_bonus = get_string_magic_bonus(props)
+    if magic_bonus == 0 do magic_bonus = get_string_magic_bonus(desc)
+
+    return damage_dice, damage_type, magic_bonus, true
+}
+
+skill_ability :: proc(skill: string) -> string {
+    switch strings.to_lower(skill) {
+    case "athletics":      return "str"
+    case "acrobatics", "sleight of hand", "stealth": return "dex"
+    case "arcana", "history", "investigation", "nature", "religion": return "int"
+    case "animal handling", "insight", "medicine", "perception", "survival": return "wis"
+    case "deception", "intimidation", "performance", "persuasion": return "cha"
+    }
+    return "wis"
+}
+
+get_multiattack_count :: proc(db: ^lib.Db, actor_type: string, actor_id: int) -> int {
+    table := ""
+    switch actor_type {
+    case "creature": table = "creatures"
+    case "npc":      table = "npcs"
+    case: return 1
+    }
+
+    stmt: ^sqlite.Statement
+    sql := fmt.tprintf("SELECT COALESCE(multiattack_count,1) FROM %s WHERE id=%d", table, actor_id)
+    sql_c := cstring(raw_data(sql))
+    if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok do return 1
+    defer sqlite.finalize(stmt)
+    if sqlite.step(stmt) == .Row do return int(sqlite.column_int(stmt, 0))
+    return 1
+}
+
+check_action_economy :: proc(db: ^lib.Db, enc_id: int, actor_type: string, actor_id: int, is_bonus: bool) -> bool {
+    stmt: ^sqlite.Statement
+    sql := fmt.tprintf("SELECT action_used, bonus_action_used, attacks_used FROM combat_participants WHERE encounter_id=%d AND actor_type='%s' AND actor_id=%d", enc_id, escape_sql(actor_type), actor_id)
+    sql_c := cstring(raw_data(sql))
+    if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok do return false
+    defer sqlite.finalize(stmt)
+    if sqlite.step(stmt) != .Row do return false
+
+    action_used := int(sqlite.column_int(stmt, 0)) != 0
+    bonus_used := int(sqlite.column_int(stmt, 1)) != 0
+    attacks_used := int(sqlite.column_int(stmt, 2))
+
+    if is_bonus {
+        return !bonus_used
+    }
+
+    if action_used {
+        max_attacks := get_multiattack_count(db, actor_type, actor_id)
+        if attacks_used >= max_attacks do return false
+    }
+    return true
+}
+
+mark_action_used :: proc(db: ^lib.Db, enc_id: int, actor_type: string, actor_id: int, is_bonus: bool) {
+    if is_bonus {
+        lib.db_exec(db, fmt.tprintf("UPDATE combat_participants SET bonus_action_used=1 WHERE encounter_id=%d AND actor_type='%s' AND actor_id=%d", enc_id, escape_sql(actor_type), actor_id))
+    } else {
+        lib.db_exec(db, fmt.tprintf("UPDATE combat_participants SET action_used=1, attacks_used=attacks_used+1 WHERE encounter_id=%d AND actor_type='%s' AND actor_id=%d", enc_id, escape_sql(actor_type), actor_id))
+    }
+}
+
+get_spell_slot_available :: proc(db: ^lib.Db, char_id: int, slot_level: int) -> (available: int, ok: bool) {
+    stmt: ^sqlite.Statement
+    sql := fmt.tprintf("SELECT max_slots, used_slots FROM character_spell_slots WHERE character_id=%d AND slot_level=%d", char_id, slot_level)
+    sql_c := cstring(raw_data(sql))
+    if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok do return 0, false
+    defer sqlite.finalize(stmt)
+    if sqlite.step(stmt) != .Row do return 0, false
+    max_slots := int(sqlite.column_int(stmt, 0))
+    used := int(sqlite.column_int(stmt, 1))
+    return max_slots - used, true
+}
+
+consume_spell_slot :: proc(db: ^lib.Db, char_id: int, slot_level: int) -> bool {
+    avail, ok := get_spell_slot_available(db, char_id, slot_level)
+    if !ok || avail < 1 do return false
+    sql := fmt.tprintf("UPDATE character_spell_slots SET used_slots = used_slots + 1 WHERE character_id=%d AND slot_level=%d", char_id, slot_level)
+    lib.db_exec(db, sql)
+    return true
+}
+
+get_character_spell :: proc(db: ^lib.Db, char_id: int, spell_name: string) -> (spell_id: int, prepared: bool, found: bool) {
+    stmt: ^sqlite.Statement
+    sql := fmt.tprintf(
+        "SELECT cs.spell_id, cs.prepared FROM character_spells cs JOIN spells s ON cs.spell_id=s.id WHERE cs.character_id=%d AND LOWER(s.name)=LOWER('%s')",
+        char_id, escape_sql(spell_name),
+    )
+    sql_c := cstring(raw_data(sql))
+    if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok do return 0, false, false
+    defer sqlite.finalize(stmt)
+    if sqlite.step(stmt) == .Row {
+        return int(sqlite.column_int(stmt, 0)), int(sqlite.column_int(stmt, 1)) != 0, true
+    }
+    return 0, false, false
+}
+
+// ---------------------------------------------------------------------------
+// combat cast <encounter_id> <caster_type> <caster_id> <spell_name> <slot_level> <target_type> <target_id> [save_ability] [damage_dice] [dc_override]
+// ---------------------------------------------------------------------------
+combat_cast :: proc(db: ^lib.Db, args: []string) -> int {
+    if len(args) < 8 {
+        return print_error(db, "Usage: ttrpg-engine combat cast <encounter_id> <caster_type> <caster_id> <spell_name> <slot_level> <target_type> <target_id> [save_ability] [damage_dice] [dc_override]")
+    }
+    enc_id := strconv.atoi(args[1])
+    if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
+    caster_type := args[2]; if caster_type == "char" do caster_type = "character"
+    caster_id := strconv.atoi(args[3])
+    spell_name := args[4]
+    slot_level := strconv.atoi(args[5])
+    tgt_type := args[6]; if tgt_type == "char" do tgt_type = "character"
+    tgt_id := strconv.atoi(args[7])
+    save_ability := ""; if len(args) >= 9 do save_ability = args[8]
+    damage_dice := ""; if len(args) >= 10 do damage_dice = args[9]
+    dc_override := 0; if len(args) >= 11 do dc_override = strconv.atoi(args[10])
+
+    if !is_participant(db, enc_id, caster_type, caster_id) do return print_error(db, "Caster is not in this combat")
+    if !is_participant(db, enc_id, tgt_type, tgt_id) do return print_error(db, "Target is not in this combat")
+
+    is_bonus := false
+    if caster_type == "character" {
+        _, prepared, spell_found := get_character_spell(db, caster_id, spell_name)
+        if !spell_found do return print_error(db, "Spell not known by this character")
+        if !prepared do return print_error(db, "Spell not prepared")
+
+        if slot_level > 0 {
+            avail, slot_ok := get_spell_slot_available(db, caster_id, slot_level)
+            if !slot_ok || avail < 1 do return print_error(db, "No spell slots available at that level")
+        }
+    }
+
+    if !check_action_economy(db, enc_id, caster_type, caster_id, is_bonus) {
+        return print_error(db, "Action already used this turn")
+    }
+
+    mark_action_used(db, enc_id, caster_type, caster_id, is_bonus)
+
+    if caster_type == "character" && slot_level > 0 {
+        if !consume_spell_slot(db, caster_id, slot_level) {
+            return print_error(db, "Failed to consume spell slot")
+        }
+    }
+
+    caster_s, _ := get_actor_stats(db, caster_type, caster_id)
+    tgt_s, _ := get_actor_stats(db, tgt_type, tgt_id)
+
+    spell_attack := 0
+    spell_dc := 0
+
+    if caster_type == "character" {
+        char, char_ok := fetch_character_stats(db, caster_id)
+        if char_ok {
+            spell_attack = char.spell_attack_bonus
+            spell_dc = char.spell_save_dc
+        }
+    } else {
+        spell_attack = caster_s.attack_bonus
+        best_mod := ability_mod(caster_s, "int")
+        if m := ability_mod(caster_s, "wis"); m > best_mod do best_mod = m
+        if m := ability_mod(caster_s, "cha"); m > best_mod do best_mod = m
+        spell_dc = 8 + caster_s.proficiency + best_mod
+    }
+
+    if dc_override > 0 do spell_dc = dc_override
+
+    if len(save_ability) > 0 {
+        tgt_mod := ability_mod(tgt_s, save_ability)
+        tgt_prof := 0
+        if tgt_type == "character" do tgt_prof = get_char_save_prof(db, tgt_id, save_ability)
+        save_roll, _ := resolve_attack_roll("d20")
+        save_total := save_roll + tgt_mod + tgt_prof * tgt_s.proficiency
+        passed := save_total >= spell_dc
+
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"caster":"%s","spell":"%s","slot_level":%d,"target":"%s","save_ability":"%s","save_roll":%d,"save_dc":%d,"passed":%s,"spell_dc":%d}}` + "\n",
+                enc_id, escape_json_string(caster_s.name), escape_json_string(spell_name), slot_level, escape_json_string(tgt_s.name), save_ability, save_total, spell_dc, passed ? "true" : "false", spell_dc)
+        } else {
+            fmt.printf("%s casts %s (level %d) on %s: %s save %d vs DC %d → %s\n",
+                caster_s.name, spell_name, slot_level, tgt_s.name, save_ability, save_total, spell_dc, passed ? "FAILS" : "PASSES")
+        }
+    } else {
+        att_roll, _ := resolve_attack_roll("d20")
+        total := att_roll + spell_attack
+        hit := total >= tgt_s.ac
+
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"caster":"%s","spell":"%s","slot_level":%d,"target":"%s","attack_roll":%d,"spell_attack_bonus":%d,"total":%d,"target_ac":%d,"hit":%s}}` + "\n",
+                enc_id, escape_json_string(caster_s.name), escape_json_string(spell_name), slot_level, escape_json_string(tgt_s.name), att_roll, spell_attack, total, tgt_s.ac, hit ? "true" : "false")
+        } else {
+            fmt.printf("%s casts %s (level %d) on %s: %d + %d = %d vs AC %d → %s\n",
+                caster_s.name, spell_name, slot_level, tgt_s.name, att_roll, spell_attack, total, tgt_s.ac, hit ? "HIT" : "MISS")
+        }
+    }
+
+    // Track concentration
+    stmt: ^sqlite.Statement
+    spell_sql := fmt.tprintf("SELECT duration FROM spells WHERE LOWER(name)=LOWER('%s')", escape_sql(spell_name))
+    spell_c := cstring(raw_data(spell_sql))
+    if sqlite.prepare(db.ptr, spell_c, i32(len(spell_sql)), &stmt, nil) == .Ok {
+        if sqlite.step(stmt) == .Row {
+            duration := column_text_safe(stmt, 0)
+            if strings.contains(strings.to_lower(duration), "concentration") {
+                table := actor_table(caster_type)
+                if len(table) > 0 {
+                    lib.db_exec(db, fmt.tprintf("UPDATE %s SET concentrating_on='%s' WHERE id=%d", table, escape_sql(spell_name), caster_id))
+                    if !db.is_json do fmt.printf("  %s is now concentrating on %s.\n", caster_s.name, spell_name)
+                }
+            }
+        }
+        sqlite.finalize(stmt)
+    }
+
+    return 0
+}
+
+// ---------------------------------------------------------------------------
+// combat check <encounter_id> <actor_type> <actor_id> <skill_name> [dc] [target_type] [target_id]
+// ---------------------------------------------------------------------------
+combat_check :: proc(db: ^lib.Db, args: []string) -> int {
+    if len(args) < 5 {
+        return print_error(db, "Usage: ttrpg-engine combat check <encounter_id> <actor_type> <actor_id> <skill_name> [dc] [target_type] [target_id]")
+    }
+    enc_id := strconv.atoi(args[1])
+    if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
+    actor_type := args[2]; if actor_type == "char" do actor_type = "character"
+    actor_id := strconv.atoi(args[3])
+    skill_name := args[4]
+    dc := 0; if len(args) >= 6 do dc = strconv.atoi(args[5])
+    contest_type := ""; if len(args) >= 7 do contest_type = args[6]; if contest_type == "char" do contest_type = "character"
+    contest_id := 0; if len(args) >= 8 do contest_id = strconv.atoi(args[7])
+
+    if !is_participant(db, enc_id, actor_type, actor_id) do return print_error(db, "Actor not in combat")
+
+    s, _ := get_actor_stats(db, actor_type, actor_id)
+    ability := skill_ability(skill_name)
+    mod := ability_mod(s, ability)
+
+    prof_level := 0
+    if actor_type == "character" {
+        stmt: ^sqlite.Statement
+        sk_sql := fmt.tprintf("SELECT proficiency_level FROM character_skills WHERE character_id=%d AND LOWER(skill_name)=LOWER('%s')", actor_id, escape_sql(skill_name))
+        sk_c := cstring(raw_data(sk_sql))
+        if sqlite.prepare(db.ptr, sk_c, i32(len(sk_sql)), &stmt, nil) == .Ok {
+            if sqlite.step(stmt) == .Row do prof_level = int(sqlite.column_int(stmt, 0))
+            sqlite.finalize(stmt)
+        }
+    }
+
+    prof_bonus := s.proficiency * prof_level
+    roll, _ := resolve_attack_roll("d20")
+    total := roll + mod + prof_bonus
+
+    if contest_id > 0 && len(contest_type) > 0 {
+        cs, c_ok := get_actor_stats(db, contest_type, contest_id)
+        if !c_ok do return print_error(db, "Contest target not found")
+
+        c_mod := ability_mod(cs, ability)
+        c_prof_level := 0
+        if contest_type == "character" {
+            stmt: ^sqlite.Statement
+            sk_sql := fmt.tprintf("SELECT proficiency_level FROM character_skills WHERE character_id=%d AND LOWER(skill_name)=LOWER('%s')", contest_id, escape_sql(skill_name))
+            sk_c := cstring(raw_data(sk_sql))
+            if sqlite.prepare(db.ptr, sk_c, i32(len(sk_sql)), &stmt, nil) == .Ok {
+                if sqlite.step(stmt) == .Row do c_prof_level = int(sqlite.column_int(stmt, 0))
+                sqlite.finalize(stmt)
+            }
+        }
+        c_prof_bonus := cs.proficiency * c_prof_level
+        c_roll, _ := resolve_attack_roll("d20")
+        c_total := c_roll + c_mod + c_prof_bonus
+
+        success := total > c_total
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"actor":"%s","skill":"%s","roll":%d,"mod":%d,"prof":%d,"total":%d,"contest_actor":"%s","contest_roll":%d,"contest_mod":%d,"contest_prof":%d,"contest_total":%d,"won":%s}}` + "\n",
+                enc_id, escape_json_string(s.name), skill_name, roll, mod, prof_bonus, total,
+                escape_json_string(cs.name), c_roll, c_mod, c_prof_bonus, c_total, success ? "true" : "false")
+        } else {
+            fmt.printf("%s %s check: %d + %d + %d = %d vs %s %d + %d + %d = %d → %s\n",
+                s.name, skill_name, roll, mod, prof_bonus, total,
+                cs.name, c_roll, c_mod, c_prof_bonus, c_total, success ? "SUCCESS" : "FAILURE")
+        }
+    } else {
+        passed := total >= dc
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"actor":"%s","skill":"%s","ability":"%s","roll":%d,"mod":%d,"prof":%d,"total":%d,"dc":%d,"passed":%s}}` + "\n",
+                enc_id, escape_json_string(s.name), skill_name, ability, roll, mod, prof_bonus, total, dc, passed ? "true" : "false")
+        } else {
+            dc_str := dc > 0 ? fmt.tprintf(" vs DC %d", dc) : ""
+            fmt.printf("%s %s check (%s): %d + %d + %d = %d%s → %s\n",
+                s.name, skill_name, ability, roll, mod, prof_bonus, total, dc_str,
+                dc > 0 ? (passed ? "PASS" : "FAIL") : fmt.tprintf("%d", total))
+        }
+    }
+    return 0
+}
+
+// ---------------------------------------------------------------------------
+// combat strike <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> [ability] [bonus_action]
+// Auto-looks-up equipped weapon, rolls attack + damage in one command.
+// ---------------------------------------------------------------------------
+combat_strike :: proc(db: ^lib.Db, args: []string) -> int {
+    if len(args) < 6 {
+        return print_error(db, "Usage: ttrpg-engine combat strike <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> [ability] [bonus_action]")
+    }
+    enc_id := strconv.atoi(args[1])
+    if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
+    att_type := args[2]; if att_type == "char" do att_type = "character"
+    att_id := strconv.atoi(args[3])
+    tgt_type := args[4]; if tgt_type == "char" do tgt_type = "character"
+    tgt_id := strconv.atoi(args[5])
+    ability := ""; if len(args) >= 7 do ability = args[6]
+    is_bonus := false; if len(args) >= 8 && (args[7] == "bonus" || args[7] == "ba") do is_bonus = true
+
+    if !is_participant(db, enc_id, att_type, att_id) do return print_error(db, "Attacker is not in this combat")
+    if !is_participant(db, enc_id, tgt_type, tgt_id) do return print_error(db, "Target is not in this combat")
+
+    if !check_action_economy(db, enc_id, att_type, att_id, is_bonus) {
+        return print_error(db, is_bonus ? "Bonus action already used" : "No actions remaining this turn")
+    }
+
+    att_s, _ := get_actor_stats(db, att_type, att_id)
+    tgt_s, _ := get_actor_stats(db, tgt_type, tgt_id)
+
+    dmg_dice, dmg_type, magic_bonus, has_weapon := get_equipped_weapon(db, att_type, att_id)
+
+    if len(ability) == 0 && has_weapon {
+        ability = "str"
+        id_col := att_type == "character" ? "character_id" : att_type == "npc" ? "npc_id" : "creature_id"
+        stmt: ^sqlite.Statement
+        prop_sql := fmt.tprintf("SELECT i.properties FROM inventory inv JOIN items i ON inv.item_id=i.id WHERE inv.%s=%d AND inv.equipped=1 AND (i.damage_dice != '' OR i.item_type='weapon') LIMIT 1", id_col, att_id)
+        prop_c := cstring(raw_data(prop_sql))
+        if sqlite.prepare(db.ptr, prop_c, i32(len(prop_sql)), &stmt, nil) == .Ok {
+            if sqlite.step(stmt) == .Row {
+                props := column_text_safe(stmt, 0)
+                if strings.contains(strings.to_lower(props), "finesse") {
+                    dex_mod := (att_s.dex - 10) / 2
+                    str_mod := (att_s.str - 10) / 2
+                    if dex_mod >= str_mod do ability = "dex"
+                } else if strings.contains(strings.to_lower(props), "ranged") {
+                    ability = "dex"
+                }
+            }
+            sqlite.finalize(stmt)
+        }
+    }
+    if len(ability) == 0 do ability = "str"
+
+    mod := attack_mod(att_s, ability)
+    cover := 0
+    if get_participant_position(db, enc_id, tgt_type, tgt_id) == "cover" do cover = 2
+
+    att_roll, _ := resolve_attack_roll("d20")
+    total := att_roll + mod + cover + magic_bonus
+    hit := total >= tgt_s.ac
+
+    mark_action_used(db, enc_id, att_type, att_id, is_bonus)
+
+    if !hit {
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"attacker":"%s","target":"%s","attack_roll":%d,"modifier":%d,"total":%d,"target_ac":%d,"hit":false}}` + "\n",
+                enc_id, escape_json_string(att_s.name), escape_json_string(tgt_s.name), att_roll, mod, total, tgt_s.ac)
+        } else {
+            fmt.printf("%s attacks %s: %d + %d = %d vs AC %d → MISS\n",
+                att_s.name, tgt_s.name, att_roll, mod, total, tgt_s.ac)
+        }
+        return 0
+    }
+
+    // Roll damage
+    ab_mod := (att_s.str - 10) / 2
+    if ability == "dex" do ab_mod = (att_s.dex - 10) / 2
+
+    if has_weapon {
+        dmg, _ := resolve_amount(dmg_dice)
+        dmg += ab_mod + magic_bonus
+
+        modified := dmg
+        status_str := ""
+        if has_damage_type(tgt_s.immunities, dmg_type) { modified = 0; status_str = " (IMMUNE)" }
+        else if has_damage_type(tgt_s.resistances, dmg_type) { modified = dmg / 2; status_str = " (resistant)" }
+        else if has_damage_type(tgt_s.vulnerabilities, dmg_type) { modified = dmg * 2; status_str = " (vulnerable)" }
+
+        remaining := modified
+        table := actor_table(tgt_type)
+        if tgt_s.temp_hp > 0 {
+            if remaining <= tgt_s.temp_hp {
+                lib.db_exec(db, fmt.tprintf("UPDATE %s SET temp_hp = temp_hp - %d WHERE id=%d", table, remaining, tgt_id))
+                remaining = 0
+            } else {
+                remaining -= tgt_s.temp_hp
+                lib.db_exec(db, fmt.tprintf("UPDATE %s SET temp_hp=0 WHERE id=%d", table, tgt_id))
+            }
+        }
+        new_hp := tgt_s.current_hp - remaining
+        hp_update(db, tgt_type, tgt_id, new_hp)
+
+        conc_msg := ""
+        if len(tgt_s.concentrating) > 0 && remaining > 0 {
+            conc_passed, conc_log := roll_concentration_save(db, enc_id, tgt_type, tgt_id, remaining)
+            _ = conc_passed
+            conc_msg = fmt.tprintf(" | %s", conc_log)
+        }
+        death_msg := ""
+        if new_hp <= 0 {
+            set_participant_active(db, enc_id, tgt_type, tgt_id, false)
+            if tgt_type == "character" do death_msg = " | Unconscious — death saves needed"
+            else do death_msg = " | Killed"
+        }
+
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"attacker":"%s","target":"%s","attack_roll":%d,"modifier":%d,"total":%d,"target_ac":%d,"hit":true,"damage_dice":"%s","damage":%d,"damage_type":"%s","modified_damage":%d,"new_hp":%d,"max_hp":%d}}` + "\n",
+                enc_id, escape_json_string(att_s.name), escape_json_string(tgt_s.name), att_roll, mod, total, tgt_s.ac, dmg_dice, dmg, dmg_type, modified, new_hp, tgt_s.max_hp)
+        } else {
+            fmt.printf("%s hits %s: %d + %d = %d vs AC %d → HIT | %d %s%s → %d/%d HP%s%s\n",
+                att_s.name, tgt_s.name, att_roll, mod, total, tgt_s.ac, dmg, dmg_type, status_str, new_hp, tgt_s.max_hp, conc_msg, death_msg)
+        }
+    } else {
+        unarmed := 1 + ab_mod
+        if unarmed < 1 do unarmed = 1
+
+        remaining := unarmed
+        table := actor_table(tgt_type)
+        if tgt_s.temp_hp > 0 {
+            if remaining <= tgt_s.temp_hp {
+                lib.db_exec(db, fmt.tprintf("UPDATE %s SET temp_hp = temp_hp - %d WHERE id=%d", table, remaining, tgt_id))
+                remaining = 0
+            } else {
+                remaining -= tgt_s.temp_hp
+                lib.db_exec(db, fmt.tprintf("UPDATE %s SET temp_hp=0 WHERE id=%d", table, tgt_id))
+            }
+        }
+        new_hp := tgt_s.current_hp - remaining
+        hp_update(db, tgt_type, tgt_id, new_hp)
+
+        death_msg := ""
+        if new_hp <= 0 {
+            set_participant_active(db, enc_id, tgt_type, tgt_id, false)
+            if tgt_type == "character" do death_msg = " | Unconscious — death saves needed"
+            else do death_msg = " | Killed"
+        }
+
+        if db.is_json {
+            fmt.printf(`{{"success":true,"encounter_id":%d,"attacker":"%s","target":"%s","attack_roll":%d,"modifier":%d,"total":%d,"target_ac":%d,"hit":true,"damage":%d,"damage_type":"bludgeoning","new_hp":%d,"max_hp":%d}}` + "\n",
+                enc_id, escape_json_string(att_s.name), escape_json_string(tgt_s.name), att_roll, mod, total, tgt_s.ac, unarmed, new_hp, tgt_s.max_hp)
+        } else {
+            fmt.printf("%s hits %s with unarmed strike: %d bludgeoning → %d/%d HP%s\n",
+                att_s.name, tgt_s.name, unarmed, new_hp, tgt_s.max_hp, death_msg)
+        }
+    }
+    return 0
+}
+
+// ---------------------------------------------------------------------------
+// Concentration auto-roll — called from combat_damage and combat_strike
+// ---------------------------------------------------------------------------
+roll_concentration_save :: proc(db: ^lib.Db, enc_id: int, tgt_type: string, tgt_id: int, damage_taken: int) -> (passed: bool, log_msg: string) {
+    s, ok := get_actor_stats(db, tgt_type, tgt_id)
+    if !ok || len(s.concentrating) == 0 || damage_taken <= 0 do return true, ""
+
+    dc := damage_taken / 2
+    if dc < 10 do dc = 10
+
+    con_mod := ability_mod(s, "con")
+    prof := 0
+    if tgt_type == "character" do prof = get_char_save_prof(db, tgt_id, "con")
+    prof_bonus := prof * s.proficiency
+
+    roll, _ := resolve_attack_roll("d20")
+    total := roll + con_mod + prof_bonus
+    passed = total >= dc
+
+    if passed {
+        log_msg = fmt.tprintf("Concentration DC %d: %d + %d + %d = %d → MAINTAINED (%s)",
+            dc, roll, con_mod, prof_bonus, total, s.concentrating)
+    } else {
+        table := actor_table(tgt_type)
+        if len(table) > 0 {
+            lib.db_exec(db, fmt.tprintf("UPDATE %s SET concentrating_on='' WHERE id=%d", table, tgt_id))
+        }
+        log_msg = fmt.tprintf("Concentration DC %d: %d + %d + %d = %d → BROKEN (was: %s)",
+            dc, roll, con_mod, prof_bonus, total, s.concentrating)
+    }
+    return
+}
+
+// ---------------------------------------------------------------------------
+// combat use-feature <encounter_id> <actor_type> <actor_id> <feature_name>
+// ---------------------------------------------------------------------------
+combat_use_feature :: proc(db: ^lib.Db, args: []string) -> int {
+    if len(args) < 5 {
+        return print_error(db, "Usage: ttrpg-engine combat use-feature <encounter_id> <actor_type> <actor_id> <feature_name>")
+    }
+    enc_id := strconv.atoi(args[1])
+    if !encounter_exists(db, enc_id) do return print_error(db, "Encounter not found or not active")
+    actor_type := args[2]; if actor_type == "char" do actor_type = "character"
+    actor_id := strconv.atoi(args[3])
+    feature_name := args[4]
+
+    if !is_participant(db, enc_id, actor_type, actor_id) do return print_error(db, "Actor not in combat")
+
+    s, _ := get_actor_stats(db, actor_type, actor_id)
+
+    // Look up feature
+    stmt: ^sqlite.Statement
+    feat_sql := fmt.tprintf("SELECT id, source, description FROM features WHERE LOWER(name)=LOWER('%s')", escape_sql(feature_name))
+    feat_c := cstring(raw_data(feat_sql))
+    if sqlite.prepare(db.ptr, feat_c, i32(len(feat_sql)), &stmt, nil) != .Ok do return print_error(db, "Feature not found in library")
+    defer sqlite.finalize(stmt)
+    if sqlite.step(stmt) != .Row do return print_error(db, "Feature not found in library")
+    feat_id := int(sqlite.column_int(stmt, 0))
+    feat_source := column_text_safe(stmt, 1)
+    sqlite.finalize(stmt)
+
+    // Verify actor has this feature (characters only for now)
+    has_feature := false
+    if actor_type == "character" {
+        chk_stmt: ^sqlite.Statement
+        chk_sql := fmt.tprintf("SELECT 1 FROM character_features WHERE character_id=%d AND feature_id=%d", actor_id, feat_id)
+        chk_c := cstring(raw_data(chk_sql))
+        if sqlite.prepare(db.ptr, chk_c, i32(len(chk_sql)), &chk_stmt, nil) == .Ok {
+            has_feature = sqlite.step(chk_stmt) == .Row
+            sqlite.finalize(chk_stmt)
+        }
+    } else {
+        // NPCs and creatures always "have" their listed features
+        has_feature = true
+    }
+    if !has_feature do return print_error(db, "Actor does not have this feature")
+
+    // Try to match and consume a resource
+    resource_name := ""
+    feature_lower := strings.to_lower(feature_name)
+    switch {
+    case strings.contains(feature_lower, "rage"):
+        resource_name = "Rage"
+    case strings.contains(feature_lower, "ki") || strings.contains(feature_lower, "flurry of blows") || strings.contains(feature_lower, "stunning strike") || strings.contains(feature_lower, "step of the wind") || strings.contains(feature_lower, "patient defense"):
+        resource_name = "Ki Points"
+    case strings.contains(feature_lower, "bardic inspiration"):
+        resource_name = "Bardic Inspiration"
+    case strings.contains(feature_lower, "channel divinity") || strings.contains(feature_lower, "turn undead"):
+        resource_name = "Channel Divinity"
+    case strings.contains(feature_lower, "action surge"):
+        resource_name = "Action Surge"
+    case strings.contains(feature_lower, "second wind"):
+        resource_name = "Second Wind"
+    case strings.contains(feature_lower, "arcane recovery"):
+        resource_name = "Arcane Recovery"
+    case strings.contains(feature_lower, "sorcery points") || strings.contains(feature_lower, "metamagic"):
+        resource_name = "Sorcery Points"
+    case strings.contains(feature_lower, "wild shape"):
+        resource_name = "Wild Shape"
+    case strings.contains(feature_lower, "lay on hands"):
+        resource_name = "Lay on Hands"
+    case strings.contains(feature_lower, "divine sense"):
+        resource_name = "Divine Sense"
+    }
+
+    resource_consumed := false
+    before_amount := 0
+    after_amount := 0
+
+    if len(resource_name) > 0 && actor_type == "character" {
+        res_stmt: ^sqlite.Statement
+        res_sql := fmt.tprintf("SELECT current_amount FROM character_resources WHERE character_id=%d AND resource_name='%s'", actor_id, escape_sql(resource_name))
+        res_c := cstring(raw_data(res_sql))
+        if sqlite.prepare(db.ptr, res_c, i32(len(res_sql)), &res_stmt, nil) == .Ok {
+            if sqlite.step(res_stmt) == .Row {
+                before_amount = int(sqlite.column_int(res_stmt, 0))
+                sqlite.finalize(res_stmt)
+                if before_amount > 0 {
+                    lib.db_exec(db, fmt.tprintf("UPDATE character_resources SET current_amount = current_amount - 1 WHERE character_id=%d AND resource_name='%s'", actor_id, escape_sql(resource_name)))
+                    after_amount = before_amount - 1
+                    resource_consumed = true
+                }
+            } else {
+                sqlite.finalize(res_stmt)
+            }
+        }
+    }
+
+    // Apply mechanical effects for known features
+    effect_msg := ""
+    feat_lower := strings.to_lower(feature_name)
+
+    if strings.contains(feat_lower, "rage") {
+        // Query current status effects from the actor's table
+        table := actor_table(actor_type)
+        current_effects := ""
+        if len(table) > 0 {
+            se_stmt: ^sqlite.Statement
+            se_sql := fmt.tprintf("SELECT COALESCE(status_effects,'') FROM %s WHERE id=%d", table, actor_id)
+            se_c := cstring(raw_data(se_sql))
+            if sqlite.prepare(db.ptr, se_c, i32(len(se_sql)), &se_stmt, nil) == .Ok {
+                if sqlite.step(se_stmt) == .Row do current_effects = column_text_safe(se_stmt, 0)
+                sqlite.finalize(se_stmt)
+            }
+            new_effects := current_effects
+            if len(new_effects) > 0 && !strings.contains(strings.to_lower(new_effects), "rage") {
+                new_effects = fmt.tprintf("%s, rage", new_effects)
+            } else if len(new_effects) == 0 {
+                new_effects = "rage"
+            }
+            lib.db_exec(db, fmt.tprintf("UPDATE %s SET status_effects='%s' WHERE id=%d", table, escape_sql(new_effects), actor_id))
+        }
+        effect_msg = "B/P/S resistance active, +2 damage to STR melee attacks"
+    } else if strings.contains(feat_lower, "action surge") {
+        // Grant an extra action by resetting action_used
+        lib.db_exec(db, fmt.tprintf("UPDATE combat_participants SET action_used=0, attacks_used=0 WHERE encounter_id=%d AND actor_type='%s' AND actor_id=%d", enc_id, escape_sql(actor_type), actor_id))
+        effect_msg = "Extra action granted — action_used and attacks_used reset"
+    } else if strings.contains(feat_lower, "second wind") {
+        // Heal 1d10 + fighter level
+        char, char_ok := fetch_character_stats(db, actor_id)
+        if char_ok {
+            heal_roll, _ := resolve_amount("1d10")
+            heal_total := heal_roll + char.level
+            new_hp := s.current_hp + heal_total
+            if new_hp > s.max_hp do new_hp = s.max_hp
+            hp_update(db, actor_type, actor_id, new_hp)
+            effect_msg = fmt.tprintf("Healed %d HP (1d10=%d + level %d)", heal_total, heal_roll, char.level)
+        }
+    } else if strings.contains(feat_lower, "ki") || strings.contains(feat_lower, "flurry of blows") || strings.contains(feat_lower, "patient defense") || strings.contains(feat_lower, "step of the wind") {
+        effect_msg = "Ki point spent"
+    } else if strings.contains(feat_lower, "divine smite") {
+        effect_msg = "Spell slot must be consumed separately via combat cast"
+    }
+
+    if db.is_json {
+        fmt.printf(`{{"success":true,"encounter_id":%d,"actor":"%s","feature":"%s","resource":"%s","resource_consumed":%s,"remaining":%d,"effect":"%s"}}` + "\n",
+            enc_id, escape_json_string(s.name), escape_json_string(feature_name), resource_name, resource_consumed ? "true" : "false", after_amount, escape_json_string(effect_msg))
+    } else {
+        res_str := ""
+        if resource_consumed {
+            res_str = fmt.tprintf(" (%s: %d → %d)", resource_name, before_amount, after_amount)
+        } else if len(resource_name) > 0 {
+            res_str = fmt.tprintf(" (%s: no uses remaining)", resource_name)
+        }
+        eff_str := ""
+        if len(effect_msg) > 0 do eff_str = fmt.tprintf(" — %s", effect_msg)
+        fmt.printf("%s uses %s%s%s\n", s.name, feature_name, res_str, eff_str)
+    }
+    return 0
 }

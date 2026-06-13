@@ -182,6 +182,9 @@ faction_set_standing :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 
+	// Touch last_interaction_day for decay tracking
+
+	touch_faction_decay_day(db, char_id, faction_id)
 	if db.is_json {
 		fmt.printf(`{{"success":true,"message":"Standing set for character %d in faction %d","character_id":%d,"faction_id":%d,"standing":%d}}\n`, char_id, faction_id, char_id, faction_id, standing)
 	} else {
@@ -203,12 +206,24 @@ faction_get_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	faction_id := 0
 	if len(args) >= 3 do faction_id = strconv.atoi(args[2])
 
+	// Compute current day for decay
+	current_day := 0
+	day_stmt: ^sqlite.Statement
+	day_sql := fmt.tprintf("SELECT c.total_elapsed_hours/24 FROM characters ch JOIN campaigns c ON ch.campaign_id=c.id WHERE ch.id=%d", char_id)
+	day_sql_c := cstring(raw_data(day_sql))
+	if sqlite.prepare(db.ptr, day_sql_c, i32(len(day_sql)), &day_stmt, nil) == .Ok {
+		if sqlite.step(day_stmt) == .Row {
+			current_day = int(sqlite.column_int(day_stmt, 0))
+		}
+		sqlite.finalize(day_stmt)
+	}
+
 	stmt: ^sqlite.Statement
 	sql := ""
 	if faction_id > 0 {
-		sql = fmt.tprintf("SELECT fs.faction_id, f.name, fs.standing, fs.notes FROM faction_standings fs JOIN factions f ON fs.faction_id=f.id WHERE fs.character_id=%d AND fs.faction_id=%d", char_id, faction_id)
+		sql = fmt.tprintf("SELECT fs.faction_id, f.name, fs.standing, fs.notes, fs.last_interaction_day FROM faction_standings fs JOIN factions f ON fs.faction_id=f.id WHERE fs.character_id=%d AND fs.faction_id=%d", char_id, faction_id)
 	} else {
-		sql = fmt.tprintf("SELECT fs.faction_id, f.name, fs.standing, fs.notes FROM faction_standings fs JOIN factions f ON fs.faction_id=f.id WHERE fs.character_id=%d", char_id)
+		sql = fmt.tprintf("SELECT fs.faction_id, f.name, fs.standing, fs.notes, fs.last_interaction_day FROM faction_standings fs JOIN factions f ON fs.faction_id=f.id WHERE fs.character_id=%d", char_id)
 	}
 
 	sql_c := cstring(raw_data(sql))
@@ -222,10 +237,31 @@ faction_get_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 	defer sqlite.finalize(stmt)
 
-	if !db.is_json {
+	if db.is_json {
+		fmt.print("[")
+		first := true
+		for sqlite.step(stmt) == .Row {
+			if !first do fmt.print(",")
+			first = false
+			raw := int(sqlite.column_int(stmt, 2))
+			last_day := int(sqlite.column_int(stmt, 4))
+			decayed := compute_decay(raw, last_day, current_day)
+			fmt.printf(`{{"faction_id":%d,"faction_name":"%s","standing":%d,"decayed":%d,"notes":"%s"}}`,
+				sqlite.column_int(stmt, 0), column_text_safe(stmt, 1), raw, decayed, column_text_safe(stmt, 3))
+		}
+		fmt.println("]")
+	} else {
 		fmt.printf("Faction standings for character %d:\n", char_id)
+		for sqlite.step(stmt) == .Row {
+			raw := int(sqlite.column_int(stmt, 2))
+			last_day := int(sqlite.column_int(stmt, 4))
+			decayed := compute_decay(raw, last_day, current_day)
+			decay_note := ""
+			if decayed != raw do decay_note = fmt.tprintf(" (decayed to %d)", decayed)
+			fmt.printf("  %s (ID: %d): standing %d%s\n",
+				column_text_safe(stmt, 1), sqlite.column_int(stmt, 0), raw, decay_note)
+		}
 	}
-	print_faction_standings(stmt, db.is_json)
 	return 0
 }
 
@@ -367,4 +403,26 @@ faction_effective_standing :: proc(db: ^lib.Db, args: []string) -> int {
 		fmt.printf("  Effective:         %+d  [canonical state is party standing; avg is display-only]\n", effective)
 	}
 	return 0
+}
+
+touch_faction_decay_day :: proc(db: ^lib.Db, char_id: int, faction_id: int) {
+	stmt: ^sqlite.Statement
+	camp_sql := fmt.tprintf("SELECT campaign_id FROM characters WHERE id=%d", char_id)
+	camp_sql_c := cstring(raw_data(camp_sql))
+	if sqlite.prepare(db.ptr, camp_sql_c, i32(len(camp_sql)), &stmt, nil) != .Ok {
+		return
+	}
+	defer sqlite.finalize(stmt)
+	if sqlite.step(stmt) != .Row {
+		return
+	}
+	campaign_id := int(sqlite.column_int(stmt, 0))
+	if campaign_id <= 0 {
+		return
+	}
+	day, ok := get_current_day(db, campaign_id)
+	if !ok {
+		return
+	}
+	lib.db_exec(db, fmt.tprintf("UPDATE faction_standings SET last_interaction_day=%d WHERE character_id=%d AND faction_id=%d", day, char_id, faction_id))
 }

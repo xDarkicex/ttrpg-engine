@@ -262,7 +262,15 @@ companion_heal :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 	id := strconv.atoi(args[1])
-	amt := strconv.atoi(args[2])
+	amt, ok := resolve_amount(args[2])
+	if !ok {
+		if db.is_json {
+			fmt.println(`{{"success":false,"error":"Invalid heal amount — expected dice spec"}}`)
+		} else {
+			fmt.eprintln("Invalid heal amount — expected dice spec")
+		}
+		return 1
+	}
 
 	comp, found := fetch_companion_stats(db, id)
 	if !found {
@@ -329,7 +337,15 @@ companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 		return 1
 	}
 
-	d := parse_damage_args(args)
+	d, parse_ok := parse_damage_args(args)
+	if !parse_ok {
+		if db.is_json {
+			fmt.println(`{{"success":false,"error":"Invalid damage amount — expected dice spec like 2d6+3 or 8d6"}}`)
+		} else {
+			fmt.eprintln("Invalid damage amount — expected dice spec like 2d6+3 or 8d6")
+		}
+		return 1
+	}
 	comp, found := fetch_companion_stats(db, d.id)
 	if !found {
 		if db.is_json {
@@ -341,8 +357,8 @@ companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	}
 
 	attack_hit := true
-	if is_numeric(d.attack_or_save) {
-		attack_roll := strconv.atoi(d.attack_or_save)
+	if is_rollable(d.attack_or_save) {
+		attack_roll, _ := resolve_attack_roll(d.attack_or_save)
 		if attack_roll < comp.ac {
 			if db.is_json {
 				fmt.printf(`{{"success":true,"id":%d,"attack_hit":false,"damage_applied":0,"current_hp":%d,"max_hp":%d}}\n`, comp.id, comp.current_hp, comp.max_hp)

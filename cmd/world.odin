@@ -250,17 +250,18 @@ shop_add :: proc(db: ^lib.Db, args: []string) -> int {
 	} else {
 		npc_val = fmt.tprintf("%d", npc_id)
 	}
+	treasury, _, _ := shop_scale_params(scale)
 	sql := fmt.tprintf(
-		"INSERT INTO shops (location_id, name, description, npc_id, scale, open_hours) VALUES (%d, '%s', '%s', %s, '%s', '%s')",
-		location_id, escape_sql(name), escape_sql(description), npc_val, escape_sql(scale), escape_sql(open_hours),
+		"INSERT INTO shops (location_id, name, description, npc_id, scale, open_hours, gold) VALUES (%d, '%s', '%s', %s, '%s', '%s', %d)",
+		location_id, escape_sql(name), escape_sql(description), npc_val, escape_sql(scale), escape_sql(open_hours), treasury,
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add shop"}`) }
 		else { fmt.eprintln("Failed to add shop") }
 		return 1
 	}
-	if db.is_json { fmt.printf(`{"success":true,"message":"Added shop: %s"}` + "\n", name) }
-	else { fmt.printf("Added shop: %s\n", name) }
+	if db.is_json { fmt.printf(`{{"success":true,"message":"Added shop","name":"%s","scale":"%s","treasury_gp":%d}}` + "\n", name, scale, treasury) }
+	else { fmt.printf("Added shop: %s (scale: %s, treasury: %d gp)\n", name, scale, treasury) }
 	return 0
 }
 
@@ -487,7 +488,7 @@ compute_relationship_with_decay :: proc(
 	sql: string
 	if visitor_npc_id > 0 {
 		sql = fmt.tprintf(
-			"SELECT friendship_level, COALESCE(last_interaction_at, '') FROM npc_relationships WHERE npc_id_1=%d AND npc_id_2=%d",
+			"SELECT friendship_level, COALESCE(last_interaction_day, 0) FROM npc_relationships WHERE npc_id_1=%d AND npc_id_2=%d",
 			visitor_npc_id, owner_npc_id,
 		)
 	} else if visitor_char_id > 0 {
@@ -495,7 +496,7 @@ compute_relationship_with_decay :: proc(
 		// to disambiguate from NPC ids in the relationship table). For v15, just look up
 		// the character's owner as the visitor. Future: separate character-npc relationship table.
 		sql = fmt.tprintf(
-			"SELECT friendship_level, COALESCE(last_interaction_at, '') FROM npc_relationships WHERE npc_id_2=%d",
+			"SELECT friendship_level, COALESCE(last_interaction_day, 0) FROM npc_relationships WHERE npc_id_2=%d",
 			owner_npc_id,
 		)
 	} else {
@@ -506,43 +507,17 @@ compute_relationship_with_decay :: proc(
 	defer sqlite.finalize(stmt)
 
 	level := 0
-	last_interaction := ""
+	last_interaction_day := 0
 	if sqlite.step(stmt) == .Row {
 		level = int(sqlite.column_int(stmt, 0))
-		last_interaction = column_text_safe(stmt, 1)
+		last_interaction_day = int(sqlite.column_int(stmt, 1))
 	}
 
-	// Compute decay if we have a last_interaction_at timestamp
-	effective := f32(level) / 10.0  // normalize -10..+10 to -1.0..+1.0
-	if len(last_interaction) > 0 && in_game_day > 0 {
-		// Parse "YYYY-MM-DD" and compute days elapsed. O(depth) which is O(1) since the
-		// date format is fixed length.
-		if len(last_interaction) >= 10 {
-			// Simple: trust the day-of-year from a precomputed function (not provided),
-			// fall back to (in_game_day - stored_day) is what the user is expected to feed
-			// as a separate calendar tool. For now, compute the difference as a rough token-based
-			// estimate (count of digits), which the DM can override by setting last_interaction_at
-			// to "" to disable decay.
-			//
-			// To keep this O(1) and not pull in a date library, we just treat the string as
-			// non-decaying if it's present. The DM can clear it to force recompute. This is
-			// documented behavior.
-			_ = in_game_day  // suppressed: real impl parses ISO and computes days
-		}
+	effective := f32(level) / 10.0
+	if last_interaction_day > 0 && in_game_day > 0 {
+		decayed_level := compute_decay(level, last_interaction_day, in_game_day)
+		effective = f32(decayed_level) / 10.0
 	}
-
-	// Exponential decay toward 0.0 baseline.
-	// S = S_base + (S_current - S_base) × e^(-λ × t)
-	// With S_base = 0, this is S_current × e^(-λ × t).
-	// Default λ = 0.05 ≈ 14 day half-life.
-	lambda := 0.05
-	if in_game_day > 0 {
-		// If we had a parsed t, apply. For v15 we just use the raw effective value
-		// (the decay function is wired but decay is a no-op until the DM provides
-		// parsed elapsed days).
-		_ = lambda
-	}
-
 	return effective
 }
 
