@@ -69,13 +69,14 @@ from a cold start.
 
 **The combat engine.** Turn-based 5e-compatible combat lives inside the
 database. `combat start`, `combat join`, `combat init` set up the
-encounter. `combat attack` resolves attack rolls against AC, `combat
-damage` applies damage with automatic resistance/vulnerability/immunity.
-`combat save` handles saving throws with proficiency bonuses. `combat
-next` advances turns, resets reactions each round. Death saves,
-concentration, conditions, reactions, and ready actions are all tracked.
-The combat snapshot appears in `get-story-state` — the AI always knows
-who's up, what HP everyone has, and what conditions are active.
+encounter. `combat attack` resolves attack rolls against AC.
+`combat damage` applies damage with automatic
+resistance/vulnerability/immunity. `combat save` handles saving throws
+with proficiency bonuses. `combat next` advances turns, resets reactions
+each round. Death saves, concentration, conditions, reactions, and ready
+actions are all tracked. The combat snapshot appears in
+`get-story-state` — the AI always knows who's up, what HP everyone has,
+and what conditions are active.
 
 **The relationship graph.** NPCs have friendships, rivalries, and family
 ties with each other (tracked with a decay-aware score). Characters have
@@ -407,8 +408,9 @@ code, never off error string content.
 
 ### Concurrency and locking
 
-SQLite provides **serialized write access**. The binary opens a single connection to `ttrpg-
-engine.db` per invocation and closes it before exiting. Two concurrent processes:
+SQLite provides **serialized write access**. The binary opens a single
+connection to `ttrpg-engine.db` per invocation and closes it before
+exiting. Two concurrent processes:
 
 - **Reads never block each other.** Multiple `get-story-state` or `list` calls can run in parallel.
 - **Writes serialize via SQLite's internal lock.** If process A is mid-write, process B's write
@@ -435,8 +437,7 @@ brew install ttrpg-engine
 ### Linux — Tarball
 
 ```sh
-curl -sL https://github.com/xDarkicex/ttrpg-engine/releases/latest/download/ttrpg-engine-
-unknown-linux.tar.gz | tar -xz
+curl -sL https://github.com/xDarkicex/ttrpg-engine/releases/latest/download/ttrpg-engine-unknown-linux.tar.gz | tar -xz
 chmod +x ttrpg-engine
 ./ttrpg-engine init
 ```
@@ -444,8 +445,7 @@ chmod +x ttrpg-engine
 ### macOS — Tarball
 
 ```sh
-curl -sL https://github.com/xDarkicex/ttrpg-engine/releases/latest/download/ttrpg-engine-apple-
-darwin.tar.gz | tar -xz
+curl -sL https://github.com/xDarkicex/ttrpg-engine/releases/latest/download/ttrpg-engine-apple-darwin.tar.gz | tar -xz
 chmod +x ttrpg-engine
 ./ttrpg-engine init
 ```
@@ -499,8 +499,7 @@ keeps every unit of logic reviewable in a single screen of code.
    - [Companions & Pets](#7-companions--pets)
    - [NPCs & Relationships](#8-npcs--relationships)
    - [Creatures & Monsters](#9-creatures--monsters)
-   - [Campaigns, Story Tracking & Session Continuity](#10-campaigns-story-tracking--session-
-continuity)
+   - [Campaigns, Story Tracking & Session Continuity](#10-campaigns-story-tracking--session-continuity)
    - [Quest Tracking](#11-quest-tracking)
    - [World & Locations](#12-world--locations)
    - [Factions & Standings](#13-factions--standings)
@@ -1231,8 +1230,8 @@ and setpieces. All commands are O(1) per query.
   ./ttrpg-engine location set-parent <id> <parent_id|0>
   ./ttrpg-engine location breadcrumb <id>
   ```
-    *Breadcrumb walks the parent chain and prints `Ashwick > Blacksmith District > The Anvil &
-  Flame`.*
+    *Breadcrumb walks the parent chain and prints
+    `Ashwick > Blacksmith District > The Anvil & Flame`.*
 - **Set Location Access Restriction**:
   ```bash
   ./ttrpg-engine location set-restricted <id> <0|1> <until>
@@ -1560,10 +1559,11 @@ internally.
 
 #### Actions (enforce action economy)
 
-The engine enforces 5e action economy: one action (with Extra Attack / Multiattack), one bonus
-action, one reaction per round. The `attacks_used` counter is compared against
-`multiattack_count` (creatures/NPCs, default 1; characters default 1 — increase via `combat
-use-feature` for Extra Attack).
+The engine enforces 5e action economy: one action (with Extra Attack /
+Multiattack), one bonus action, one reaction per round. The
+`attacks_used` counter is compared against `multiattack_count`
+(creatures/NPCs, default 1; characters default 1 — increase via
+`combat use-feature` for Extra Attack).
 
 - **Attack (roll vs AC)**:
   ```bash
@@ -1742,9 +1742,9 @@ maintain relationships.
 **Decay formula:** `standing × e^(-0.05 × days_elapsed)` — half-life of ~14 days. After 30 days
 without interaction, standing drops to ~22% of its original value.
 
-**Wanted heat decay** uses the same exponential curve, calculated per-hour: `heat × e^(-0.05/24
-× hours_elapsed)`. The finer granularity prevents edge cases on day 0 (the first day of a
-campaign).
+**Wanted heat decay** uses the same exponential curve, calculated
+per-hour: `heat × e^(-0.05/24 × hours_elapsed)`. The finer granularity
+prevents edge cases on day 0 (the first day of a campaign).
 
 
 ### 21. Wanted & Crime System
