@@ -7,6 +7,30 @@
 [![Linux](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-blue?logo=linux&logoColor=white)](https://github.com/xDarkicex/ttrpg-engine/actions)
 [![Build](https://github.com/xDarkicex/ttrpg-engine/actions/workflows/release.yml/badge.svg)](https://github.com/xDarkicex/ttrpg-engine/actions/workflows/release.yml)
 
+
+## Agent Rules (read before doing anything else)
+
+The SQLite database is an internal implementation detail, **not the API**. The `ttrpg-engine` binary is the sole interface to canonical state.
+
+**Agents MUST:**
+
+- Use `ttrpg-engine` subcommands for all reads and writes
+- Call `campaign get-story-state --json` to load world state
+- Treat the `.db` file as opaque — back it up, copy it, but never open it for writes
+- Let the binary run schema migrations automatically on startup
+
+**Agents MUST NOT:**
+
+- Run `sqlite3` against the campaign database for any reason
+- Execute `CREATE`, `ALTER`, `DROP`, `INSERT`, `UPDATE`, or `DELETE` against the `.db`
+- Infer schema from `docs/schema.md` and write rows directly
+- Patch, repair, or migrate the database manually
+
+**Why.** The binary manages schema versioning with `PRAGMA user_version` and forward-only migrations. Any external DDL or DML breaks version tracking, corrupts the migration chain, and produces errors the agent cannot diagnose. The `.db` file is safe to read with any SQLite browser for inspection — just never write to it.
+
+For the complete JSON schema, error shapes, exit codes, read/write command tables, and concurrency behavior, see the full **[AI Agent Contract](#ai-agent-contract)** below.
+
+
 ## The World Engine
 
 ttrpg-engine models your tabletop world as a **relational database** — every tavern, blacksmith, quest giver, and goblin camp is a row you can query, update, and connect. It was built for DMs who run long-form campaigns with deep continuity, and for AI agents that need a canonical source of truth about the game state.
@@ -366,13 +390,14 @@ Every proc in the codebase has a hard cyclomatic complexity limit of 10 (McCabe'
 ---
 
 ## Table of Contents
-1. [The World Engine](#the-world-engine)
-2. [AI Agent Contract](#ai-agent-contract)
-3. [Installation & Build](#installation--build)
-3. [Database Schema](#database-schema)
-4. [Global Output Flags](#global-output-flags)
-5. [Dice Notation](#dice-notation)
-6. [CLI Command Reference](#cli-command-reference)
+1. [Agent Rules](#agent-rules-read-before-doing-anything-else)
+2. [The World Engine](#the-world-engine)
+3. [AI Agent Contract](#ai-agent-contract)
+4. [Installation & Build](#installation--build)
+5. [Database Schema](#database-schema)
+6. [Global Output Flags](#global-output-flags)
+7. [Dice Notation](#dice-notation)
+8. [CLI Command Reference](#cli-command-reference)
    - [Characters & Multiclassing](#1-characters--multiclassing)
    - [Vitals & Resting Setters](#2-vitals--resting-setters)
    - [Combat Stats & Spellcasting](#3-combat-stats--spellcasting)
@@ -394,7 +419,7 @@ Every proc in the codebase has a hard cyclomatic complexity limit of 10 (McCabe'
    - [Combat Engine](#19-combat-engine)
    - [Time, Calendar & Decay](#20-time-calendar--decay)
    - [Wanted & Crime System](#21-wanted--crime-system)
-7. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
+9. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
 8. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
 ---
