@@ -1,6 +1,6 @@
 # ttrpg-engine
 
-> The terminal-native D&D world engine. Build your campaign as a living database — towns, shops, NPCs, quests, session journals, faction politics — then query it from the command line or feed it to an AI Dungeon Master.
+> The terminal-native 5e-compatible TTRPG world engine. Build your campaign as a living database — towns, shops, NPCs, quests, session journals, faction politics — then query it from the command line or feed it to an AI Dungeon Master.
 
 [![Odin](https://img.shields.io/badge/Odin-dev--2026--05-blue?logo=odin&logoColor=white)](https://odin-lang.org)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -15,13 +15,308 @@ ttrpg-engine models your tabletop world as a **relational database** — every t
 
 **The memory system.** A stateless AI agent only knows what you tell it. ttrpg-engine solves this with three systems working together: a **campaign journal** (timestamped session recaps the AI writes and reads back), a **quest tracker** (step-by-step objectives with linked actors, so the AI remembers what the party is supposed to be doing), and an **in-game calendar** (day, time of day, season) so the AI can say "it's autumn evening on day 42." One command — `campaign get-story-state` — returns the complete context packet the AI needs to reconstruct the game from a cold start.
 
-**The combat engine.** Turn-based D&D 5e combat lives inside the database. `combat start`, `combat join`, `combat init` set up the encounter. `combat attack` resolves attack rolls against AC, `combat damage` applies damage with automatic resistance/vulnerability/immunity. `combat save` handles saving throws with proficiency bonuses. `combat next` advances turns, resets reactions each round. Death saves, concentration, conditions, reactions, and ready actions are all tracked. The combat snapshot appears in `get-story-state` — the AI always knows who's up, what HP everyone has, and what conditions are active.
+**The combat engine.** Turn-based 5e-compatible combat lives inside the database. `combat start`, `combat join`, `combat init` set up the encounter. `combat attack` resolves attack rolls against AC, `combat damage` applies damage with automatic resistance/vulnerability/immunity. `combat save` handles saving throws with proficiency bonuses. `combat next` advances turns, resets reactions each round. Death saves, concentration, conditions, reactions, and ready actions are all tracked. The combat snapshot appears in `get-story-state` — the AI always knows who's up, what HP everyone has, and what conditions are active.
 
 **The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have personal faction standings, and campaigns track party-wide institutional faction reputation — a faction can hate one PC but still mark the party as hostile for the group's actions. Houses have residents. Characters group into parties with shared treasury and location. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
 
 **Built for AI pipelines.** Every command emits `--json` output for piping into LLM agents, Discord bots, or automation scripts. The schema is designed so an AI can call `get-story-state`, receive the full world snapshot (locations tree with all entities present, active quests, recent journal entries, faction standings, story log), and immediately begin DMing with full context. No warm-up, no context-stuffing — one query, everything it needs.
 
-**Fast by design.** O(1) database lookups. Arena-based memory with zero heap allocations after startup. Automatic SQLite schema migrations — drop the binary into a campaign folder and run. No config files, no daemons, no network calls. Just a 2.6 MB binary and a `.db` file you can commit to git alongside your session notes.
+**Fast by design.** Single-row lookups are O(1) via indexed primary keys. List commands scale with result size, not table size. Location tree walks are O(depth) with depth bounded by campaign geography (practically ≤10). Arena-based memory with zero heap allocations after startup. Automatic SQLite schema migrations — drop the binary into a campaign folder and run. No config files, no daemons, no network calls. Just a 2.6 MB binary and a `.db` file you can commit to git alongside your session notes.
+
+
+## AI Agent Contract
+
+This section is the canonical reference for AI agents, automation scripts, and LLM pipelines that call `ttrpg-engine` as a subprocess. Everything an agent needs to consume the engine reliably without reading the Odin source.
+
+### Golden rule: `get-story-state` is your entry point
+
+To reconstruct the full game world from a cold start, call:
+
+```bash
+ttrpg-engine campaign get-story-state <campaign_id> --json
+```
+
+This returns the complete context packet — one JSON object containing everything. **Never** scrape the world by calling multiple `list`/`get` commands; the result is a single snapshot that is internally consistent.
+
+### `get-story-state` JSON schema
+
+```jsonc
+{
+  "success": true,                     // always true on success (see error shapes below)
+
+  // ── Campaign metadata ──
+  "campaign": {
+    "id": 1,                           // stable, never reused after DELETE
+    "name": "Phandelver",
+    "chapter": "",                     // current narrative chapter
+    "session_num": 0,                  // increments via campaign next-session
+    "dm_notes": "",                    // private DM scratchpad
+    "in_game_day": 0,                  // total elapsed days (total_hours / 24)
+    "in_game_time": "morning",         // morning | afternoon | evening | night
+    "current_season": "spring"         // spring | summer | autumn | winter
+  },
+
+  // ── Session journal (last 10 entries, newest first) ──
+  "journal": [{
+    "id": 1,
+    "session_num": 1,
+    "entry_type": "narrative",         // narrative | combat | decision | npc_interaction | quest_update | dm_note
+    "description": "...",
+    "location_id": 1,                  // null if no location
+    "created_at": "2026-06-13 17:40:03"
+  }],
+
+  // ── Active quests with objectives and linked actors ──
+  "quests": [{
+    "id": 1,
+    "name": "Find Gundren Rockseeker",
+    "description": "The dwarf patron is missing",
+    "quest_giver_npc_id": 1,           // null if none
+    "quest_giver_name": "Sildar Hallwinter",
+    "status": "active",                // active | completed | failed | abandoned
+    "reward_description": "500 gp",
+    "chapter": "Chapter 1",
+    "created_at": "2026-06-13 17:40:03",
+    "objectives": [{
+      "id": 1,
+      "description": "Investigate the goblin ambush site",
+      "status": "incomplete",          // incomplete | complete
+      "sort_order": 1
+    }],
+    "actors": [{
+      "actor_type": "character",       // character | npc
+      "actor_id": 1,
+      "actor_name": "Grimgar",
+      "role": "leader"                 // leader | participant | target | observer
+    }]
+  }],
+
+  // ── Location tree (recursive — sub_locations nest arbitrarily deep) ──
+  "locations_tree": [{
+    "id": 1,                           // global PK, never reused
+    "name": "Phandalin",
+    "description": "A frontier town",
+    "chapter": "Chapter 1",
+    "is_current": true,                // campaign's active location
+    "parent_id": null,                 // null = root; integer = child of that location
+    "restricted": 0,                   // 0 = open, 1 = restricted
+    "restricted_until": "",
+    "sub_locations": [{                // recursive — same shape, can nest deeper
+      "id": 2,
+      "name": "Cragmaw Hideout"
+      // ... same fields, may have sub_locations of its own
+    }],
+    "houses": [],                      // {id, name, description, npc_id, scale, restricted, inventory}
+    "shops": [],                       // {id, name, description, npc_id, scale, open_hours, restricted, inventory}
+    "encounters": [],                  // {id, type, description, npc_id}
+    "setpieces": [],                   // {id, name, description, chapter_event}
+    "npcs_present": [{                 // NPCs whose location_id matches this location
+      "id": 1,
+      "name": "Sildar Hallwinter",
+      "description": "Retired knight",
+      "current_hp": 40,
+      "max_hp": 40,
+      "story_role": "",
+      "daily_role": ""
+    }],
+    "characters_present": [{           // characters whose location_id matches
+      "id": 1,
+      "name": "Grimgar",
+      "current_hp": 50,
+      "max_hp": 50,
+      "owner": "dm",
+      "party": ""
+    }],
+    "creatures_present": []            // {id, name, current_hp, max_hp}
+  }],
+
+  // ── Parties with members and treasury ──
+  "parties": [{
+    "id": 1,
+    "name": "The Black Company",
+    "notes": "",
+    "location_id": 1,
+    "gold": 0, "silver": 0, "copper": 0,
+    "members": [{
+      "id": 1, "name": "Grimgar", "hp": 50, "max_hp": 50, "ac": 10
+    }]
+  }],
+
+  // ── All factions in the campaign ──
+  "factions": [{
+    "id": 1,
+    "name": "Harpers",
+    "description": "Defenders of peace"
+  }],
+
+  // ── NPC ↔ NPC relationships ──
+  "npc_relationships": [{
+    "npc_id_1": 1,
+    "npc_name_1": "Sildar Hallwinter",
+    "npc_id_2": 2,
+    "npc_name_2": "Goblin Scout",
+    "friendship_level": 8,             // -10 (archnemesis) to +10 (close ally)
+    "type": "ally",                    // spouse | family | friend | rival | enemy | acquaintance | ally
+    "notes": "Old war buddies",
+    "last_interaction_at": ""
+  }],
+
+  // ── Character faction standings ──
+  "character_faction_standings": [{
+    "character_id": 1,
+    "character_name": "Grimgar",
+    "faction_id": 1,
+    "faction_name": "Harpers",
+    "standing": 75,                    // decays toward 0 over ~14 days without interaction
+    "notes": "Hero of the realm"
+  }],
+
+  // ── Party-wide faction standings (institutional reputation) ──
+  "party_faction_standings": [{
+    "campaign_id": 1,
+    "faction_id": 2,
+    "faction_name": "Redbrands",
+    "standing": -30,
+    "notes": "Enemies of the Redbrands"
+  }],
+
+  // ── Active combat encounter (null if no combat in progress) ──
+  "combat": null | {
+    "id": 1,
+    "round": 2,
+    "turn_index": 0,
+    "status": "active",
+    "location_id": 1,
+    "participants": [{
+      "actor_type": "character",
+      "actor_id": 1,
+      "actor_name": "Grimgar",
+      "initiative_roll": 18,
+      "initiative_mod": 3,
+      "sort_order": 0,
+      "is_active": true,
+      "position": "melee",
+      "current_hp": 45,
+      "max_hp": 50,
+      "ac": 15,
+      "status_effects": "rage",
+      "reaction_used": 0, "action_used": 1, "bonus_action_used": 0,
+      "attacks_used": 1, "movement_used": 0,
+      "readied_action": ""
+    }]
+  },
+
+  // ── Story action log (chronological) ──
+  "story_actions": [{
+    "id": 1,
+    "description": "Cleared goblin ambush on Triboar Trail",
+    "location_id": 1,
+    "location_name": "Phandalin",
+    "standing_faction_id": 1,
+    "standing_faction_name": "Harpers",
+    "standing_impact": 10,
+    "story_progression": 5,
+    "status": "completed",
+    "created_at": "2026-06-13 17:40:03",
+    "actors": [{
+      "type": "character",             // character | npc
+      "id": 1
+    }]
+  }]
+}
+```
+
+### Stable ID contract
+
+- **Every entity has an integer primary key** (`id`). IDs are SQLite `INTEGER PRIMARY KEY` — never reused after `DELETE`.
+- **Actor references are `(actor_type, actor_id)` tuples.** `actor_type` is one of `"character"`, `"npc"`, or `"creature"`. These strings are stable and will not change.
+- **Location IDs are global**, not per-campaign. A location's `parent_id` points to another location by its global ID.
+- **Faction IDs are global.** Characters, NPCs, wanted heat, and standings all reference factions by these IDs.
+- **Campaign IDs scope** characters, NPCs, locations, quests, and journal entries. An entity's `campaign_id` links it to the campaign it belongs to.
+- **Name fields are display-only.** Never key logic off `name` — always use `id`. Names can change, be duplicated, or be empty.
+
+### Read vs. write commands
+
+Agents must know which commands mutate canonical state. **Assume mutation unless listed below.**
+
+**Read-only** (safe to call at any time, no side effects):
+
+| Command | Notes |
+|---|---|
+| `character list`, `character get <id>` | |
+| `npc list`, `npc get <id>` | |
+| `creature list`, `creature get <id>` | |
+| `companion list`, `companion get <id>` | |
+| `item list` | |
+| `inventory get <type> <id>` | |
+| `spell list`, `spell list-character <id>` | |
+| `feature list`, `feature list-character <id>` | |
+| `faction list`, `faction get-standing`, `faction get-party-standing`, `faction effective-standing` | `get-standing` computes decay at query time but does not persist it |
+| `campaign list`, `campaign get`, `campaign get-story-state`, `campaign get-time`, `campaign list-locations`, `campaign list-actions`, `campaign list-journal` | |
+| `class-specialty list` | |
+| `condition list` | |
+| `quest list`, `quest get` | |
+| `party list` | |
+| `combat status` | |
+| `wanted get`, `wanted list` | Decay computed at query time, not persisted |
+| `shop browse`, `shop get` | |
+| `house list`, `house list-residents` | |
+| `encounter list`, `setpiece list` | |
+| `can-enter` | |
+| `location breadcrumb` | |
+
+**Mutating** (changes database state — be intentional about when you call these):
+
+| Command | What it changes |
+|---|---|
+| `character create/delete/damage/heal/set-*` | Character rows, inventory, conditions |
+| `npc create/delete/damage/heal/set-*` | NPC rows, relationships, standings |
+| `creature create/damage/heal/set-*` | Creature rows |
+| `combat start/join/init/next/attack/strike/cast/damage/save/move/condition/death-save/react/ready/use-feature/end` | Combat state, HP, spell slots, conditions, resources |
+| `rest short/long` | HP, hit dice, spell slots, resources, conditions, in-game time |
+| `wanted crime/set/clear` | wanted_heat rows, crime_log rows |
+| `campaign create/delete/set-*/add-*/next-session/advance-time/set-calendar` | Campaign state, locations, journal, quests, story actions, time |
+| `faction create/set-standing/set-party-standing/join` | Faction rows, standing rows |
+| `item upsert` | Item definitions |
+| `inventory add/remove/equip/attune` | Inventory rows |
+| `spell upsert/learn/forget/prepare` | Spell rows, character_spells |
+| `quest add/add-objective/complete-objective/set-status/add-actor` | Quest state |
+| `party create/add/remove/rest/move/treasury` | Party rows, character location/party fields |
+| `shop stock/buy/sell/add-money/remove-money/haggle` | Shop inventory, character inventory/coins, haggle state |
+| `condition add/remove` | conditions rows |
+| `trade` | Character inventory and coins (two characters) |
+
+### Exit codes and error shapes
+
+Every command returns **0 on success, 1 on failure**. All output goes to stdout in JSON mode; errors go to stderr in text mode.
+
+**Success shape** (varies by command, but always contains `"success":true`):
+```json
+{"success":true, "message": "...", ...command-specific fields...}
+```
+
+**Error shape** (uniform across all commands):
+```json
+{"success":false, "error": "<human-readable message>"}
+```
+
+Error messages are **human-readable, not machine-stable**. Key logic off `"success"` and exit code, never off error string content.
+
+| Exit | JSON shape | When |
+|---|---|---|
+| 1 | `{"success":false,"error":"Usage: ..."}` | Missing or invalid arguments |
+| 1 | `{"success":false,"error":"... not found"}` | Entity ID doesn't exist |
+| 1 | `{"success":false,"error":"Failed to ..."}` | Database constraint, lock, or I/O error |
+
+### Concurrency and locking
+
+SQLite provides **serialized write access**. The binary opens a single connection to `ttrpg-engine.db` per invocation and closes it before exiting. Two concurrent processes:
+
+- **Reads never block each other.** Multiple `get-story-state` or `list` calls can run in parallel.
+- **Writes serialize via SQLite's internal lock.** If process A is mid-write, process B's write blocks until A commits. If the wait exceeds SQLite's busy timeout, B gets `{"success":false,"error":"Failed to ..."}` and exits 1.
+- **There is no WAL mode.** The database uses SQLite's default rollback journal. Long-running reads can starve writers under extreme load.
+
+**Recommendation for agents:** serialize all writes through a single process or queue. Reads can fan out freely. If you need to batch mutations, chain them in a single `ttrpg-engine` invocation by using multiple subcommands (not yet supported — each invocation is one command).
 
 ## Install
 
@@ -54,11 +349,26 @@ chmod +x ttrpg-engine
 odin build . -file -collection:ext=./vendor -out:ttrpg-engine
 ```
 
+### Database portability
+
+The campaign database is a single SQLite file (`ttrpg-engine.db`). This means:
+
+- **Backup is `cp`.** Copy the file. That's it.
+- **Clone a campaign** by copying the `.db` and renaming the campaign row.
+- **Version control** the `.db` alongside your session notes. SQLite files diff reasonably with `sqldiff` or `git diff` after `sqlite3 .db .dump > schema.sql`.
+- **Cross-platform.** The `.db` file is binary-identical across macOS and Linux. Copy it between machines freely.
+- **Inspect with any SQLite tool.** `sqlite3`, DB Browser, Datasette — the schema is documented in [docs/schema.md](docs/schema.md). Reads are always safe; never issue DDL (see schema warning above).
+
+### Code quality constraints
+
+Every proc in the codebase has a hard cyclomatic complexity limit of 10 (McCabe's original threshold). Decision points counted: `if`, `else if`, `for`, `case` (in `switch`), `&&`, `||`, `?:`. Procs that would exceed the limit must be split — helper procs that exist only to keep a caller under the limit are preferred over clever monolithic functions. This keeps every unit of logic reviewable in a single screen of code.
+
 ---
 
 ## Table of Contents
 1. [The World Engine](#the-world-engine)
-2. [Installation & Build](#installation--build)
+2. [AI Agent Contract](#ai-agent-contract)
+3. [Installation & Build](#installation--build)
 3. [Database Schema](#database-schema)
 4. [Global Output Flags](#global-output-flags)
 5. [Dice Notation](#dice-notation)
@@ -105,6 +415,9 @@ Run these commands from the project root:
 ---
 
 ## Database Schema
+
+> **IMPORTANT — AI agents and automation tools:** All schema management is handled internally by the `ttrpg-engine` binary via automatic forward-only migrations keyed on `PRAGMA user_version`. **Do not manually modify the schema with `sqlite3` or any other external tool.** Adding, altering, or dropping tables/columns outside the binary's migration system will break the engine's version tracking and cause migration failures on next startup. The `.db` file is safe to read (SELECT) and safe to open in any SQLite browser for inspection — just never execute DDL (CREATE/ALTER/DROP) against it directly.
+
 The database uses a highly relational SQLite schema. For a detailed mapping of all tables, fields, constraints, and relationships, see the **[docs/schema.md](docs/schema.md)** document.
 
 ---
@@ -143,6 +456,41 @@ All damage, healing, attack rolls, saving throws, initiative, and hit dice value
 | `4dF` | Roll 4 Fudge dice |
 
 Every command that previously accepted a raw integer now accepts a dice spec. The engine parses the spec, rolls with cryptographically secure RNG, and uses the total.
+
+### Where dice are rolled
+
+**User provides the dice spec** (you control the expression):
+
+| Command | What rolls |
+|---|---|
+| `character damage` | `dice_spec` — damage dealt |
+| `character heal` | `dice_spec` — HP restored |
+| `character set-temp-hp` | `dice_spec` — temporary HP granted |
+| `npc damage`, `npc heal` | `dice_spec` — damage or healing |
+| `creature damage`, `creature heal` | `dice_spec` — damage or healing |
+| `companion damage`, `companion heal` | `dice_spec` — damage or healing |
+| `combat attack` | `dice_spec` — d20 attack roll |
+| `combat strike` | Weapon damage dice auto-looked up from inventory; d20 attack roll |
+| `combat cast` | `dice_spec` — spell damage/healing; d20 attack roll or target save |
+| `combat damage` | `dice_spec` — damage dealt |
+| `combat save` | `dice_spec` — d20 saving throw |
+| `combat join` | `dice_spec` — initiative roll |
+| `combat death-save` | `dice_spec` — death saving throw |
+| `combat check` | d20 auto-rolled internally |
+| `rest short` | Hit dice auto-rolled internally (largest class hit die × count + CON per die) |
+| `rest long` | No rolls — full heal |
+
+**Engine rolls automatically** (no dice spec argument):
+
+| Command | What happens |
+|---|---|
+| `combat check` | Rolls d20 + ability mod + proficiency internally |
+| `combat strike` | After the d20 attack roll, damage dice auto-looked up from equipped weapon |
+| `combat cast` | Auto-rolls concentration save (d20 + CON + prof vs DC) when caster takes damage |
+| `combat damage` | Auto-rolls concentration save for concentrating targets |
+| `combat use-feature Second Wind` | Auto-rolls 1d10 + character level healing |
+| `rest short` | Auto-rolls hit dice (largest class die × count) + CON per die |
+| `shop haggle` | Auto-rolls d20 + CHA (Persuasion) vs scaling DC |
 
 ---
 
@@ -248,7 +596,7 @@ Manage combat conditions, resting metrics, and temporary states.
 ---
 
 ### 3. Combat Stats & Spellcasting
-Set D&D 5e combat math: proficiency bonus, initiative, spell save DC, spell attack bonus, passive perception, languages, max hit dice, concentration, and the combat-engaged flag (consumed by an external combat engine).
+Set 5e-compatible combat math: proficiency bonus, initiative, spell save DC, spell attack bonus, passive perception, languages, max hit dice, concentration, and the combat-engaged flag (consumed by an external combat engine).
 
 - **Set Proficiency Bonus**:
   ```bash
@@ -295,7 +643,7 @@ Set D&D 5e combat math: proficiency bonus, initiative, spell save DC, spell atta
 ---
 
 ### 4. Conditions & Personality
-Track D&D 5e conditions with source/duration/save metadata, and PHB personality hooks. Conditions are a top-level command (apply to character, NPC, or creature polymorphically).
+Track 5e conditions with source/duration/save metadata, and PHB personality hooks. Conditions are a top-level command (apply to character, NPC, or creature polymorphically).
 
 - **Apply a Condition**:
   ```bash
@@ -964,7 +1312,7 @@ Group characters into adventuring parties for collective movement, resting, and 
 
 ### 19. Combat Engine
 
-Full D&D 5e turn-based combat with action economy enforcement, spell slot tracking, weapon auto-lookup, skill checks, concentration auto-rolls, and feature resource consumption. All dice values are dice specs — the engine rolls cryptographically secure random numbers internally.
+Full 5e-compatible turn-based combat with action economy enforcement, spell slot tracking, weapon auto-lookup, skill checks, concentration auto-rolls, and feature resource consumption. All dice values are dice specs — the engine rolls cryptographically secure random numbers internally.
 
 #### Encounter Lifecycle
 

@@ -71,10 +71,17 @@ DM's agent is the sole writer; all players query through the DM.
 
 ## Algorithm constraints
 
-- **O(1) only.** All DB operations are constant time relative to
-  result set size (single-row lookups, not full table scans unless
-  explicitly requested).
+- **Single-row lookups: O(1).** All primary-key and unique-index
+  lookups are constant time. Single-row INSERT/UPDATE/DELETE is
+  also O(1).
+- **List operations: O(rows returned).** Commands like `list`,
+  `get-story-state`, or `wanted get` without a location filter
+  scale with the number of rows they return, not with table size.
+- **Tree walks: O(depth).** Location parent-chain inheritance
+  (`get_effective_heat`, `location breadcrumb`) walks the `parent_id`
+  chain. Depth is bounded by campaign geography — practically ≤10.
 - **No linear searches or O(n) string operations** in the hot path.
+  No full table scans unless a list command explicitly requests one.
 
 ## Schema
 
