@@ -26,26 +26,78 @@ The SQLite database is an internal implementation detail, **not the API**. The `
 - Infer schema from `docs/schema.md` and write rows directly
 - Patch, repair, or migrate the database manually
 
-**Why.** The binary manages schema versioning with `PRAGMA user_version` and forward-only migrations. Any external DDL or DML breaks version tracking, corrupts the migration chain, and produces errors the agent cannot diagnose. The `.db` file is safe to read with any SQLite browser for inspection — just never write to it.
+**Why.** The binary manages schema versioning with `PRAGMA user_version`
+and forward-only migrations. Any external DDL or DML breaks version
+tracking, corrupts the migration chain, and produces errors the agent
+cannot diagnose. The `.db` file is safe to read with any SQLite browser
+for inspection — just never write to it.
 
-For the complete JSON schema, error shapes, exit codes, read/write command tables, and concurrency behavior, see the full **[AI Agent Contract](#ai-agent-contract)** below.
+For the complete JSON schema, error shapes, exit codes, read/write
+command tables, and concurrency behavior, see the full
+**[AI Agent Contract](#ai-agent-contract)** below.
 
 
 ## The World Engine
 
-ttrpg-engine models your tabletop world as a **relational database** — every tavern, blacksmith, quest giver, and goblin camp is a row you can query, update, and connect. It was built for DMs who run long-form campaigns with deep continuity, and for AI agents that need a canonical source of truth about the game state.
+ttrpg-engine models your tabletop world as a **relational database** —
+every tavern, blacksmith, quest giver, and goblin camp is a row you can
+query, update, and connect. It was built for DMs who run long-form
+campaigns with deep continuity, and for AI agents that need a canonical
+source of truth about the game state.
 
-**The world model.** You create a campaign. Inside it, you build locations — towns, districts, dungeons. Locations nest into sub-locations (`Ashwick > Blacksmith District > The Anvil & Flame`). Each location holds houses (with residents and inventory), shops (with opening hours and proprietors), wandering encounters, and story-driving setpieces. NPCs, characters, and creatures all have a location — the CLI tells you exactly who is where right now.
+**The world model.** You create a campaign. Inside it, you build
+locations — towns, districts, dungeons. Locations nest into
+sub-locations (`Ashwick > Blacksmith District > The Anvil & Flame`).
+Each location holds houses (with residents and inventory), shops (with
+opening hours and proprietors), wandering encounters, and story-driving
+setpieces. NPCs, characters, and creatures all have a location — the CLI
+tells you exactly who is where right now.
 
-**The memory system.** A stateless AI agent only knows what you tell it. ttrpg-engine solves this with three systems working together: a **campaign journal** (timestamped session recaps the AI writes and reads back), a **quest tracker** (step-by-step objectives with linked actors, so the AI remembers what the party is supposed to be doing), and an **in-game calendar** (day, time of day, season) so the AI can say "it's autumn evening on day 42." One command — `campaign get-story-state` — returns the complete context packet the AI needs to reconstruct the game from a cold start.
+**The memory system.** A stateless AI agent only knows what you tell it.
+ttrpg-engine solves this with three systems working together: a
+**campaign journal** (timestamped session recaps the AI writes and reads
+back), a **quest tracker** (step-by-step objectives with linked actors,
+so the AI remembers what the party is supposed to be doing), and an
+**in-game calendar** (day, time of day, season) so the AI can say "it's
+autumn evening on day 42." One command — `campaign get-story-state` —
+returns the complete context packet the AI needs to reconstruct the game
+from a cold start.
 
-**The combat engine.** Turn-based 5e-compatible combat lives inside the database. `combat start`, `combat join`, `combat init` set up the encounter. `combat attack` resolves attack rolls against AC, `combat damage` applies damage with automatic resistance/vulnerability/immunity. `combat save` handles saving throws with proficiency bonuses. `combat next` advances turns, resets reactions each round. Death saves, concentration, conditions, reactions, and ready actions are all tracked. The combat snapshot appears in `get-story-state` — the AI always knows who's up, what HP everyone has, and what conditions are active.
+**The combat engine.** Turn-based 5e-compatible combat lives inside the
+database. `combat start`, `combat join`, `combat init` set up the
+encounter. `combat attack` resolves attack rolls against AC, `combat
+damage` applies damage with automatic resistance/vulnerability/immunity.
+`combat save` handles saving throws with proficiency bonuses. `combat
+next` advances turns, resets reactions each round. Death saves,
+concentration, conditions, reactions, and ready actions are all tracked.
+The combat snapshot appears in `get-story-state` — the AI always knows
+who's up, what HP everyone has, and what conditions are active.
 
-**The relationship graph.** NPCs have friendships, rivalries, and family ties with each other (tracked with a decay-aware score). Characters have personal faction standings, and campaigns track party-wide institutional faction reputation — a faction can hate one PC but still mark the party as hostile for the group's actions. Houses have residents. Characters group into parties with shared treasury and location. Quests have quest givers and participants. Every entity can be linked to every other entity — the database IS the campaign bible.
+**The relationship graph.** NPCs have friendships, rivalries, and family
+ties with each other (tracked with a decay-aware score). Characters have
+personal faction standings, and campaigns track party-wide institutional
+faction reputation — a faction can hate one PC but still mark the party
+as hostile for the group's actions. Houses have residents. Characters
+group into parties with shared treasury and location. Quests have quest
+givers and participants. Every entity can be linked to every other
+entity — the database IS the campaign bible.
 
-**Built for AI pipelines.** Every command emits `--json` output for piping into LLM agents, Discord bots, or automation scripts. The schema is designed so an AI can call `get-story-state`, receive the full world snapshot (locations tree with all entities present, active quests, recent journal entries, faction standings, story log), and immediately begin DMing with full context. No warm-up, no context-stuffing — one query, everything it needs.
+**Built for AI pipelines.** Every command emits `--json` output for
+piping into LLM agents, Discord bots, or automation scripts. The schema
+is designed so an AI can call `get-story-state`, receive the full world
+snapshot (locations tree with all entities present, active quests,
+recent journal entries, faction standings, story log), and immediately
+begin DMing with full context. No warm-up, no context-stuffing — one
+query, everything it needs.
 
-**Fast by design.** Single-row lookups are O(1) via indexed primary keys. List commands scale with result size, not table size. Location tree walks are O(depth) with depth bounded by campaign geography (practically ≤10). Arena-based memory with zero heap allocations after startup. Automatic SQLite schema migrations — drop the binary into a campaign folder and run. No config files, no daemons, no network calls. Just a 2.6 MB binary and a `.db` file you can commit to git alongside your session notes.
+**Fast by design.** Single-row lookups are O(1) via indexed primary
+keys. List commands scale with result size, not table size. Location
+tree walks are O(depth) with depth bounded by campaign geography
+(practically ≤10). Arena-based memory with zero heap allocations after
+startup. Automatic SQLite schema migrations — drop the binary into a
+campaign folder and run. No config files, no daemons, no network calls.
+Just a 2.6 MB binary and a `.db` file you can commit to git alongside
+your session notes.
 
 
 ## AI Agent Contract
@@ -340,7 +392,11 @@ SQLite provides **serialized write access**. The binary opens a single connectio
 - **Writes serialize via SQLite's internal lock.** If process A is mid-write, process B's write blocks until A commits. If the wait exceeds SQLite's busy timeout, B gets `{"success":false,"error":"Failed to ..."}` and exits 1.
 - **There is no WAL mode.** The database uses SQLite's default rollback journal. Long-running reads can starve writers under extreme load.
 
-**Recommendation for agents:** serialize all writes through a single process or queue. Reads can fan out freely. If you need to batch mutations, chain them in a single `ttrpg-engine` invocation by using multiple subcommands (not yet supported — each invocation is one command).
+**Recommendation for agents:** serialize all writes through a single
+process or queue. Reads can fan out freely. If you need to batch
+mutations, chain them in a single `ttrpg-engine` invocation by using
+multiple subcommands (not yet supported — each invocation is one
+command).
 
 ## Install
 
@@ -385,7 +441,12 @@ The campaign database is a single SQLite file (`ttrpg-engine.db`). This means:
 
 ### Code quality constraints
 
-Every proc in the codebase has a hard cyclomatic complexity limit of 10 (McCabe's original threshold). Decision points counted: `if`, `else if`, `for`, `case` (in `switch`), `&&`, `||`, `?:`. Procs that would exceed the limit must be split — helper procs that exist only to keep a caller under the limit are preferred over clever monolithic functions. This keeps every unit of logic reviewable in a single screen of code.
+Every proc in the codebase has a hard cyclomatic complexity limit of 10
+(McCabe's original threshold). Decision points counted: `if`, `else if`,
+`for`, `case` (in `switch`), `&&`, `||`, `?:`. Procs that would exceed
+the limit must be split — helper procs that exist only to keep a caller
+under the limit are preferred over clever monolithic functions. This
+keeps every unit of logic reviewable in a single screen of code.
 
 ---
 
@@ -420,7 +481,7 @@ Every proc in the codebase has a hard cyclomatic complexity limit of 10 (McCabe'
    - [Time, Calendar & Decay](#20-time-calendar--decay)
    - [Wanted & Crime System](#21-wanted--crime-system)
 9. [Automatic Database Schema Migrations](#automatic-database-schema-migrations)
-8. [Example Walkthrough Scenario](#example-walkthrough-scenario)
+10. [Example Walkthrough Scenario](#example-walkthrough-scenario)
 
 ---
 
@@ -441,7 +502,15 @@ Run these commands from the project root:
 
 ## Database Schema
 
-> **IMPORTANT — AI agents and automation tools:** All schema management is handled internally by the `ttrpg-engine` binary via automatic forward-only migrations keyed on `PRAGMA user_version`. **Do not manually modify the schema with `sqlite3` or any other external tool.** Adding, altering, or dropping tables/columns outside the binary's migration system will break the engine's version tracking and cause migration failures on next startup. The `.db` file is safe to read (SELECT) and safe to open in any SQLite browser for inspection — just never execute DDL (CREATE/ALTER/DROP) against it directly.
+> **IMPORTANT — AI agents and automation tools:** All schema management
+> is handled internally by the `ttrpg-engine` binary via automatic
+> forward-only migrations keyed on `PRAGMA user_version`. **Do not
+> manually modify the schema with `sqlite3` or any other external tool.**
+> Adding, altering, or dropping tables/columns outside the binary's
+> migration system will break the engine's version tracking and cause
+> migration failures on next startup. The `.db` file is safe to read
+> (SELECT) and safe to open in any SQLite browser for inspection — just
+> never execute DDL (CREATE/ALTER/DROP) against it directly.
 
 The database uses a highly relational SQLite schema. For a detailed mapping of all tables, fields, constraints, and relationships, see the **[docs/schema.md](docs/schema.md)** document.
 
@@ -568,7 +637,12 @@ Manage combat conditions, resting metrics, and temporary states.
   ```bash
   ./ttrpg-engine character damage <id> <dice_spec> [damage_type] [attack_or_save] [save_dc] [d20_roll]
   ```
-  *`dice_spec` is a dice expression like `2d6+3` or `8d6`. The `attack_or_save` argument accepts dice specs (e.g. `d20+5`) for attack rolls, or save ability names (str/dex/con/int/wis/cha) for saving throws. Handles evasion feats, races, resistances, vulnerabilities, immunities, and saving throw modifier calculations automatically.*
+  *`dice_spec` is a dice expression like `2d6+3` or `8d6`. The
+  `attack_or_save` argument accepts dice specs (e.g. `d20+5`) for
+  attack rolls, or save ability names (str/dex/con/int/wis/cha) for
+  saving throws. Handles evasion feats, races, resistances,
+  vulnerabilities, immunities, and saving throw modifier calculations
+  automatically.*
 - **Apply Healing**:
   ```bash
   ./ttrpg-engine character heal <id> <dice_spec> [source]
@@ -873,7 +947,12 @@ Manage campaign NPCs, daily roles, location, and interpersonal relationships.
   ./ttrpg-engine npc set-char-standing <npc_id> <character_id> <standing> [notes]
   ./ttrpg-engine npc get-char-standing <character_id> [npc_id]
   ```
-  *Track individual reputation between a player character and an NPC. Standing ranges from -100 (hated) to +100 (trusted). Affects haggle DCs, shop prices, and access checks. Decays over time (14-day half-life) — reset by any interaction or by calling `set-char-standing`. If `npc_id` is omitted from `get-char-standing`, returns all standings for that character.*
+  *Track individual reputation between a player character and an NPC.
+  Standing ranges from -100 (hated) to +100 (trusted). Affects haggle
+  DCs, shop prices, and access checks. Decays over time (14-day
+  half-life) — reset by any interaction or by calling
+  `set-char-standing`. If `npc_id` is omitted from `get-char-standing`,
+  returns all standings for that character.*
 
 
 ---
@@ -1029,7 +1108,15 @@ Manage the campaign world, track sessions, log story events, write session recap
   ```bash
   ./ttrpg-engine campaign get-story-state <campaign_id> [--json]
   ```
-  *Returns the full context packet: campaign metadata with in-game time, DM notes, last 10 journal entries, active quests with objectives and actors, location tree with all entities present (sub-locations, houses, shops, encounters, setpieces, NPCs, characters, creatures), factions, NPC relationships, character faction standings, party faction standings, parties with members and treasury, active combat encounter with turn order/HP/conditions, and chronological story log. This is the single command an AI agent calls to reconstruct the entire game state.*
+  *Returns the full context packet: campaign metadata with in-game time,
+  DM notes, last 10 journal entries, active quests with objectives and
+  actors, location tree with all entities present (sub-locations, houses,
+  shops, encounters, setpieces, NPCs, characters, creatures), factions,
+  NPC relationships, character faction standings, party faction
+  standings, parties with members and treasury, active combat encounter
+  with turn order/HP/conditions, and chronological story log. This is
+  the single command an AI agent calls to reconstruct the entire game
+  state.*
 
 ---
 
@@ -1270,7 +1357,12 @@ Browse shop inventory, stock items with custom prices, buy and sell with full cu
   ```bash
   ./ttrpg-engine shop haggle <shop_id> <char_id> <item_id> <quantity> <discount_pct> [--json]
   ```
-  *Attempt a Persuasion (CHA) check to negotiate a discount with the shop owner. **3 attempts per shop per in-game day.** DC escalates with each failure, and a critical fail (miss by 10+) damages reputation with the NPC. On success, the item is purchased automatically at the discounted price — coins are deducted from the character and credited to the shop treasury.*
+  *Attempt a Persuasion (CHA) check to negotiate a discount with the
+  shop owner. **3 attempts per shop per in-game day.** DC escalates
+  with each failure, and a critical fail (miss by 10+) damages
+  reputation with the NPC. On success, the item is purchased
+  automatically at the discounted price — coins are deducted from the
+  character and credited to the shop treasury.*
 
   | Mechanic | Detail |
   |---|---|
@@ -1386,13 +1478,27 @@ The engine enforces 5e action economy: one action (with Extra Attack / Multiatta
   ```bash
   ./ttrpg-engine combat strike <encounter_id> <attacker_type> <attacker_id> <target_type> <target_id> [ability] [bonus|ba]
   ```
-  *One-command weapon attack. Auto-looks up the actor's equipped weapon from inventory: reads damage dice, damage type, magic bonus. Determines ability (STR for melee, DEX for ranged/finesse). Rolls d20 + mod + proficiency + magic vs AC. On hit: rolls weapon damage + ability mod + magic bonus, applies resistance/vulnerability/immunity, drains temp HP, auto-rolls concentration save, marks death at 0 HP. Falls back to unarmed strike (1 + STR bludgeoning) if no weapon equipped. Use `bonus` or `ba` as 7th argument for bonus-action attacks (e.g. off-hand).*
+  *One-command weapon attack. Auto-looks up the actor's equipped weapon
+  from inventory: reads damage dice, damage type, magic bonus. Determines
+  ability (STR for melee, DEX for ranged/finesse). Rolls d20 + mod +
+  proficiency + magic vs AC. On hit: rolls weapon damage + ability mod +
+  magic bonus, applies resistance/vulnerability/immunity, drains temp HP,
+  auto-rolls concentration save, marks death at 0 HP. Falls back to
+  unarmed strike (1 + STR bludgeoning) if no weapon equipped. Use
+  `bonus` or `ba` as 7th argument for bonus-action attacks (e.g.
+  off-hand).*
 
 - **Cast a Spell**:
   ```bash
   ./ttrpg-engine combat cast <encounter_id> <caster_type> <caster_id> <spell_name> <slot_level> <target_type> <target_id> [save_ability] [dice_spec] [dc_override]
   ```
-  *For characters: verifies spell is known and prepared, checks spell slots, consumes a slot. For all casters: uses character's spell_attack_bonus / spell_save_dc, or computes DC (8 + prof + best mental mod) for NPCs/creatures. If `save_ability` given (str/dex/con/int/wis/cha): target rolls save vs caster's DC. Otherwise: rolls spell attack vs target AC. Auto-tracks concentration if the spell's duration contains "Concentration".*
+  *For characters: verifies spell is known and prepared, checks spell
+  slots, consumes a slot. For all casters: uses character's
+  spell_attack_bonus / spell_save_dc, or computes DC (8 + prof + best
+  mental mod) for NPCs/creatures. If `save_ability` given
+  (str/dex/con/int/wis/cha): target rolls save vs caster's DC.
+  Otherwise: rolls spell attack vs target AC. Auto-tracks concentration
+  if the spell's duration contains "Concentration".*
 
 - **Apply Damage (manual)**:
   ```bash
@@ -1404,7 +1510,12 @@ The engine enforces 5e action economy: one action (with Extra Attack / Multiatta
   ```bash
   ./ttrpg-engine combat use-feature <encounter_id> <actor_type> <actor_id> <feature_name>
   ```
-  *Activates a class feature or monster ability. Auto-matches feature to resource pool by naming convention (Rage → "Rage", Ki/Flurry of Blows → "Ki Points", Action Surge → "Action Surge", Second Wind → "Second Wind", Channel Divinity → "Channel Divinity", Bardic Inspiration, Sorcery Points, Wild Shape, etc.). Decrements resource by 1. Applies mechanical effects for known features:*
+  *Activates a class feature or monster ability. Auto-matches feature to
+  resource pool by naming convention (Rage → "Rage", Ki/Flurry of Blows
+  → "Ki Points", Action Surge → "Action Surge", Second Wind →
+  "Second Wind", Channel Divinity → "Channel Divinity", Bardic
+  Inspiration, Sorcery Points, Wild Shape, etc.). Decrements resource
+  by 1. Applies mechanical effects for known features:*
   - **Rage**: adds "rage" to status_effects (B/P/S resistance, +2 STR damage)
   - **Action Surge**: resets action_used and attacks_used (grants an extra action)
   - **Second Wind**: auto-heals 1d10 + character level
@@ -1585,7 +1696,11 @@ An **explicit row at a child location takes precedence** over the parent — thi
 
 #### Decay
 
-Wanted heat decays exponentially with the same ~14-day half-life as faction standings. The decay is computed **at query time** from the `last_decay_hour` timestamp (stored as `total_elapsed_hours`) and never persisted back — the raw heat remains unchanged, only the displayed value decays. Setting heat via `crime` or `set` resets the decay timer.
+Wanted heat decays exponentially with the same ~14-day half-life as
+faction standings. The decay is computed **at query time** from the
+`last_decay_hour` timestamp (stored as `total_elapsed_hours`) and never
+persisted back — the raw heat remains unchanged, only the displayed
+value decays. Setting heat via `crime` or `set` resets the decay timer.
 
 Actors without a campaign assignment can still accumulate wanted heat (decay timer is 0, meaning "never decays"). Assign the actor to a campaign and advance time to enable decay.
 
@@ -1625,7 +1740,12 @@ Actors without a campaign assignment can still accumulate wanted heat (decay tim
 ## Automatic Database Schema Migrations
 The tool handles schema updates automatically using SQLite's internal versioning integer `PRAGMA user_version`. 
 
-When the CLI starts up, it reads the current schema version of `ttrpg-engine.db`. If the database is new or has an older version, the tool executes all missing forward-only SQL migration blocks sequentially and stamps the new version number onto the file. This requires zero setup or manual commands from the Dungeon Master, keeping campaign data intact.
+When the CLI starts up, it reads the current schema version of
+`ttrpg-engine.db`. If the database is new or has an older version, the
+tool executes all missing forward-only SQL migration blocks sequentially
+and stamps the new version number onto the file. This requires zero
+setup or manual commands from the Dungeon Master, keeping campaign data
+intact.
 
 ---
 
