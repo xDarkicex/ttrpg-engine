@@ -382,7 +382,7 @@ route_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		return route_meta_command(db, cmd_name, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown command"}`)
+			cmd.usage_error(db, "Unknown command")
 		} else {
 			fmt.eprintln("Unknown command:", cmd_name)
 			print_usage()
@@ -426,7 +426,7 @@ route_asset_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> in
 route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine class-specialty <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine class-specialty <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine class-specialty <subcommand> [args]")
 		}
@@ -438,7 +438,7 @@ route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
 	case "list":   return cmd.specialty_list(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown class-specialty subcommand"}`)
+			cmd.usage_error(db, "Unknown class-specialty subcommand")
 		} else {
 			fmt.eprintln("Unknown class-specialty subcommand:", sub)
 		}
@@ -449,7 +449,7 @@ route_specialty :: proc(db: ^lib.Db, args: []string) -> int {
 route_quest :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine quest <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine quest <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine quest <subcommand> [args]")
 		}
@@ -466,7 +466,7 @@ route_quest :: proc(db: ^lib.Db, args: []string) -> int {
 	case "get":               return cmd.quest_get(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown quest subcommand"}`)
+			cmd.usage_error(db, "Unknown quest subcommand")
 		} else {
 			fmt.eprintln("Unknown quest subcommand:", sub)
 		}
@@ -494,7 +494,7 @@ route_meta_command :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int
 route_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine character <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine character <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine character <subcommand> [args]")
 		}
@@ -508,7 +508,7 @@ route_character :: proc(db: ^lib.Db, args: []string) -> int {
 		return route_character_setters(db, sub, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown character subcommand"}`)
+			cmd.usage_error(db, "Unknown character subcommand")
 		} else {
 			fmt.eprintln("Unknown character subcommand:", sub)
 		}
@@ -585,7 +585,7 @@ route_character_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int
 route_item :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine item <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine item <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine item <subcommand> [args]")
 		}
@@ -599,7 +599,7 @@ route_item :: proc(db: ^lib.Db, args: []string) -> int {
 		return cmd.item_list(db)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown item subcommand"}`)
+			cmd.usage_error(db, "Unknown item subcommand")
 		} else {
 			fmt.eprintln("Unknown item subcommand:", sub)
 		}
@@ -610,7 +610,7 @@ route_item :: proc(db: ^lib.Db, args: []string) -> int {
 route_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine inventory <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine inventory <subcommand> [args]")
 		}
@@ -625,7 +625,7 @@ route_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	case "attune": return cmd.inventory_attune(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown inventory subcommand"}`)
+			cmd.usage_error(db, "Unknown inventory subcommand")
 		} else {
 			fmt.eprintln("Unknown inventory subcommand:", sub)
 		}
@@ -636,7 +636,7 @@ route_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 route_spell :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine spell <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine spell <subcommand> [args]")
 		}
@@ -652,7 +652,7 @@ route_spell :: proc(db: ^lib.Db, args: []string) -> int {
 	case "list-character": return cmd.spell_list_character(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown spell subcommand"}`)
+			cmd.usage_error(db, "Unknown spell subcommand")
 		} else {
 			fmt.eprintln("Unknown spell subcommand:", sub)
 		}
@@ -663,7 +663,7 @@ route_spell :: proc(db: ^lib.Db, args: []string) -> int {
 route_feature :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine feature <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine feature <subcommand> [args]")
 		}
@@ -677,7 +677,7 @@ route_feature :: proc(db: ^lib.Db, args: []string) -> int {
 	case "list-character": return cmd.feature_list_character(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown feature subcommand"}`)
+			cmd.usage_error(db, "Unknown feature subcommand")
 		} else {
 			fmt.eprintln("Unknown feature subcommand:", sub)
 		}
@@ -688,7 +688,7 @@ route_feature :: proc(db: ^lib.Db, args: []string) -> int {
 route_companion :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine companion <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine companion <subcommand> [args]")
 		}
@@ -704,7 +704,7 @@ route_companion :: proc(db: ^lib.Db, args: []string) -> int {
 	case "heal":      return cmd.companion_heal(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown companion subcommand"}`)
+			cmd.usage_error(db, "Unknown companion subcommand")
 		} else {
 			fmt.eprintln("Unknown companion subcommand:", sub)
 		}
@@ -715,7 +715,7 @@ route_companion :: proc(db: ^lib.Db, args: []string) -> int {
 route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine creature <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine creature <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine creature <subcommand> [args]")
 		}
@@ -729,7 +729,7 @@ route_creature :: proc(db: ^lib.Db, args: []string) -> int {
 		return route_creature_ops(db, sub, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown creature subcommand"}`)
+			cmd.usage_error(db, "Unknown creature subcommand")
 		} else {
 			fmt.eprintln("Unknown creature subcommand:", sub)
 		}
@@ -794,7 +794,7 @@ route_creature_ops :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine faction <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine faction <subcommand> [args]")
 		}
@@ -812,7 +812,7 @@ route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 		case "effective-standing":  return cmd.faction_effective_standing(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown faction subcommand"}`)
+			cmd.usage_error(db, "Unknown faction subcommand")
 		} else {
 			fmt.eprintln("Unknown faction subcommand:", sub)
 		}
@@ -824,7 +824,7 @@ route_faction :: proc(db: ^lib.Db, args: []string) -> int {
 route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine condition <add|remove|list> <character|npc|creature> <id> <name> [source] [duration_rounds] [save_dc] [save_ability]")
 		}
@@ -836,7 +836,7 @@ route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 	case "list":   return cmd.condition_list(db, args[1:])
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown condition subcommand"}`)
+			cmd.usage_error(db, "Unknown condition subcommand")
 		} else {
 			fmt.eprintln("Unknown condition subcommand:", args[0])
 		}
@@ -846,7 +846,7 @@ route_condition :: proc(db: ^lib.Db, args: []string) -> int {
 
 route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine combat <subcommand> ..."}`) }
+		if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine combat <subcommand> ...") }
 		else { fmt.eprintln("Usage: ttrpg-engine combat <subcommand> ...") }
 		return 1
 	}
@@ -871,7 +871,7 @@ route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 	case "status":      return cmd.combat_status(db, args)
 	case "end":         return cmd.combat_end(db, args)
 	case:
-		if db.is_json { fmt.println(`{"success":false,"error":"Unknown combat subcommand"}`) }
+		if db.is_json { cmd.usage_error(db, "Unknown combat subcommand") }
 		else { fmt.eprintln("Unknown combat subcommand:", args[0]) }
 		return 1
 	}
@@ -879,7 +879,7 @@ route_combat :: proc(db: ^lib.Db, args: []string) -> int {
 
 route_party :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine party <subcommand> ..."}`) }
+		if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine party <subcommand> ...") }
 		else { fmt.eprintln("Usage: ttrpg-engine party <subcommand> ...") }
 		return 1
 	}
@@ -892,7 +892,7 @@ route_party :: proc(db: ^lib.Db, args: []string) -> int {
 	case "move":     return cmd.party_move(db, args)
 	case "treasury": return cmd.party_treasury(db, args)
 	case:
-		if db.is_json { fmt.println(`{"success":false,"error":"Unknown party subcommand"}`) }
+		if db.is_json { cmd.usage_error(db, "Unknown party subcommand") }
 		else { fmt.eprintln("Unknown party subcommand:", args[0]) }
 		return 1
 	}
@@ -901,7 +901,7 @@ route_party :: proc(db: ^lib.Db, args: []string) -> int {
 route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine rest <short|long> <character_id> [hit_dice_count]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine rest <short|long> <character_id> [hit_dice_count]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine rest <short|long> <character_id> [hit_dice_count]")
 		}
@@ -912,7 +912,7 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 	case "long":  return cmd.rest_long(db, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown rest subcommand. Use 'short' or 'long'."}`)
+			cmd.usage_error(db, "Unknown rest subcommand. Use 'short' or 'long'.")
 		} else {
 			fmt.eprintln("Unknown rest subcommand. Use 'short' or 'long'.")
 		}
@@ -923,7 +923,7 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 
 	route_trade :: proc(db: ^lib.Db, args: []string) -> int {
 		if len(args) < 4 {
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]"}`) }
+			if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]") }
 			else { fmt.eprintln("Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]") }
 			return 1
 		}
@@ -933,7 +933,7 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 	route_wanted :: proc(db: ^lib.Db, args: []string) -> int {
 		if len(args) < 1 {
 			if db.is_json {
-				fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted <crime|get|set|clear|list> [args]"}`)
+				cmd.usage_error(db, "Usage: ttrpg-engine wanted <crime|get|set|clear|list> [args]")
 			} else {
 				fmt.eprintln("Usage: ttrpg-engine wanted <crime|get|set|clear|list> [args]")
 			}
@@ -947,7 +947,7 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 		case "list":  return cmd.wanted_list(db, args)
 		case:
 			if db.is_json {
-				fmt.println(`{"success":false,"error":"Unknown wanted subcommand. Use crime, get, set, clear, or list."}`)
+				cmd.usage_error(db, "Unknown wanted subcommand. Use crime, get, set, clear, or list.")
 			} else {
 				fmt.eprintln("Unknown wanted subcommand:", args[0])
 			}
@@ -958,7 +958,7 @@ route_rest :: proc(db: ^lib.Db, args: []string) -> int {
 route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine npc <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine npc <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine npc <subcommand> [args]")
 		}
@@ -979,7 +979,7 @@ route_npc :: proc(db: ^lib.Db, args: []string) -> int {
 		return 0
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown npc subcommand"}`)
+			cmd.usage_error(db, "Unknown npc subcommand")
 		} else {
 			fmt.eprintln("Unknown npc subcommand:", sub)
 		}
@@ -1040,7 +1040,7 @@ route_npc_setters :: proc(db: ^lib.Db, sub: string, args: []string) -> int {
 route_campaign :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 1 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign <subcommand> [args]"}`)
+			cmd.usage_error(db, "Usage: ttrpg-engine campaign <subcommand> [args]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine campaign <subcommand> [args]")
 		}
@@ -1054,7 +1054,7 @@ route_campaign :: proc(db: ^lib.Db, args: []string) -> int {
 		return route_campaign_story(db, sub, args)
 	case:
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Unknown campaign subcommand"}`)
+			cmd.usage_error(db, "Unknown campaign subcommand")
 		} else {
 			fmt.eprintln("Unknown campaign subcommand:", sub)
 		}
@@ -1150,7 +1150,7 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 			fmt.println(cmd.location_breadcrumb(db, id))
 			return 0
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine location <set-parent|set-restricted|breadcrumb> ..."}`) }
+			if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine location <set-parent|set-restricted|breadcrumb> ...") }
 			else { fmt.eprintln("Usage: ttrpg-engine location <set-parent|set-restricted|breadcrumb> ...") }
 			return 1
 		}
@@ -1164,7 +1164,7 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "remove-resident":  return cmd.house_remove_resident(db, args)
 		case "list-residents":   return cmd.house_list_residents(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house <add|list|set-inventory|set-restricted> ..."}`) }
+			if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine house <add|list|set-inventory|set-restricted> ...") }
 			else { fmt.eprintln("Usage: ttrpg-engine house <add|list|set-inventory|set-restricted> ...") }
 			return 1
 		}
@@ -1182,7 +1182,7 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 			case "get":              return cmd.shop_get(db, args)
 			case "haggle":           return cmd.shop_haggle(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop <add|list|set-inventory|browse|stock|buy|sell|add-money|remove-money|get|haggle> ..."}`) }
+			if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine shop <add|list|set-inventory|browse|stock|buy|sell|add-money|remove-money|get|haggle> ...") }
 			else { fmt.eprintln("Usage: ttrpg-engine shop <add|list|set-inventory|browse|stock|buy|sell|add-money|remove-money|get|haggle> ...") }
 			return 1
 		}
@@ -1191,7 +1191,7 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "add":              return cmd.encounter_add(db, args)
 		case "list":             return cmd.encounter_list(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine encounter <add|list> ..."}`) }
+			if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine encounter <add|list> ...") }
 			else { fmt.eprintln("Usage: ttrpg-engine encounter <add|list> ...") }
 			return 1
 		}
@@ -1200,7 +1200,7 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 		case "add":              return cmd.setpiece_add(db, args)
 		case "list":             return cmd.setpiece_list(db, args)
 		case:
-			if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine setpiece <add|list> ..."}`) }
+			if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine setpiece <add|list> ...") }
 			else { fmt.eprintln("Usage: ttrpg-engine setpiece <add|list> ...") }
 			return 1
 		}
@@ -1211,7 +1211,7 @@ route_world :: proc(db: ^lib.Db, cmd_name: string, args: []string) -> int {
 route_can_enter :: proc(db: ^lib.Db, args: []string) -> int {
 	// Usage: ttrpg-engine can-enter <property_kind> <property_id> [visitor_npc_id] [visitor_char_id] [in_game_day]
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]"}`) }
+		if db.is_json { cmd.usage_error(db, "Usage: ttrpg-engine can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]") }
 		else { fmt.eprintln("Usage: ttrpg-engine can-enter <house|shop|location> <id> [visitor_npc_id] [visitor_char_id] [in_game_day]") }
 		return 1
 	}
