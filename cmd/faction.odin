@@ -9,7 +9,7 @@ import sqlite "ext:sqlite3"
 faction_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction create <name> <description>"}`)
+			usage_error(db, "Usage: ttrpg-engine faction create <name> <description>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine faction create <name> <description>")
 		}
@@ -22,7 +22,7 @@ faction_create :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to create faction"}`)
+			usage_error(db, "Failed to create faction")
 		} else {
 			fmt.eprintln("Failed to create faction")
 		}
@@ -44,7 +44,7 @@ faction_list :: proc(db: ^lib.Db) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list factions"}`)
+			usage_error(db, "Failed to list factions")
 		} else {
 			fmt.eprintln("Failed to list factions")
 		}
@@ -82,7 +82,7 @@ faction_list :: proc(db: ^lib.Db) -> int {
 faction_join :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction join <char|npc> <id> <faction_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine faction join <char|npc> <id> <faction_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine faction join <char|npc> <id> <faction_id>")
 		}
@@ -99,7 +99,7 @@ faction_join :: proc(db: ^lib.Db, args: []string) -> int {
 		sql = fmt.tprintf("UPDATE npcs SET faction_id=%d WHERE id=%d", faction_id, id)
 	} else {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Target type must be 'char' or 'npc'"}`)
+			usage_error(db, "Target type must be 'char' or 'npc'")
 		} else {
 			fmt.eprintln("Target type must be 'char' or 'npc'")
 		}
@@ -108,7 +108,7 @@ faction_join :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to join faction"}`)
+			usage_error(db, "Failed to join faction")
 		} else {
 			fmt.eprintln("Failed to join faction")
 		}
@@ -157,7 +157,7 @@ print_faction_standings :: proc(stmt: ^sqlite.Statement, is_json: bool) {
 faction_set_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction set-standing <character_id> <faction_id> <standing> [notes]"}`)
+			usage_error(db, "Usage: ttrpg-engine faction set-standing <character_id> <faction_id> <standing> [notes]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine faction set-standing <character_id> <faction_id> <standing> [notes]")
 		}
@@ -175,7 +175,7 @@ faction_set_standing :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to set faction standing"}`)
+			usage_error(db, "Failed to set faction standing")
 		} else {
 			fmt.eprintln("Failed to set faction standing")
 		}
@@ -196,7 +196,7 @@ faction_set_standing :: proc(db: ^lib.Db, args: []string) -> int {
 faction_get_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine faction get-standing <character_id> [faction_id]"}`)
+			usage_error(db, "Usage: ttrpg-engine faction get-standing <character_id> [faction_id]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine faction get-standing <character_id> [faction_id]")
 		}
@@ -229,7 +229,7 @@ faction_get_standing :: proc(db: ^lib.Db, args: []string) -> int {
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to get standings"}`)
+			usage_error(db, "Failed to get standings")
 		} else {
 			fmt.eprintln("Failed to get standings")
 		}

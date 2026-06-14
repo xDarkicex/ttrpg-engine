@@ -9,7 +9,7 @@ import sqlite "ext:sqlite3"
 spell_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 9 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>"}`)
+			usage_error(db, "Usage: ttrpg-engine spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine spell upsert <name> <level> <school> <casting_time> <range> <components> <duration> <description>")
 		}
@@ -31,7 +31,7 @@ spell_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to upsert spell"}`)
+			usage_error(db, "Failed to upsert spell")
 		} else {
 			fmt.eprintln("Failed to upsert spell")
 		}
@@ -52,7 +52,7 @@ spell_list :: proc(db: ^lib.Db) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list spells"}`)
+			usage_error(db, "Failed to list spells")
 		} else {
 			fmt.eprintln("Failed to list spells")
 		}
@@ -92,7 +92,7 @@ spell_list :: proc(db: ^lib.Db) -> int {
 spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]"}`)
+			usage_error(db, "Usage: ttrpg-engine spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine spell learn <char_id> <spell_id> [prepared (0/1)] [class_name] [source]")
 		}
@@ -120,7 +120,7 @@ spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to learn spell"}`)
+			usage_error(db, "Failed to learn spell")
 		} else {
 			fmt.eprintln("Failed to learn spell")
 		}
@@ -137,7 +137,7 @@ spell_learn :: proc(db: ^lib.Db, args: []string) -> int {
 spell_prepare :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell prepare <char_id> <spell_id> <0/1>"}`)
+			usage_error(db, "Usage: ttrpg-engine spell prepare <char_id> <spell_id> <0/1>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine spell prepare <char_id> <spell_id> <0/1>")
 		}
@@ -154,7 +154,7 @@ spell_prepare :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to prepare/unprepare spell"}`)
+			usage_error(db, "Failed to prepare/unprepare spell")
 		} else {
 			fmt.eprintln("Failed to prepare/unprepare spell")
 		}
@@ -171,7 +171,7 @@ spell_prepare :: proc(db: ^lib.Db, args: []string) -> int {
 spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell list-character <char_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine spell list-character <char_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine spell list-character <char_id>")
 		}
@@ -188,7 +188,7 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to get character spells"}`)
+			usage_error(db, "Failed to get character spells")
 		} else {
 			fmt.eprintln("Failed to get character spells")
 		}
@@ -236,7 +236,7 @@ spell_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 spell_forget :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine spell forget <char_id> <spell_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine spell forget <char_id> <spell_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine spell forget <char_id> <spell_id>")
 		}
@@ -248,7 +248,7 @@ spell_forget :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("DELETE FROM character_spells WHERE character_id=%d AND spell_id=%d", char_id, spell_id)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to forget spell"}`)
+			usage_error(db, "Failed to forget spell")
 		} else {
 			fmt.eprintln("Failed to forget spell")
 		}

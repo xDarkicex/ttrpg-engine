@@ -235,7 +235,7 @@ combat_start :: proc(db: ^lib.Db, args: []string) -> int {
 
     if enc_id, ok := get_active_encounter(db, campaign_id); ok {
         if db.is_json {
-            fmt.printf(`{{"success":false,"error":"Combat encounter %d is already active. End it first."}}` + "\n", enc_id)
+            error_response(db, .COMBAT_ALREADY_ACTIVE, fmt.tprintf("Combat encounter %d is already active. End it first.", enc_id), false)
         } else {
             fmt.eprintf("Combat encounter %d is already active. End it first.\n", enc_id)
         }

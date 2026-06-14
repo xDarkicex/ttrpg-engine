@@ -9,7 +9,7 @@ import sqlite "ext:sqlite3"
 feature_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature upsert <name> <source> <description>"}`)
+			usage_error(db, "Usage: ttrpg-engine feature upsert <name> <source> <description>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine feature upsert <name> <source> <description>")
 		}
@@ -26,7 +26,7 @@ feature_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to upsert feature"}`)
+			usage_error(db, "Failed to upsert feature")
 		} else {
 			fmt.eprintln("Failed to upsert feature")
 		}
@@ -47,7 +47,7 @@ feature_list :: proc(db: ^lib.Db) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list features"}`)
+			usage_error(db, "Failed to list features")
 		} else {
 			fmt.eprintln("Failed to list features")
 		}
@@ -85,7 +85,7 @@ feature_list :: proc(db: ^lib.Db) -> int {
 feature_add_to_char :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature add-to-char <char_id> <feature_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine feature add-to-char <char_id> <feature_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine feature add-to-char <char_id> <feature_id>")
 		}
@@ -101,7 +101,7 @@ feature_add_to_char :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to add feature to character"}`)
+			usage_error(db, "Failed to add feature to character")
 		} else {
 			fmt.eprintln("Failed to add feature to character")
 		}
@@ -118,7 +118,7 @@ feature_add_to_char :: proc(db: ^lib.Db, args: []string) -> int {
 feature_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine feature list-character <char_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine feature list-character <char_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine feature list-character <char_id>")
 		}
@@ -135,7 +135,7 @@ feature_list_character :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to get character features"}`)
+			usage_error(db, "Failed to get character features")
 		} else {
 			fmt.eprintln("Failed to get character features")
 		}

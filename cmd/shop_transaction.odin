@@ -94,7 +94,7 @@ credit_coins :: proc(db: ^lib.Db, table: string, id_col: string, id: int, amount
 
 shop_browse :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop browse <shop_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop browse <shop_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop browse <shop_id>") }
 		return 1
 	}
@@ -107,7 +107,7 @@ shop_browse :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to browse shop"}`) }
+		if db.is_json { usage_error(db, "Failed to browse shop") }
 		else { fmt.eprintln("Failed to browse shop") }
 		return 1
 	}
@@ -151,7 +151,7 @@ shop_browse :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_stock :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop stock <shop_id> <item_id> <quantity> [price_gp]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop stock <shop_id> <item_id> <quantity> [price_gp]") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop stock <shop_id> <item_id> <quantity> [price_gp]") }
 		return 1
 	}
@@ -168,7 +168,7 @@ shop_stock :: proc(db: ^lib.Db, args: []string) -> int {
 		shop_id, item_id, qty, price_gp,
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to stock item"}`) }
+		if db.is_json { usage_error(db, "Failed to stock item") }
 		else { fmt.eprintln("Failed to stock item") }
 		return 1
 	}
@@ -182,7 +182,7 @@ shop_stock :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_buy :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop buy <shop_id> <char_id> <item_id> <quantity>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop buy <shop_id> <char_id> <item_id> <quantity>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop buy <shop_id> <char_id> <item_id> <quantity>") }
 		return 1
 	}
@@ -198,14 +198,14 @@ shop_buy :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to look up shop item"}`) }
+		if db.is_json { usage_error(db, "Failed to look up shop item") }
 		else { fmt.eprintln("Failed to look up shop item") }
 		return 1
 	}
 	defer sqlite.finalize(stmt)
 
 	if sqlite.step(stmt) != .Row {
-		if db.is_json { fmt.println(`{"success":false,"error":"Item not available in shop"}`) }
+		if db.is_json { usage_error(db, "Item not available in shop") }
 		else { fmt.eprintln("Item not available in shop") }
 		return 1
 	}
@@ -216,13 +216,13 @@ shop_buy :: proc(db: ^lib.Db, args: []string) -> int {
 	shop_scale := column_text_safe(stmt, 4)
 	_, _, max_item := shop_scale_params(shop_scale)
 	if max_item > 0 && base_value > f64(max_item) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Item value exceeds shop scale limit"}`) }
+		if db.is_json { usage_error(db, "Item value exceeds shop scale limit") }
 		else { fmt.eprintln("This shop does not deal in items of that value") }
 		return 1
 	}
 
 	if stock_qty < qty {
-		if db.is_json { fmt.println(`{"success":false,"error":"Insufficient stock"}`) }
+		if db.is_json { usage_error(db, "Insufficient stock") }
 		else { fmt.eprintln("Insufficient stock in shop") }
 		return 1
 	}
@@ -232,7 +232,7 @@ shop_buy :: proc(db: ^lib.Db, args: []string) -> int {
 
 	// Character pays shop
 	if !deduct_coins(db, "characters", "id", char_id, total_price_cp) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Insufficient funds"}`) }
+		if db.is_json { usage_error(db, "Insufficient funds") }
 		else { fmt.eprintln("Insufficient funds to purchase") }
 		return 1
 	}
@@ -262,7 +262,7 @@ shop_buy :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_sell :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop sell <shop_id> <char_id> <item_id> <quantity>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop sell <shop_id> <char_id> <item_id> <quantity>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop sell <shop_id> <char_id> <item_id> <quantity>") }
 		return 1
 	}
@@ -278,14 +278,14 @@ shop_sell :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	check_sql_c := cstring(raw_data(check_sql))
 	if sqlite.prepare(db.ptr, check_sql_c, i32(len(check_sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to check inventory"}`) }
+		if db.is_json { usage_error(db, "Failed to check inventory") }
 		else { fmt.eprintln("Failed to check inventory") }
 		return 1
 	}
 	defer sqlite.finalize(stmt)
 
 	if sqlite.step(stmt) != .Row {
-		if db.is_json { fmt.println(`{"success":false,"error":"Item not in character inventory"}`) }
+		if db.is_json { usage_error(db, "Item not in character inventory") }
 		else { fmt.eprintln("Item not in character inventory") }
 		return 1
 	}
@@ -294,7 +294,7 @@ shop_sell :: proc(db: ^lib.Db, args: []string) -> int {
 	item_name := column_text_safe(stmt, 2)
 
 	if owned_qty < qty {
-		if db.is_json { fmt.println(`{"success":false,"error":"Insufficient quantity owned"}`) }
+		if db.is_json { usage_error(db, "Insufficient quantity owned") }
 		else { fmt.eprintln("Insufficient quantity in inventory") }
 		return 1
 	}
@@ -304,7 +304,7 @@ shop_sell :: proc(db: ^lib.Db, args: []string) -> int {
 
 	// Shop pays character
 	if !deduct_coins(db, "shops", "id", shop_id, sell_price_cp) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Shop has insufficient funds to buy"}`) }
+		if db.is_json { usage_error(db, "Shop has insufficient funds to buy") }
 		else { fmt.eprintln("Shop has insufficient funds to buy this item") }
 		return 1
 	}
@@ -335,7 +335,7 @@ shop_sell :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop add-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop add-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop add-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]") }
 		return 1
 	}
@@ -348,7 +348,7 @@ shop_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 
 	total_cp := pp * 1000 + gp * 100 + ep * 50 + sp * 10 + cp
 	if !credit_coins(db, "shops", "id", shop_id, total_cp) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add money"}`) }
+		if db.is_json { usage_error(db, "Failed to add money") }
 		else { fmt.eprintln("Failed to add money to shop") }
 		return 1
 	}
@@ -360,7 +360,7 @@ shop_add_money :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop remove-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop remove-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop remove-money <shop_id> <gold> <silver> <copper> [platinum] [electrum]") }
 		return 1
 	}
@@ -373,7 +373,7 @@ shop_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 
 	total_cp := pp * 1000 + gp * 100 + ep * 50 + sp * 10 + cp
 	if !deduct_coins(db, "shops", "id", shop_id, total_cp) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Shop has insufficient funds"}`) }
+		if db.is_json { usage_error(db, "Shop has insufficient funds") }
 		else { fmt.eprintln("Shop has insufficient funds") }
 		return 1
 	}
@@ -386,7 +386,7 @@ shop_remove_money :: proc(db: ^lib.Db, args: []string) -> int {
 // Show shop details including treasury and proprietor
 shop_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop get <shop_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop get <shop_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop get <shop_id>") }
 		return 1
 	}
@@ -399,14 +399,14 @@ shop_get :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to get shop"}`) }
+		if db.is_json { usage_error(db, "Failed to get shop") }
 		else { fmt.eprintln("Failed to get shop") }
 		return 1
 	}
 	defer sqlite.finalize(stmt)
 
 	if sqlite.step(stmt) != .Row {
-		if db.is_json { fmt.println(`{"success":false,"error":"Shop not found"}`) }
+		if db.is_json { usage_error(db, "Shop not found") }
 		else { fmt.eprintln("Shop not found") }
 		return 1
 	}
@@ -609,7 +609,7 @@ record_haggle_failure :: proc(db: ^lib.Db, shop_id: int, char_id: int, npc_id: i
 
 shop_haggle :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 6 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop haggle <shop_id> <char_id> <item_id> <quantity> <discount_pct>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop haggle <shop_id> <char_id> <item_id> <quantity> <discount_pct>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop haggle <shop_id> <char_id> <item_id> <quantity> <discount_pct>") }
 		return 1
 	}
@@ -620,43 +620,43 @@ shop_haggle :: proc(db: ^lib.Db, args: []string) -> int {
 	discount_pct := strconv.atoi(args[5])
 
 	if discount_pct < 0 || discount_pct > 50 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Discount must be between 0 and 50 percent"}`) }
+		if db.is_json { usage_error(db, "Discount must be between 0 and 50 percent") }
 		else { fmt.eprintln("Discount must be between 0 and 50 percent") }
 		return 1
 	}
 
 	ctx, ctx_ok := lookup_haggle_context(db, shop_id, item_id)
 	if !ctx_ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Shop or item not found"}`) }
+		if db.is_json { usage_error(db, "Shop or item not found") }
 		else { fmt.eprintln("Shop or item not found") }
 		return 1
 	}
 	if ctx.npc_id <= 0 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Shop has no owner to haggle with"}`) }
+		if db.is_json { usage_error(db, "Shop has no owner to haggle with") }
 		else { fmt.eprintln("Shop has no owner to haggle with") }
 		return 1
 	}
 	if ctx.stock_qty < qty {
-		if db.is_json { fmt.println(`{"success":false,"error":"Insufficient stock"}`) }
+		if db.is_json { usage_error(db, "Insufficient stock") }
 		else { fmt.eprintln("Insufficient stock in shop") }
 		return 1
 	}
 
 	attempts_used, fail_streak, att_ok := get_or_init_haggle_attempts(db, shop_id, char_id, ctx.in_game_day)
 	if !att_ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to check haggle attempts"}`) }
+		if db.is_json { usage_error(db, "Failed to check haggle attempts") }
 		else { fmt.eprintln("Failed to check haggle attempts") }
 		return 1
 	}
 	if attempts_used >= 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Shop owner refuses to haggle further today"}`) }
+		if db.is_json { usage_error(db, "Shop owner refuses to haggle further today") }
 		else { fmt.eprintln("Shop owner refuses to haggle further today") }
 		return 1
 	}
 
 	persuasion, pers_ok := get_persuasion_mod(db, char_id)
 	if !pers_ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Character not found"}`) }
+		if db.is_json { usage_error(db, "Character not found") }
 		else { fmt.eprintln("Character not found") }
 		return 1
 	}
@@ -671,7 +671,7 @@ shop_haggle :: proc(db: ^lib.Db, args: []string) -> int {
 	if total >= dc {
 		ok, price_cp := execute_haggle_purchase(db, shop_id, char_id, item_id, qty, discount_pct, ctx.stock_qty, ctx.unit_price, ctx.in_game_day, attempts_used)
 		if !ok {
-			if db.is_json { fmt.println(`{"success":false,"error":"Insufficient funds for discounted price"}`) }
+			if db.is_json { usage_error(db, "Insufficient funds for discounted price") }
 			else { fmt.eprintln("Insufficient funds even with discount") }
 			return 1
 		}

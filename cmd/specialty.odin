@@ -9,7 +9,7 @@ import sqlite "ext:sqlite3"
 specialty_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine class-specialty upsert <class_name> <level> <ability_name> <description>"}`)
+			usage_error(db, "Usage: ttrpg-engine class-specialty upsert <class_name> <level> <ability_name> <description>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine class-specialty upsert <class_name> <level> <ability_name> <description>")
 		}
@@ -27,7 +27,7 @@ specialty_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to upsert class specialty"}`)
+			usage_error(db, "Failed to upsert class specialty")
 		} else {
 			fmt.eprintln("Failed to upsert class specialty")
 		}
@@ -59,7 +59,7 @@ specialty_list :: proc(db: ^lib.Db, args: []string) -> int {
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list specialties"}`)
+			usage_error(db, "Failed to list specialties")
 		} else {
 			fmt.eprintln("Failed to list specialties")
 		}

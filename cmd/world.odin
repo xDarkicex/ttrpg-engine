@@ -21,7 +21,7 @@ import sqlite "ext:sqlite3"
 // Set a location's parent_id (sub-location). Pass 0 to make it a root location.
 location_set_parent :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine location set-parent <id> <parent_id|0>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine location set-parent <id> <parent_id|0>") }
 		else { fmt.eprintln("Usage: ttrpg-engine location set-parent <id> <parent_id|0>") }
 		return 1
 	}
@@ -32,7 +32,7 @@ location_set_parent :: proc(db: ^lib.Db, args: []string) -> int {
 		// Prevent making a cycle: parent must not be the same as id
 		// (or any descendant of id). O(1) check: parent must be different from id.
 		if parent == id {
-			if db.is_json { fmt.println(`{"success":false,"error":"A location cannot be its own parent"}`) }
+			if db.is_json { usage_error(db, "A location cannot be its own parent") }
 			else { fmt.eprintln("A location cannot be its own parent") }
 			return 1
 		}
@@ -45,7 +45,7 @@ location_set_parent :: proc(db: ^lib.Db, args: []string) -> int {
 		sql = fmt.tprintf("UPDATE locations SET parent_id=%d WHERE id=%d", parent, id)
 	}
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set parent"}`) }
+		if db.is_json { usage_error(db, "Failed to set parent") }
 		else { fmt.eprintln("Failed to set parent") }
 		return 1
 	}
@@ -56,14 +56,14 @@ location_set_parent :: proc(db: ^lib.Db, args: []string) -> int {
 
 location_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine location set-restricted <id> <0|1> <until>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine location set-restricted <id> <0|1> <until>") }
 		else { fmt.eprintln("Usage: ttrpg-engine location set-restricted <id> <0|1> <until>") }
 		return 1
 	}
 	id := strconv.atoi(args[1])
 	flag := strconv.atoi(args[2])
 	if flag != 0 && flag != 1 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Flag must be 0 or 1"}`) }
+		if db.is_json { usage_error(db, "Flag must be 0 or 1") }
 		else { fmt.eprintln("Flag must be 0 or 1") }
 		return 1
 	}
@@ -71,7 +71,7 @@ location_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 
 	sql := fmt.tprintf("UPDATE locations SET restricted=%d, restricted_until='%s' WHERE id=%d", flag, escape_sql(until), id)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set restricted"}`) }
+		if db.is_json { usage_error(db, "Failed to set restricted") }
 		else { fmt.eprintln("Failed to set restricted") }
 		return 1
 	}
@@ -118,7 +118,7 @@ location_breadcrumb :: proc(db: ^lib.Db, location_id: int) -> string {
 // Add a house to a location. The npc_id is the resident.
 house_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house add <location_id> <name> [description] [npc_id] [scale]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house add <location_id> <name> [description] [npc_id] [scale]") }
 		else { fmt.eprintln("Usage: ttrpg-engine house add <location_id> <name> [description] [npc_id] [scale]") }
 		return 1
 	}
@@ -139,7 +139,7 @@ house_add :: proc(db: ^lib.Db, args: []string) -> int {
 		location_id, escape_sql(name), escape_sql(description), npc_val, escape_sql(scale),
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add house"}`) }
+		if db.is_json { usage_error(db, "Failed to add house") }
 		else { fmt.eprintln("Failed to add house") }
 		return 1
 	}
@@ -150,7 +150,7 @@ house_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house list <location_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house list <location_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine house list <location_id>") }
 		return 1
 	}
@@ -159,7 +159,7 @@ house_list :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("SELECT id, name, description, npc_id, scale, restricted, restricted_until, inventory FROM houses WHERE location_id=%d ORDER BY name", location_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to list houses"}`) }
+		if db.is_json { usage_error(db, "Failed to list houses") }
 		else { fmt.eprintln("Failed to list houses") }
 		return 1
 	}
@@ -192,7 +192,7 @@ house_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house set-inventory <id> <text>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house set-inventory <id> <text>") }
 		else { fmt.eprintln("Usage: ttrpg-engine house set-inventory <id> <text>") }
 		return 1
 	}
@@ -200,7 +200,7 @@ house_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	text := args[2]
 	sql := fmt.tprintf("UPDATE houses SET inventory='%s' WHERE id=%d", escape_sql(text), id)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set inventory"}`) }
+		if db.is_json { usage_error(db, "Failed to set inventory") }
 		else { fmt.eprintln("Failed to set inventory") }
 		return 1
 	}
@@ -211,7 +211,7 @@ house_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house set-restricted <id> <0|1> <until>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house set-restricted <id> <0|1> <until>") }
 		else { fmt.eprintln("Usage: ttrpg-engine house set-restricted <id> <0|1> <until>") }
 		return 1
 	}
@@ -220,7 +220,7 @@ house_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 	until := args[3]
 	sql := fmt.tprintf("UPDATE houses SET restricted=%d, restricted_until='%s' WHERE id=%d", flag, escape_sql(until), id)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set restricted"}`) }
+		if db.is_json { usage_error(db, "Failed to set restricted") }
 		else { fmt.eprintln("Failed to set restricted") }
 		return 1
 	}
@@ -233,7 +233,7 @@ house_set_restricted :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop add <location_id> <name> [description] [npc_id] [scale] [open_hours]") }
 		return 1
 	}
@@ -256,7 +256,7 @@ shop_add :: proc(db: ^lib.Db, args: []string) -> int {
 		location_id, escape_sql(name), escape_sql(description), npc_val, escape_sql(scale), escape_sql(open_hours), treasury,
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add shop"}`) }
+		if db.is_json { usage_error(db, "Failed to add shop") }
 		else { fmt.eprintln("Failed to add shop") }
 		return 1
 	}
@@ -267,7 +267,7 @@ shop_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop list <location_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop list <location_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop list <location_id>") }
 		return 1
 	}
@@ -276,7 +276,7 @@ shop_list :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("SELECT id, name, description, npc_id, scale, open_hours, restricted, inventory FROM shops WHERE location_id=%d ORDER BY name", location_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to list shops"}`) }
+		if db.is_json { usage_error(db, "Failed to list shops") }
 		else { fmt.eprintln("Failed to list shops") }
 		return 1
 	}
@@ -309,7 +309,7 @@ shop_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 shop_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine shop set-inventory <id> <text>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine shop set-inventory <id> <text>") }
 		else { fmt.eprintln("Usage: ttrpg-engine shop set-inventory <id> <text>") }
 		return 1
 	}
@@ -317,7 +317,7 @@ shop_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 	text := args[2]
 	sql := fmt.tprintf("UPDATE shops SET inventory='%s' WHERE id=%d", escape_sql(text), id)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to set inventory"}`) }
+		if db.is_json { usage_error(db, "Failed to set inventory") }
 		else { fmt.eprintln("Failed to set inventory") }
 		return 1
 	}
@@ -330,7 +330,7 @@ shop_set_inventory :: proc(db: ^lib.Db, args: []string) -> int {
 
 encounter_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine encounter add <location_id> <type> [description] [npc_id]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine encounter add <location_id> <type> [description] [npc_id]") }
 		else { fmt.eprintln("Usage: ttrpg-engine encounter add <location_id> <type> [description] [npc_id]") }
 		return 1
 	}
@@ -350,7 +350,7 @@ encounter_add :: proc(db: ^lib.Db, args: []string) -> int {
 		location_id, escape_sql(type_str), escape_sql(description), npc_val,
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add encounter"}`) }
+		if db.is_json { usage_error(db, "Failed to add encounter") }
 		else { fmt.eprintln("Failed to add encounter") }
 		return 1
 	}
@@ -361,7 +361,7 @@ encounter_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 encounter_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine encounter list <location_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine encounter list <location_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine encounter list <location_id>") }
 		return 1
 	}
@@ -370,7 +370,7 @@ encounter_list :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("SELECT id, type, description, npc_id FROM encounters WHERE location_id=%d ORDER BY id", location_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to list encounters"}`) }
+		if db.is_json { usage_error(db, "Failed to list encounters") }
 		else { fmt.eprintln("Failed to list encounters") }
 		return 1
 	}
@@ -400,7 +400,7 @@ encounter_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 setpiece_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine setpiece add <location_id> <name> [description] [chapter_event]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine setpiece add <location_id> <name> [description] [chapter_event]") }
 		else { fmt.eprintln("Usage: ttrpg-engine setpiece add <location_id> <name> [description] [chapter_event]") }
 		return 1
 	}
@@ -414,7 +414,7 @@ setpiece_add :: proc(db: ^lib.Db, args: []string) -> int {
 		location_id, escape_sql(name), escape_sql(description), escape_sql(chapter_event),
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add setpiece"}`) }
+		if db.is_json { usage_error(db, "Failed to add setpiece") }
 		else { fmt.eprintln("Failed to add setpiece") }
 		return 1
 	}
@@ -425,7 +425,7 @@ setpiece_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 setpiece_list :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine setpiece list <location_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine setpiece list <location_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine setpiece list <location_id>") }
 		return 1
 	}
@@ -434,7 +434,7 @@ setpiece_list :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("SELECT id, name, description, chapter_event FROM setpieces WHERE location_id=%d ORDER BY name", location_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to list setpieces"}`) }
+		if db.is_json { usage_error(db, "Failed to list setpieces") }
 		else { fmt.eprintln("Failed to list setpieces") }
 		return 1
 	}
@@ -578,7 +578,7 @@ can_enter :: proc(
 
 house_add_resident :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house add-resident <house_id> <npc_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house add-resident <house_id> <npc_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine house add-resident <house_id> <npc_id>") }
 		return 1
 	}
@@ -587,7 +587,7 @@ house_add_resident :: proc(db: ^lib.Db, args: []string) -> int {
 
 	sql := fmt.tprintf("INSERT OR IGNORE INTO house_residents (house_id, npc_id) VALUES(%d, %d)", house_id, npc_id)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to add resident"}`) }
+		if db.is_json { usage_error(db, "Failed to add resident") }
 		else { fmt.eprintln("Failed to add resident") }
 		return 1
 	}
@@ -598,7 +598,7 @@ house_add_resident :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_remove_resident :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house remove-resident <house_id> <npc_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house remove-resident <house_id> <npc_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine house remove-resident <house_id> <npc_id>") }
 		return 1
 	}
@@ -607,7 +607,7 @@ house_remove_resident :: proc(db: ^lib.Db, args: []string) -> int {
 
 	sql := fmt.tprintf("DELETE FROM house_residents WHERE house_id=%d AND npc_id=%d", house_id, npc_id)
 	if lib.db_exec(db, sql) != lib.Error.None {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to remove resident"}`) }
+		if db.is_json { usage_error(db, "Failed to remove resident") }
 		else { fmt.eprintln("Failed to remove resident") }
 		return 1
 	}
@@ -618,7 +618,7 @@ house_remove_resident :: proc(db: ^lib.Db, args: []string) -> int {
 
 house_list_residents :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine house list-residents <house_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine house list-residents <house_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine house list-residents <house_id>") }
 		return 1
 	}
@@ -627,7 +627,7 @@ house_list_residents :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("SELECT hr.npc_id, n.name FROM house_residents hr JOIN npcs n ON hr.npc_id = n.id WHERE hr.house_id=%d ORDER BY n.name", house_id)
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to list residents"}`) }
+		if db.is_json { usage_error(db, "Failed to list residents") }
 		else { fmt.eprintln("Failed to list residents") }
 		return 1
 	}

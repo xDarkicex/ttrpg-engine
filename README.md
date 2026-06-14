@@ -394,17 +394,44 @@ errors go to stderr in text mode.
 
 **Error shape** (uniform across all commands):
 ```json
-{"success":false, "error": "<human-readable message>"}
+{
+  "success": false,
+  "code": "MACHINE_READABLE_CODE",
+  "error": "Human-readable message. Tells the agent what went wrong and what to do next.",
+  "retryable": false
+}
 ```
 
-Error messages are **human-readable, not machine-stable**. Key logic off `"success"` and exit
-code, never off error string content.
+**`code`** is a stable, machine-readable identifier. Branch on it. **Never** branch on the
+`error` string — that field is for human debugging and may change wording. Codes follow
+`<DOMAIN>_<SPECIFIC_STATE>` in SCREAMING_SNAKE_CASE.
 
-| Exit | JSON shape | When |
+**`error`** is a prompt-shaped message. It tells the agent what went wrong and what command
+to call or what argument to fix. Treat it as system context for the next agent turn.
+
+**`retryable`** is a boolean hint. `true` means the operation might succeed if retried
+(database lock, transient state). `false` means the operation failed for a reason that
+retrying won't fix (bad input, missing entity).
+
+| Code | When | Retryable |
 |---|---|---|
-| 1 | `{"success":false,"error":"Usage: ..."}` | Missing or invalid arguments |
-| 1 | `{"success":false,"error":"... not found"}` | Entity ID doesn't exist |
-| 1 | `{"success":false,"error":"Failed to ..."}` | Database constraint, lock, or I/O error |
+| `USAGE` | Missing or invalid arguments | No |
+| `NOT_FOUND` | Entity ID doesn't exist | No |
+| `VALIDATION` | Argument passed but value is out of range or wrong shape | No |
+| `CONFLICT` | Uniqueness constraint violated | No |
+| `DB_ERROR` | Database operation failed (lock, I/O) | Yes |
+| `INTERNAL` | Catch-all for unexpected failures | No |
+| `COMBAT_ALREADY_ACTIVE` | Tried to start combat when an encounter is already running | No |
+| `REST_BLOCKED_BY_COMBAT` | Tried to rest while combat is active | No |
+| `SPELL_SLOT_EXHAUSTED` | No spell slots remaining at the requested level | No |
+| `CHARACTER_DEAD` | Cannot act — HP is 0 | No |
+| `INVENTORY_QUANTITY_INVALID` | Quantity must be positive | No |
+| `SHOP_OUT_OF_STOCK` | Shop has insufficient stock | No |
+| `SHOP_HAGGLE_EXHAUSTED` | No haggle attempts remaining today | No |
+| `TIME_INVALID` | Calendar input is out of valid range | No |
+
+This list grows over time. Treat unknown codes as `INTERNAL` and fall back to
+the error message. The current full taxonomy is defined in `cmd/errors.odin`.
 
 ### Concurrency and locking
 

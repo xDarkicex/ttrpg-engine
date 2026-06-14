@@ -33,7 +33,7 @@ CompanionStats :: struct {
 companion_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 9 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>"}`)
+			usage_error(db, "Usage: ttrpg-engine companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine companion create <char_id> <name> <type> <level> <max_hp> <ac> <attack_bonus> <damage_dice>")
 		}
@@ -56,7 +56,7 @@ companion_create :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to create companion"}`)
+			usage_error(db, "Failed to create companion")
 		} else {
 			fmt.eprintln("Failed to create companion")
 		}
@@ -74,7 +74,7 @@ companion_create :: proc(db: ^lib.Db, args: []string) -> int {
 companion_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 8 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>"}`)
+			usage_error(db, "Usage: ttrpg-engine companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine companion set-stats <id> <str> <dex> <con> <int> <wis> <cha>")
 		}
@@ -94,7 +94,7 @@ companion_set_stats :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to update stats"}`)
+			usage_error(db, "Failed to update stats")
 		} else {
 			fmt.eprintln("Failed to update stats")
 		}
@@ -126,7 +126,7 @@ companion_list :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list companions"}`)
+			usage_error(db, "Failed to list companions")
 		} else {
 			fmt.eprintln("Failed to list companions")
 		}
@@ -214,7 +214,7 @@ fetch_companion_stats :: proc(db: ^lib.Db, id: int) -> (comp: CompanionStats, fo
 companion_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion get <id>"}`)
+			usage_error(db, "Usage: ttrpg-engine companion get <id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine companion get <id>")
 		}
@@ -225,7 +225,7 @@ companion_get :: proc(db: ^lib.Db, args: []string) -> int {
 	comp, found := fetch_companion_stats(db, id)
 	if !found {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Companion not found"}`)
+			usage_error(db, "Companion not found")
 		} else {
 			fmt.eprintln("Companion not found")
 		}
@@ -255,7 +255,7 @@ companion_get :: proc(db: ^lib.Db, args: []string) -> int {
 companion_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion heal <id> <amount>"}`)
+			usage_error(db, "Usage: ttrpg-engine companion heal <id> <amount>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine companion heal <id> <amount>")
 		}
@@ -265,7 +265,7 @@ companion_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	amt, ok := resolve_amount(args[2])
 	if !ok {
 		if db.is_json {
-			fmt.println(`{{"success":false,"error":"Invalid heal amount — expected dice spec"}}`)
+			usage_error(db, "Invalid heal amount — expected dice spec")
 		} else {
 			fmt.eprintln("Invalid heal amount — expected dice spec")
 		}
@@ -275,7 +275,7 @@ companion_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	comp, found := fetch_companion_stats(db, id)
 	if !found {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Companion not found"}`)
+			usage_error(db, "Companion not found")
 		} else {
 			fmt.eprintln("Companion not found")
 		}
@@ -288,7 +288,7 @@ companion_heal :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("UPDATE companions SET current_hp=%d WHERE id=%d", new_hp, id)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to update HP"}`)
+			usage_error(db, "Failed to update HP")
 		} else {
 			fmt.eprintln("Failed to update HP")
 		}
@@ -330,7 +330,7 @@ calculate_companion_save :: proc(comp: CompanionStats, save_type: string, dc: in
 companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]"}`)
+			usage_error(db, "Usage: ttrpg-engine companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine companion damage <id> <amount> [damage_type] [attack_or_save] [save_dc] [d20_roll]")
 		}
@@ -340,7 +340,7 @@ companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	d, parse_ok := parse_damage_args(args)
 	if !parse_ok {
 		if db.is_json {
-			fmt.println(`{{"success":false,"error":"Invalid damage amount — expected dice spec like 2d6+3 or 8d6"}}`)
+			usage_error(db, "Invalid damage amount — expected dice spec like 2d6+3 or 8d6")
 		} else {
 			fmt.eprintln("Invalid damage amount — expected dice spec like 2d6+3 or 8d6")
 		}
@@ -349,7 +349,7 @@ companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	comp, found := fetch_companion_stats(db, d.id)
 	if !found {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Companion not found"}`)
+			usage_error(db, "Companion not found")
 		} else {
 			fmt.eprintln("Companion not found")
 		}
@@ -409,7 +409,7 @@ companion_damage :: proc(db: ^lib.Db, args: []string) -> int {
 	sql := fmt.tprintf("UPDATE companions SET current_hp=%d WHERE id=%d", new_hp, d.id)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to update HP"}`)
+			usage_error(db, "Failed to update HP")
 		} else {
 			fmt.eprintln("Failed to update HP")
 		}

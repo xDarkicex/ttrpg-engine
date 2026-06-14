@@ -134,7 +134,7 @@ wanted_crime :: proc(db: ^lib.Db, args: []string) -> int {
 	// args: <char|npc> <actor_id> <faction_id> <location_id> <severity> <description>
 	if len(args) < 7 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted crime <char|npc> <actor_id> <faction_id> <location_id> <severity> <description>"}`)
+			usage_error(db, "Usage: ttrpg-engine wanted crime <char|npc> <actor_id> <faction_id> <location_id> <severity> <description>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine wanted crime <char|npc> <actor_id> <faction_id> <location_id> <severity> <description>")
 		}
@@ -144,7 +144,7 @@ wanted_crime :: proc(db: ^lib.Db, args: []string) -> int {
 	actor_type, ok := validate_wanted_actor(args[1])
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Invalid actor type. Use 'char' or 'npc'."}`)
+			usage_error(db, "Invalid actor type. Use 'char' or 'npc'.")
 		} else {
 			fmt.eprintln("Invalid actor type. Use 'char' or 'npc'.")
 		}
@@ -176,7 +176,7 @@ wanted_crime :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	if lib.db_exec(db, crime_sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to log crime."}`)
+			usage_error(db, "Failed to log crime.")
 		} else {
 			fmt.eprintln("Failed to log crime.")
 		}
@@ -198,7 +198,7 @@ wanted_crime :: proc(db: ^lib.Db, args: []string) -> int {
 		)
 		if lib.db_exec(db, update_sql) != lib.Error.None {
 			if db.is_json {
-				fmt.println(`{"success":false,"error":"Failed to update wanted heat."}`)
+				usage_error(db, "Failed to update wanted heat.")
 			} else {
 				fmt.eprintln("Failed to update wanted heat.")
 			}
@@ -216,7 +216,7 @@ wanted_crime :: proc(db: ^lib.Db, args: []string) -> int {
 		)
 		if lib.db_exec(db, insert_sql) != lib.Error.None {
 			if db.is_json {
-				fmt.println(`{"success":false,"error":"Failed to create wanted heat."}`)
+				usage_error(db, "Failed to create wanted heat.")
 			} else {
 				fmt.eprintln("Failed to create wanted heat.")
 			}
@@ -306,7 +306,7 @@ wanted_get_all :: proc(db: ^lib.Db, actor_type: string, actor_id: int, faction_i
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to query wanted heat."}`)
+			usage_error(db, "Failed to query wanted heat.")
 		} else {
 			fmt.eprintln("Failed to query wanted heat.")
 		}
@@ -366,7 +366,7 @@ wanted_get :: proc(db: ^lib.Db, args: []string) -> int {
 	// args: <char|npc> <actor_id> <faction_id> [location_id]
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted get <char|npc> <actor_id> <faction_id> [location_id]"}`)
+			usage_error(db, "Usage: ttrpg-engine wanted get <char|npc> <actor_id> <faction_id> [location_id]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine wanted get <char|npc> <actor_id> <faction_id> [location_id]")
 		}
@@ -376,7 +376,7 @@ wanted_get :: proc(db: ^lib.Db, args: []string) -> int {
 	actor_type, ok := validate_wanted_actor(args[1])
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Invalid actor type. Use 'char' or 'npc'."}`)
+			usage_error(db, "Invalid actor type. Use 'char' or 'npc'.")
 		} else {
 			fmt.eprintln("Invalid actor type. Use 'char' or 'npc'.")
 		}
@@ -397,7 +397,7 @@ wanted_set :: proc(db: ^lib.Db, args: []string) -> int {
 	// args: <char|npc> <actor_id> <faction_id> <location_id> <heat>
 	if len(args) < 6 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted set <char|npc> <actor_id> <faction_id> <location_id> <heat>"}`)
+			usage_error(db, "Usage: ttrpg-engine wanted set <char|npc> <actor_id> <faction_id> <location_id> <heat>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine wanted set <char|npc> <actor_id> <faction_id> <location_id> <heat>")
 		}
@@ -407,7 +407,7 @@ wanted_set :: proc(db: ^lib.Db, args: []string) -> int {
 	actor_type, ok := validate_wanted_actor(args[1])
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Invalid actor type. Use 'char' or 'npc'."}`)
+			usage_error(db, "Invalid actor type. Use 'char' or 'npc'.")
 		} else {
 			fmt.eprintln("Invalid actor type. Use 'char' or 'npc'.")
 		}
@@ -432,7 +432,7 @@ wanted_set :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to set wanted heat."}`)
+			usage_error(db, "Failed to set wanted heat.")
 		} else {
 			fmt.eprintln("Failed to set wanted heat.")
 		}
@@ -462,7 +462,7 @@ wanted_clear :: proc(db: ^lib.Db, args: []string) -> int {
 	// args: <char|npc> <actor_id> <faction_id> <location_id>
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted clear <char|npc> <actor_id> <faction_id> <location_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine wanted clear <char|npc> <actor_id> <faction_id> <location_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine wanted clear <char|npc> <actor_id> <faction_id> <location_id>")
 		}
@@ -472,7 +472,7 @@ wanted_clear :: proc(db: ^lib.Db, args: []string) -> int {
 	actor_type, ok := validate_wanted_actor(args[1])
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Invalid actor type. Use 'char' or 'npc'."}`)
+			usage_error(db, "Invalid actor type. Use 'char' or 'npc'.")
 		} else {
 			fmt.eprintln("Invalid actor type. Use 'char' or 'npc'.")
 		}
@@ -492,7 +492,7 @@ wanted_clear :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to clear wanted heat."}`)
+			usage_error(db, "Failed to clear wanted heat.")
 		} else {
 			fmt.eprintln("Failed to clear wanted heat.")
 		}
@@ -518,7 +518,7 @@ wanted_list :: proc(db: ^lib.Db, args: []string) -> int {
 	// args: <faction_id> <location_id>
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine wanted list <faction_id> <location_id>"}`)
+			usage_error(db, "Usage: ttrpg-engine wanted list <faction_id> <location_id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine wanted list <faction_id> <location_id>")
 		}
@@ -537,7 +537,7 @@ wanted_list :: proc(db: ^lib.Db, args: []string) -> int {
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to query wanted list."}`)
+			usage_error(db, "Failed to query wanted list.")
 		} else {
 			fmt.eprintln("Failed to query wanted list.")
 		}

@@ -10,7 +10,7 @@ import sqlite "ext:sqlite3"
 campaign_create :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign create <name>"}`)
+			usage_error(db, "Usage: ttrpg-engine campaign create <name>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine campaign create <name>")
 		}
@@ -20,7 +20,7 @@ campaign_create :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to create campaign"}`)
+			usage_error(db, "Failed to create campaign")
 		} else {
 			fmt.eprintln("Failed to create campaign")
 		}
@@ -41,7 +41,7 @@ campaign_list :: proc(db: ^lib.Db) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list campaigns"}`)
+			usage_error(db, "Failed to list campaigns")
 		} else {
 			fmt.eprintln("Failed to list campaigns")
 		}
@@ -81,7 +81,7 @@ campaign_list :: proc(db: ^lib.Db) -> int {
 campaign_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign get <id>"}`)
+			usage_error(db, "Usage: ttrpg-engine campaign get <id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine campaign get <id>")
 		}
@@ -95,7 +95,7 @@ campaign_get :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Campaign not found"}`)
+			usage_error(db, "Campaign not found")
 		} else {
 			fmt.eprintln("Campaign not found")
 		}
@@ -105,7 +105,7 @@ campaign_get :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if sqlite.step(stmt) != .Row {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Campaign not found"}`)
+			usage_error(db, "Campaign not found")
 		} else {
 			fmt.eprintln("Campaign not found")
 		}
@@ -132,7 +132,7 @@ campaign_get :: proc(db: ^lib.Db, args: []string) -> int {
 campaign_delete :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign delete <id>"}`)
+			usage_error(db, "Usage: ttrpg-engine campaign delete <id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine campaign delete <id>")
 		}
@@ -143,7 +143,7 @@ campaign_delete :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to delete campaign"}`)
+			usage_error(db, "Failed to delete campaign")
 		} else {
 			fmt.eprintln("Failed to delete campaign")
 		}
@@ -160,7 +160,7 @@ campaign_delete :: proc(db: ^lib.Db, args: []string) -> int {
 campaign_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign set-chapter <id> <chapter>"}`)
+			usage_error(db, "Usage: ttrpg-engine campaign set-chapter <id> <chapter>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine campaign set-chapter <id> <chapter>")
 		}
@@ -171,7 +171,7 @@ campaign_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to set chapter"}`)
+			usage_error(db, "Failed to set chapter")
 		} else {
 			fmt.eprintln("Failed to set chapter")
 		}
@@ -188,7 +188,7 @@ campaign_set_chapter :: proc(db: ^lib.Db, args: []string) -> int {
 campaign_next_session :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign next-session <id>"}`)
+			usage_error(db, "Usage: ttrpg-engine campaign next-session <id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine campaign next-session <id>")
 		}
@@ -199,7 +199,7 @@ campaign_next_session :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to advance session"}`)
+			usage_error(db, "Failed to advance session")
 		} else {
 			fmt.eprintln("Failed to advance session")
 		}
@@ -219,14 +219,12 @@ column_text_safe :: proc(stmt: ^sqlite.Statement, col: i32) -> string {
 	return string(ptr)
 }
 
+// Backwards-compatible thin wrapper. New code should call error_response
+// from errors.odin directly with explicit (code, message, retryable).
+// Existing 150+ call sites continue to emit a USAGE-class error.
 print_error :: proc(db: ^lib.Db, text_err: string, json_err: string = "") -> int {
-	if db.is_json {
-		msg := json_err != "" ? json_err : text_err
-		fmt.printf(`{{"success":false,"error":"%s"}}\n`, msg)
-	} else {
-		fmt.eprintln(text_err)
-	}
-	return 1
+	msg := json_err != "" ? json_err : text_err
+	return error_response(db, .USAGE, msg, false)
 }
 
 parse_opt_id :: proc(args: []string, index: int) -> string {
@@ -1971,14 +1969,14 @@ expire_hour_conditions :: proc(db: ^lib.Db, campaign_id: int, new_total_hours: i
 
 campaign_advance_time :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign advance-time <campaign_id> <hours>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine campaign advance-time <campaign_id> <hours>") }
 		else { fmt.eprintln("Usage: ttrpg-engine campaign advance-time <campaign_id> <hours>") }
 		return 1
 	}
 	campaign_id := strconv.atoi(args[1])
 	hours := strconv.atoi(args[2])
 	if hours <= 0 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Hours must be positive"}`) }
+		if db.is_json { usage_error(db, "Hours must be positive") }
 		else { fmt.eprintln("Hours must be positive") }
 		return 1
 	}
@@ -2028,7 +2026,7 @@ campaign_advance_time :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_set_calendar :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 6 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>") }
 		else { fmt.eprintln("Usage: ttrpg-engine campaign set-calendar <campaign_id> <year> <month> <day> <hour>") }
 		return 1
 	}
@@ -2039,7 +2037,7 @@ campaign_set_calendar :: proc(db: ^lib.Db, args: []string) -> int {
 	hour := strconv.atoi(args[5])
 
 	if month < 1 || month > 12 || day < 1 || day > 30 || hour < 0 || hour > 23 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Invalid date values (month 1-12, day 1-30, hour 0-23)"}`) }
+		if db.is_json { usage_error(db, "Invalid date values (month 1-12, day 1-30, hour 0-23)") }
 		else { fmt.eprintln("Invalid date values (month 1-12, day 1-30, hour 0-23)") }
 		return 1
 	}
@@ -2086,7 +2084,7 @@ campaign_set_calendar :: proc(db: ^lib.Db, args: []string) -> int {
 
 campaign_get_time :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 2 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine campaign get-time <campaign_id>"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine campaign get-time <campaign_id>") }
 		else { fmt.eprintln("Usage: ttrpg-engine campaign get-time <campaign_id>") }
 		return 1
 	}

@@ -13,7 +13,7 @@ Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] 
 */
 trade_character :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
-		if db.is_json { fmt.println(`{"success":false,"error":"Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]"}`) }
+		if db.is_json { usage_error(db, "Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]") }
 		else { fmt.eprintln("Usage: ttrpg-engine trade <from_char_id> <to_char_id> <item_id> <quantity> [gp] [sp] [cp] [pp] [ep]") }
 		return 1
 	}
@@ -24,12 +24,12 @@ trade_character :: proc(db: ^lib.Db, args: []string) -> int {
 
 	// Verify both characters exist
 	if !character_exists(db, from_id) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Sender character not found"}`) }
+		if db.is_json { usage_error(db, "Sender character not found") }
 		else { fmt.eprintln("Sender character not found") }
 		return 1
 	}
 	if !character_exists(db, to_id) {
-		if db.is_json { fmt.println(`{"success":false,"error":"Recipient character not found"}`) }
+		if db.is_json { usage_error(db, "Recipient character not found") }
 		else { fmt.eprintln("Recipient character not found") }
 		return 1
 	}
@@ -42,14 +42,14 @@ trade_character :: proc(db: ^lib.Db, args: []string) -> int {
 	)
 	check_sql_c := cstring(raw_data(check_sql))
 	if sqlite.prepare(db.ptr, check_sql_c, i32(len(check_sql)), &stmt, nil) != .Ok {
-		if db.is_json { fmt.println(`{"success":false,"error":"Failed to check inventory"}`) }
+		if db.is_json { usage_error(db, "Failed to check inventory") }
 		else { fmt.eprintln("Failed to check inventory") }
 		return 1
 	}
 	defer sqlite.finalize(stmt)
 
 	if sqlite.step(stmt) != .Row {
-		if db.is_json { fmt.println(`{"success":false,"error":"Sender does not own this item"}`) }
+		if db.is_json { usage_error(db, "Sender does not own this item") }
 		else { fmt.eprintln("Sender does not own this item") }
 		return 1
 	}
@@ -57,7 +57,7 @@ trade_character :: proc(db: ^lib.Db, args: []string) -> int {
 	item_name := column_text_safe(stmt, 1)
 
 	if owned_qty < qty {
-		if db.is_json { fmt.println(`{"success":false,"error":"Sender has insufficient quantity"}`) }
+		if db.is_json { usage_error(db, "Sender has insufficient quantity") }
 		else { fmt.eprintln("Sender has insufficient quantity") }
 		return 1
 	}

@@ -9,7 +9,7 @@ import sqlite "ext:sqlite3"
 item_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 4 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]"}`)
+			usage_error(db, "Usage: ttrpg-engine item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine item upsert <name> <description> <type> [damage_dice] [damage_type] [ac_bonus] [properties] [weight] [value_gp]")
 		}
@@ -40,7 +40,7 @@ item_upsert :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to upsert item"}`)
+			usage_error(db, "Failed to upsert item")
 		} else {
 			fmt.eprintln("Failed to upsert item")
 		}
@@ -62,7 +62,7 @@ item_list :: proc(db: ^lib.Db) -> int {
 
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql_str)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to list items"}`)
+			usage_error(db, "Failed to list items")
 		} else {
 			fmt.eprintln("Failed to list items")
 		}
@@ -109,7 +109,7 @@ get_inventory_column_name :: proc(target_type: string) -> (col: string, ok: bool
 inventory_add :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory add <char|npc|creature> <id> <item_id> <qty>"}`)
+			usage_error(db, "Usage: ttrpg-engine inventory add <char|npc|creature> <id> <item_id> <qty>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine inventory add <char|npc|creature> <id> <item_id> <qty>")
 		}
@@ -123,7 +123,7 @@ inventory_add :: proc(db: ^lib.Db, args: []string) -> int {
 	col, ok := get_inventory_column_name(target_type)
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Target type must be 'char', 'npc', or 'creature'"}`)
+			usage_error(db, "Target type must be 'char', 'npc', or 'creature'")
 		} else {
 			fmt.eprintln("Target type must be 'char', 'npc', or 'creature'")
 		}
@@ -134,7 +134,7 @@ inventory_add :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to add item to inventory"}`)
+			usage_error(db, "Failed to add item to inventory")
 		} else {
 			fmt.eprintln("Failed to add item")
 		}
@@ -197,7 +197,7 @@ print_inventory :: proc(stmt: ^sqlite.Statement, is_json: bool) {
 inventory_get :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 3 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory get <char|npc|creature> <id>"}`)
+			usage_error(db, "Usage: ttrpg-engine inventory get <char|npc|creature> <id>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine inventory get <char|npc|creature> <id>")
 		}
@@ -209,7 +209,7 @@ inventory_get :: proc(db: ^lib.Db, args: []string) -> int {
 	sql, ok := get_inventory_sql(target_type, id)
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Target type must be 'char', 'npc', or 'creature'"}`)
+			usage_error(db, "Target type must be 'char', 'npc', or 'creature'")
 		} else {
 			fmt.eprintln("Target type must be 'char', 'npc', or 'creature'")
 		}
@@ -220,7 +220,7 @@ inventory_get :: proc(db: ^lib.Db, args: []string) -> int {
 	sql_c := cstring(raw_data(sql))
 	if sqlite.prepare(db.ptr, sql_c, i32(len(sql)), &stmt, nil) != .Ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to get inventory"}`)
+			usage_error(db, "Failed to get inventory")
 		} else {
 			fmt.eprintln("Failed to get inventory")
 		}
@@ -235,7 +235,7 @@ inventory_get :: proc(db: ^lib.Db, args: []string) -> int {
 inventory_remove :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory remove <char|npc|creature> <id> <item_id> <qty>"}`)
+			usage_error(db, "Usage: ttrpg-engine inventory remove <char|npc|creature> <id> <item_id> <qty>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine inventory remove <char|npc|creature> <id> <item_id> <qty>")
 		}
@@ -249,7 +249,7 @@ inventory_remove :: proc(db: ^lib.Db, args: []string) -> int {
 	col, ok := get_inventory_column_name(target_type)
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Target type must be 'char', 'npc', or 'creature'"}`)
+			usage_error(db, "Target type must be 'char', 'npc', or 'creature'")
 		} else {
 			fmt.eprintln("Target type must be 'char', 'npc', or 'creature'")
 		}
@@ -260,7 +260,7 @@ inventory_remove :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to remove item"}`)
+			usage_error(db, "Failed to remove item")
 		} else {
 			fmt.eprintln("Failed to remove item")
 		}
@@ -281,7 +281,7 @@ inventory_remove :: proc(db: ^lib.Db, args: []string) -> int {
 inventory_equip :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory equip <char|npc|creature> <id> <item_id> <0/1>"}`)
+			usage_error(db, "Usage: ttrpg-engine inventory equip <char|npc|creature> <id> <item_id> <0/1>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine inventory equip <char|npc|creature> <id> <item_id> <0/1>")
 		}
@@ -295,7 +295,7 @@ inventory_equip :: proc(db: ^lib.Db, args: []string) -> int {
 	col, ok := get_inventory_column_name(target_type)
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Target type must be 'char', 'npc', or 'creature'"}`)
+			usage_error(db, "Target type must be 'char', 'npc', or 'creature'")
 		} else {
 			fmt.eprintln("Target type must be 'char', 'npc', or 'creature'")
 		}
@@ -306,7 +306,7 @@ inventory_equip :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to equip item"}`)
+			usage_error(db, "Failed to equip item")
 		} else {
 			fmt.eprintln("Failed to equip item")
 		}
@@ -324,7 +324,7 @@ inventory_equip :: proc(db: ^lib.Db, args: []string) -> int {
 inventory_attune :: proc(db: ^lib.Db, args: []string) -> int {
 	if len(args) < 5 {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Usage: ttrpg-engine inventory attune <char|npc|creature> <id> <item_id> <0/1>"}`)
+			usage_error(db, "Usage: ttrpg-engine inventory attune <char|npc|creature> <id> <item_id> <0/1>")
 		} else {
 			fmt.eprintln("Usage: ttrpg-engine inventory attune <char|npc|creature> <id> <item_id> <0/1>")
 		}
@@ -338,7 +338,7 @@ inventory_attune :: proc(db: ^lib.Db, args: []string) -> int {
 	col, ok := get_inventory_column_name(target_type)
 	if !ok {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Target type must be 'char', 'npc', or 'creature'"}`)
+			usage_error(db, "Target type must be 'char', 'npc', or 'creature'")
 		} else {
 			fmt.eprintln("Target type must be 'char', 'npc', or 'creature'")
 		}
@@ -349,7 +349,7 @@ inventory_attune :: proc(db: ^lib.Db, args: []string) -> int {
 
 	if lib.db_exec(db, sql) != lib.Error.None {
 		if db.is_json {
-			fmt.println(`{"success":false,"error":"Failed to attune item"}`)
+			usage_error(db, "Failed to attune item")
 		} else {
 			fmt.eprintln("Failed to attune item")
 		}
